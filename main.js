@@ -1,5 +1,5 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
+import express from 'express';
 import "./config.js";
 import { createRequire as createRequire } from "module";
 import path, { join as pathJoin } from "path";
@@ -33,6 +33,9 @@ import {
   handlePairing,
   messageTemplates
 } from "./lib/connection.js";
+
+const app = express();
+app.use(express.json());
 
 global.__filename = function filename(url = import.meta.url, isWindows = "win32" !== processPlatform) {
   return isWindows 
@@ -333,3 +336,24 @@ await handlePairing(conn, opts);
   }
 })().then(() => conn.logger.info("✓ Quick Test Done"))
   .catch(console.error);
+
+      app.post("/webhook/send-promo", async (req, res) => {
+        const { number, message } = req.body;
+        if (!number || !message) return res.status(400).json({ error: "number & message required" });
+
+        try {
+            const jid = number.includes('@s.whatsapp.net') ? number : `${number}@s.whatsapp.net`;
+            await conn.sendMessage(jid, { text: message });
+            res.json({ status: 'ok', sent_to: number });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: 'Failed to send message' });
+        }
+    });
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, async () => {
+    await loadPlugins();
+    startBot();
+    console.log(`🚀 WhatsApp Webhook & Bot running on port ${PORT}`);
+});
