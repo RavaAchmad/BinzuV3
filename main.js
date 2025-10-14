@@ -353,7 +353,5 @@ await handlePairing(conn, opts);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, async () => {
-    await loadPlugins();
-    startBot();
     console.log(`🚀 WhatsApp Webhook & Bot running on port ${PORT}`);
 });
