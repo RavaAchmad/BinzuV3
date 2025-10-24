@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 
 // Biar 'exec' bisa pake async/await, lebih keren
 const execAsync = promisify(exec);
-
+const ytdlpath = "/home/container/BinzuV3/bin/yt-dlp"
 // Alamat proxy buat jaga-jaga kalo download error
 const PROXY_URL = "http://xmaze:xmpanel@203.194.114.50:3128";
 
@@ -36,11 +36,11 @@ const ytdl = async (url, quality = "720") => {
   // Command yt-dlp yang udah dioptimalkan
   let command;
   if (isAudio) {
-    command = `yt-dlp -x --audio-format mp3 --audio-quality 0 ${authOptions} -o "${tempFilePath}" "${url}" --no-warnings --quiet`;
+    command = `${ytdlpath} -x --audio-format mp3 --audio-quality 0 ${authOptions} -o "${tempFilePath}" "${url}" --no-warnings --quiet`;
   } else {
     // Format selector ini lebih efisien, langsung cari video terbaik <= resolusi yg diminta + audio terbaik
     const formatSelector = `"bestvideo[height<=${quality}][ext=mp4]+bestaudio[ext=m4a]/best[height<=${quality}]/best"`;
-    command = `yt-dlp -f ${formatSelector} --merge-output-format mp4 ${authOptions} -o "${tempFilePath}" "${url}" --no-warnings --quiet`;
+    command = `${ytdlpath} -f ${formatSelector} --merge-output-format mp4 ${authOptions} -o "${tempFilePath}" "${url}" --no-warnings --quiet`;
   }
 
   // Fungsi buat eksekusi command, bisa pake proxy kalo perlu
@@ -87,7 +87,7 @@ const ytdl = async (url, quality = "720") => {
   // Ambil judul video dari yt-dlp
   let videoTitle = 'N/A';
   try {
-    const { stdout } = await execAsync(`yt-dlp --get-title "${url}" --no-warnings ${authOptions}`);
+    const { stdout } = await execAsync(`${ytdlpath} --get-title "${url}" --no-warnings ${authOptions}`);
     videoTitle = stdout.trim();
   } catch (infoError) {
     console.error('Gagal dapetin judul video, pake judul default aja.');
