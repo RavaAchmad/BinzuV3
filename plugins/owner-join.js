@@ -3,6 +3,9 @@ let linkRegex = /chat.whatsapp.com\/([0-9A-Za-z]{20,24})(?:[^\d]*(\d{1,3}))?/i
 let handler = async (m, { conn, text, isOwner }) => {
     let [_, code, expired] = text.match(linkRegex) || []
     if (!code) throw 'Link invalid'
+    console.log('Invite code:', code)
+    console.log('Bot user:', conn.user?.id)
+    console.log('Connection status:', conn?.ws?.readyState)
     let res = await conn.groupAcceptInvite(code)
     expired = Math.floor(Math.min(9999, Math.max(1, isOwner ? isNumber(expired) ? parseInt(expired) : 0 : 3)))
     m.reply(`Berhasil join grup ${res}${expired ? ` selama ${expired} hari` : ''}`)
