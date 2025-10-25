@@ -1509,7 +1509,7 @@ export async function deleteUpdate(message) {
         }
         
         let chat = global.db.data.chats[remoteJid] || {};
-        if (!chat.delete) {
+        if (!chat.antiLinkdelete) {
             return;
         }
 
