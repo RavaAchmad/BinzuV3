@@ -2,10 +2,10 @@ let handler = async (m, { conn, text, command }) => {
     // CONFIG AREA - Area ini doang yang perlu lo otak-atik
     const ruangguruConfig = {
         'rg1': {
-            groupId: '120363155842131515@g.us', // ID GRUP RUANG 1
+            groupId: '120363422919131515@g.us', // ID GRUP RUANG 1
             // List orang-orang VIP yang mau ditag di rg1
             targets: [
-                '6281234567890@s.whatsapp.net', // Pak Budi (Nomor biasa)
+                '6281212035575@s.whatsapp.net', // Pak Budi (Nomor biasa)
                 '456789123456789@lid',          // Bu Siti (Pake LID, tetep bisa!)
                 '6289876543210@s.whatsapp.net'  // Pak Tono
             ]
