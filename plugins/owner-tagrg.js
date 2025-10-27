@@ -7,7 +7,7 @@ let handler = async (m, { conn, text, command }) => {
             targets: [
                 '6281212035575@s.whatsapp.net', // Pak Budi (Nomor biasa)
                 '456789123456789@lid',          // Bu Siti (Pake LID, tetep bisa!)
-                '6289876543210@s.whatsapp.net'  // Pak Tono
+                '0@s.whatsapp.net'  // Pak Tono
             ]
         },
         'rg2': {
