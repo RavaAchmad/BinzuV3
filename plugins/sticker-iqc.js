@@ -43,6 +43,7 @@ let handler = async (m, { conn, text }) => {
             react: { text: '✅', key: m.key }
         });
     } catch (e) {
+        console.error('Primary API gagal, coba fallback:', e);
         try {
             const fallbackUrl = `https://api.deline.my.id/maker/iqc?text=${encodeURIComponent(text.trim())}&chatTime=${encodeURIComponent(chatTime)}&statusBarTime=${encodeURIComponent(statusBarTime)}`;
 
