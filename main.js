@@ -196,8 +196,6 @@ global.reloadHandler = async function reloadHandler(restartConn) {
     conn.ev.off("message.delete", conn.onDelete);
     conn.ev.off("connection.update", conn.connectionUpdate);
     conn.ev.off("creds.update", conn.credsUpdate);
-    conn.ev.off("presence.update", conn.presenceUpdate);
-
   }
 
   conn.handler = handlerModule.handler.bind(global.conn);
@@ -206,7 +204,6 @@ global.reloadHandler = async function reloadHandler(restartConn) {
   conn.onDelete = handlerModule.deleteUpdate.bind(global.conn);
   conn.connectionUpdate = (update) => connectionUpdate(update, conn);
   conn.credsUpdate = saveCredentials.bind(global.conn);
-  conn.presenceUpdate = presenceUpdate.bind(global.conn);
 
   conn.ev.on("messages.upsert", conn.handler);
   conn.ev.on("group-participants.update", conn.participantsUpdate);
@@ -214,7 +211,6 @@ global.reloadHandler = async function reloadHandler(restartConn) {
   conn.ev.on("message.delete", conn.onDelete);
   conn.ev.on("connection.update", conn.connectionUpdate);
   conn.ev.on("creds.update", conn.credsUpdate);
-  conn.ev.on("presence.update", conn.presenceUpdate);
 
   isHandlerInitializing = false;
   return true;
