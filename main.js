@@ -196,7 +196,6 @@ global.reloadHandler = async function reloadHandler(restartConn) {
     conn.ev.off("message.delete", conn.onDelete);
     conn.ev.off("connection.update", conn.connectionUpdate);
     conn.ev.off("creds.update", conn.credsUpdate);
-    conn.ev.off("contacts.upsert", conn.contactsUpsert);
     conn.ev.off("presence.update", conn.presenceUpdate);
 
   }
@@ -207,7 +206,6 @@ global.reloadHandler = async function reloadHandler(restartConn) {
   conn.onDelete = handlerModule.deleteUpdate.bind(global.conn);
   conn.connectionUpdate = (update) => connectionUpdate(update, conn);
   conn.credsUpdate = saveCredentials.bind(global.conn);
-  conn.contactsUpsert = contactsUpsert.bind(global.conn); // <-- TAMBAHIN INI
   conn.presenceUpdate = presenceUpdate.bind(global.conn);
 
   conn.ev.on("messages.upsert", conn.handler);
@@ -217,7 +215,6 @@ global.reloadHandler = async function reloadHandler(restartConn) {
   conn.ev.on("connection.update", conn.connectionUpdate);
   conn.ev.on("creds.update", conn.credsUpdate);
   conn.ev.on("presence.update", conn.presenceUpdate);
-  conn.ev.on("contacts.upsert", conn.contactsUpsert);
 
   isHandlerInitializing = false;
   return true;
