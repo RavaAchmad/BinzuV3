@@ -1,62 +1,117 @@
+// ref.js
 import crypto from 'crypto'
 
-const xp_first_time = 2500
-const xp_link_creator = 15000
-const xp_bonus = {
-    5: 40000,
-   10: 100000,
-   20: 250000,
-   50: 1000000,
+const GROUP_JID = '6281371753464-1592310529@g.us' // grup official lo
+const OWNER_JID = '6281212035575@s.whatsapp.net' // notif ke lu pribadi
+const XP_FIRST_TIME = 2500
+const XP_LINK_CREATOR = 15000
+const XP_BONUS = {
+  5: 40000,
+  10: 100000,
+  20: 250000,
+  50: 1000000,
   100: 10000000,
+}
+const PENDING_TIMEOUT = 23 * 60 * 60 * 1000 // 23 jam
+const ONE_DAY = 24 * 60 * 60 * 1000
+
+function genRefCode(len = 10) {
+  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+  return Array.from({ length: len }, () => chars[crypto.randomInt(chars.length)]).join('')
+}
+function getNextMilestone(count) {
+  const keys = Object.keys(XP_BONUS).map(Number).sort((a, b) => a - b)
+  const next = keys.find(n => count < n)
+  return next ? { target: next, reward: XP_BONUS[next] } : null
 }
 
 let handler = async (m, { conn, usedPrefix, text }) => {
-  let users = global.db.data.users
+  const users = global.db.data.users = global.db.data.users || {}
+  const pending = global.db.data.pendingRefs = global.db.data.pendingRefs || {} // { jid: { refCreator, group, expiresAt, createdAt } }
+
+  // ensure user record
+  users[m.sender] = users[m.sender] || {}
+  const me = users[m.sender]
+
+  // init common fields
+  me.ref_code = me.ref_code || genRefCode()
+  me.ref_count = Number(me.ref_count || 0)
+  me.bonusClaimed = Array.isArray(me.bonusClaimed) ? me.bonusClaimed : []
+  me.exp = Number(me.exp || 0)
+  me.premiumTime = Number(me.premiumTime || 0)
+  me.ref_used = Boolean(me.ref_used || false)
+
+  // === if user supplied a code: create pending ref (must join group within 23 hours) ===
   if (text) {
-    if ('ref_count' in users[m.sender]) throw 'Tidak bisa menggunakan kode referal!'
-    let link_creator = (Object.entries(users).find(([, { ref_code }]) => ref_code === text.trim()) || [])[0]
-    if (!link_creator) throw 'Kode referal tidak valid'
-    let count = users[link_creator].ref_count++
-    let extra = xp_bonus[count] || 0
-    users[link_creator].exp += xp_link_creator + extra
-    users[m.sender].exp += xp_first_time
-    users[m.sender].ref_count = 0
-    m.reply(`
-Selamat!
-+${xp_first_time} XP
-`.trim())
-    m.reply(`
-Seseorang telah menggunakan kode referal kamu
-+${xp_link_creator + extra} XP
-`.trim(), link_creator)
-  } else {
-    let code = users[m.sender].ref_code = users[m.sender].ref_code || new Array(11).fill().map(() => [...'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'][crypto.randomInt(62)]).join('')
-    users[m.sender].ref_count = users[m.sender].ref_count ? users[m.sender].ref_count : 0
-    let command_text = `${usedPrefix}ref ${code}`
-    let command_link = `wa.me/${conn.user.jid.split('@')[0]}?text=${encodeURIComponent(command_text)}`
-    let share_text = `
-Dapatkan ${xp_first_time} XP untuk yang menggunakan link/kode referal dibawah ini
+    const code = text.trim()
+    // validate code owner
+    const targetId = Object.keys(users).find(id => users[id]?.ref_code === code)
+    if (!targetId) throw 'Kode referral tidak valid.'
+    if (targetId === m.sender) throw 'Gak bisa pakai kode sendiri.'
+    if (me.ref_used) throw 'Kamu sudah pernah pakai kode referral sebelumnya.'
 
-Referal Code: *${code}*
+    // create pending record keyed by user's jid (the one who must join)
+    const now = Date.now()
+    const expiresAt = now + PENDING_TIMEOUT
 
-${command_link}
-`.trim()
-    m.reply(`
-Dapatkan ${xp_link_creator} XP untuk setiap pengguna baru yang menggunakan kode referal kamu
-${users[m.sender].ref_count} orang telah menggunakan kode referal kamu
+    pending[m.sender] = {
+      refCreator: targetId,
+      group: GROUP_JID,
+      expiresAt,
+      createdAt: now,
+      used: false
+    }
 
-Kode referal kamu: ${code}
+    // schedule cleanup (best-effort; also cleanup on startup/db load should be considered)
+    setTimeout(() => {
+      try {
+        const p = global.db.data.pendingRefs || {}
+        if (p[m.sender] && p[m.sender].expiresAt <= Date.now()) {
+          delete p[m.sender]
+        }
+      } catch (e) { /* ignore */ }
+    }, PENDING_TIMEOUT + 1000)
 
-Bagikan link kepada teman: ${command_link}
+    // send group link (the user must join using this link within 23 hours)
+    const inviteLink = 'https://chat.whatsapp.com/IzdHOmj7n8gGJQhHzf3GyU'
+    await m.reply(
+      `✅ Kode valid. Untuk dapat premium & XP, kamu harus **bergabung ke grup official** dalam 23 jam.\n\n` +
+      `Link grup: ${inviteLink}\n\n` +
+      `Catatan: Jika kamu sudah bergabung dalam 23 jam, sistem akan mendeteksi dan memberikan reward otomatis.\n` +
+      `Kalau kamu tidak join dalam 23 jam, klaim akan dibatalkan.`
+    )
 
-atau kirim pesan kepada teman wa.me/?text=${encodeURIComponent(share_text)}
+    // notify owner that pending ref created (opsional)
+    await conn.sendMessage(OWNER_JID, { text: `Pending referral: ${m.sender} => kode dari ${targetId}\nExpires: ${new Date(expiresAt).toLocaleString()}` })
 
-${Object.entries(xp_bonus).map(([count, xp]) => `${count} Orang = Bonus ${xp} XP`).join('\n')}
-`.trim())
+    return
   }
+
+  // === .ref tanpa arg: tampilkan kode dan progress ===
+  const code = me.ref_code
+  const count = me.ref_count
+  const next = getNextMilestone(count)
+  const waLink = `wa.me/${conn.user.jid.split('@')[0]}?text=${encodeURIComponent(`${usedPrefix}ref ${code}`)}`
+  const shareText = `Gunakan kode referral ini untuk dapat ${XP_FIRST_TIME} XP:\n${code}\n${waLink}`
+
+  const premiumLeft = me.premiumTime && me.premiumTime > Date.now()
+    ? Math.max(0, Math.ceil((me.premiumTime - Date.now()) / ONE_DAY))
+    : 0
+
+  let message =
+    `Kode referral kamu: ${code}\n` +
+    `Total referral: ${count}\n` +
+    `${next ? `Target berikut: ${next.target} orang (+${next.reward} XP)\n` : 'Tidak ada milestone berikutnya atau semua milestone tercapai.\n'}` +
+    `Premium aktif: ${premiumLeft} hari tersisa\n\n` +
+    `Bagikan link ini ke teman:\n${waLink}\n\n` +
+    `Atau kirim pesan:\nwa.me/?text=${encodeURIComponent(shareText)}\n\n` +
+    `Untuk dapat 1 hari premium sebagai pengguna baru, kirim .ref <kode> ke bot lalu JOIN grup official menggunakan link yang diberikan dalam 23 jam.`
+
+  m.reply(message)
 }
-handler.help = ['ref']
-handler.tags = ['main', 'xp']
+
+handler.help = ['ref [kode]']
+handler.tags = ['xp', 'referral']
 handler.command = ['ref']
 handler.register = true
 
