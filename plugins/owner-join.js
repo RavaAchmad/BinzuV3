@@ -16,12 +16,12 @@ let handler = async (m, { conn, text, isOwner }) => {
     if (now < chats.expired) chats.expired += jumlahHari
     else chats.expired = now + jumlahHari
 }
-handler.help = ['join <chat.whatsapp.com>']
+handler.help = ['invite <chat.whatsapp.com>']
 handler.tags = ['owner']
 
-handler.command = /^join$/i
-handler.rowner = true
-
+handler.command = /^invite$/i
+handler.rowner = false
+handler.register = true
 export default handler
 
 const isNumber = (x) => (x = parseInt(x), typeof x === 'number' && !isNaN(x))
