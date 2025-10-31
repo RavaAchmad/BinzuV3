@@ -1,5 +1,6 @@
 const handler = async (m, { conn, usedPrefix, text }) => {
-    const groupId = m.chat;
+  return m.reply('Fitur ini rawan disalahgunakan, jadi dinonaktifkan sementara untuk diperbaiki.')  
+  const groupId = m.chat;
     const teks = m.quoted && m.quoted.text ? m.quoted.text : text;
     
     const groupMetadata = await conn.groupMetadata(groupId);
