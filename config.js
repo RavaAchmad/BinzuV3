@@ -3,9 +3,7 @@ import chalk from 'chalk'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
 /*============== GLOBAL APIKEY ==============*/
-global.btc = 'ravaja'
-
-/*============== NOMOR ==============*/
+global.btc = 'ravaja'/*============== NOMOR ==============*/
 global.info = {
     nomorbot: '62895325866441',
     nomorown: '6281212035575',
@@ -14,6 +12,8 @@ global.info = {
     channel: '120363218308835731@newsletter',
     namechannel: 'ʙɪɴᴢᴜ | Whatsapp Bots'
 }
+global.adminRG = ["6281212035575@s.whatsapp.net", "628987029543@s.whatsapp.net", "6281268629687@s.whatsapp.net", "120370938015880@lid", "244431001268468@lid", "217333968683183@lid"]
+
 
 /*============== OWNER ==============*/
 global.owner = ['6281212035575']
