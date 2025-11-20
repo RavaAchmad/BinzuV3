@@ -33,7 +33,6 @@ import {
   handlePairing,
   messageTemplates
 } from "./lib/connection.js";
-emitter.setMaxListeners(20);
 
 const app = express();
 app.use(express.json());
