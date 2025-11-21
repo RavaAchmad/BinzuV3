@@ -57,27 +57,40 @@ ${usedPrefix + command} muslim random
             }
 
             const url = `https://www.hadits.id/hadits/${kitab}/${nomorHadits}`
-            
+
             const response = await fetch(url)
             if (!response.ok) throw new Error('Hadits tidak ditemukan')
-            
+
             const html = await response.text()
             const $ = cheerio.load(html)
 
-            // Scraping struktur hadits.id
-            const arabText = $('div[class*="arabic"]').first().text().trim() || 
-                           $('div p').filter((i, el) => /[\u0600-\u06FF]/.test($(el).text())).first().text().trim()
-            
-            const indonesiaText = $('div[class*="translation"]').first().text().trim() ||
-                                $('div').filter((i, el) => {
-                                    const text = $(el).text()
-                                    return text.includes('Telah menceritakan') || text.includes('Telah bercerita')
-                                }).first().text().trim()
+            // === BAGIAN YANG GUE FIX ===
+            // Targetin container utamanya dulu biar scope-nya jelas
+            const content = $('article.hadits-content')
+
+            // Judul Bab ada di h1 atau h2 di dalem article
+            const judulBab = content.find('h1').text().trim() || content.find('h2').text().trim() || 'Tanpa Judul Bab'
+
+            // Teks Arab ada di tag <p> dengan class "rtl"
+            const arabText = content.find('p.rtl').first().text().trim()
+
+            // Terjemahan itu tricky, dia ada di tag <p> tapi gak punya class spesifik.
+            // Logic: Cari tag <p> yang isinya mengandung kata kunci periwayat ("Telah menceritakan", dsb)
+            // ATAU ambil elemen <p> tepat setelah teks Arab (next sibling)
+            let indonesiaText = content.find('p').filter((i, el) => {
+                const txt = $(el).text()
+                return txt.includes('Telah menceritakan') || txt.includes('Telah bercerita') || txt.includes('berkata;')
+            }).first().text().trim()
+
+            // Fallback kalo filter gagal: Ambil <p> setelah <p class="rtl">
+            if (!indonesiaText) {
+                indonesiaText = content.find('p.rtl').next('p').text().trim()
+            }
+            // ============================
             
             const namaKitab = kitab.charAt(0).toUpperCase() + kitab.slice(1)
-            const judulBab = $('h2, h3').first().text().trim() || 'Hadits Shahih'
 
-            if (!indonesiaText) throw new Error('Gagal parsing hadits')
+            if (!indonesiaText && !arabText) throw new Error('Gagal parsing hadits, struktur web mungkin berubah.')
 
             let caption = `╭─━━━━━━「 📖 HADITS 」━━━━━━─╮\n\n`
             caption += `*Kitab:* Shahih ${namaKitab}\n`
