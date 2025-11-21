@@ -92,7 +92,7 @@ ${usedPrefix + command} muslim random
 
             if (!indonesiaText && !arabText) throw new Error('Gagal parsing hadits, struktur web mungkin berubah.')
 
-            let caption = `╭─━━━━━「 📖 HADITS 」━━━━━─╮\n\n`
+            let caption = `╭─━━━━━「 HADITS 」━━━━━─╮\n\n`
             caption += `*Kitab:* Shahih ${namaKitab}\n`
             caption += `*Nomor:* ${nomorHadits}\n`
             caption += `*Bab:* ${judulBab}\n\n`
@@ -240,10 +240,10 @@ ${usedPrefix + command} muslim random
         
         const randomQuote = quotes[Math.floor(Math.random() * quotes.length)]
         
-        let caption = `╭─━━━━━━「 🔥 MOTIVASI 」━━━━━━─╮\n\n`
+        let caption = `╭─━━━━━━「 MOTIVASI 」━━━━━━─╮\n\n`
         caption += `_"${randomQuote.quote}"_\n\n`
         caption += `— ${randomQuote.author}\n\n`
-        caption += `╰─━━━━━━「 Keep Going! 💪 」━━━━━━─╯`
+        caption += `╰─━━━━━「 Keep Going 」━━━━━─╯`
         
         m.reply(caption)
     }
