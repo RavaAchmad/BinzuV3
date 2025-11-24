@@ -1,3 +1,5 @@
+import { sendButtons } from 'baileys_helper';
+
 let handler = async (m, { usedPrefix, text }) => {
     conn.absen = conn.absen ? conn.absen : {}
     let id = m.chat
@@ -5,7 +7,15 @@ let handler = async (m, { usedPrefix, text }) => {
         throw `_*Masih ada absen di chat ini!*_\n\n*${usedPrefix}hapusabsen* - untuk menghapus absen`
     }
     conn.absen[id] = [
-        m.reply(`Berhasil memulai absen!\n\n*${usedPrefix}absen* - untuk absen\n*${usedPrefix}cekabsen* - untuk mengecek absen\n*${usedPrefix}hapusabsen* - untuk menghapus data absen`),
+    await sendButtons(conn, m.chat, {
+        title: 'Absen',            // optional header
+        text: `Berhasil memulai absen!`,    // body
+        footer: 'Made with Love',            // optional footer
+        buttons: [
+            { id: `.absen`, text: 'Absen' },
+            { id: `.hapusabsen`, text : 'Hapus Absen'}       // legacy simple shape auto‑converted
+        ]
+    }),
         [],
         text
     ]
