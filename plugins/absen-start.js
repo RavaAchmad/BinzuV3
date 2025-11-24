@@ -13,8 +13,7 @@ let handler = async (m, { usedPrefix, text }) => {
         text: `Berhasil memulai absen!`,    // body
         footer: 'Made with Love',            // optional footer
         buttons: [
-            { id: `.absen`, text: 'Absen' },
-            { id: `.hapusabsen`, text : 'Hapus Absen'}       // legacy simple shape auto‑converted
+            { id: `.absen`, text: 'Absen' }      // legacy simple shape auto‑converted
         ]
     }),
         [],
