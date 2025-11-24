@@ -1,7 +1,8 @@
-import baileys from 'baileys';
+import pkg from 'baileys_helper';
 import chalk from 'chalk';
 
-const { proto, generateWAMessage, areJidsSameUser } = baileys;
+// Import dari baileys_helper yang sudah di-enhance
+const { generateWAMessage, proto, areJidsSameUser } = pkg;
 
 export async function all(m, chatUpdate) {
     if (m.isBaileys) return
