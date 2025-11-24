@@ -8,6 +8,9 @@ import fs from 'fs';
 import CFonts from 'cfonts';
 import chalk from 'chalk';
 import readline from 'readline';
+import { EventEmitter } from 'node:events';
+const emitter = new EventEmitter();
+emitter.setMaxListeners(20);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
