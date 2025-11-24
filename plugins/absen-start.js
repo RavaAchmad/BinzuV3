@@ -1,4 +1,5 @@
-import { sendButtons } from 'baileys_helper';
+import pkg from 'baileys_helper';
+const { sendButtons } = pkg;
 
 let handler = async (m, { usedPrefix, text }) => {
     conn.absen = conn.absen ? conn.absen : {}
