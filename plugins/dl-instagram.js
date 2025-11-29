@@ -1,41 +1,89 @@
-import fetch from 'node-fetch';
+import { aiopro, anydown } from '../lib/scrape.js';
 
-let handler = async (m, { conn, args, usedPrefix, command, text }) => {
-	if (!args[0]) throw `*Contoh:* ${usedPrefix}${command} https://www.instagram.com/p/ByxKbUSnubS/?utm_source=ig_web_copy_link`
+let handler = async (m, { conn, args, usedPrefix, command }) => {
+    // Cek input url
+    if (!args[0]) throw `*Contoh:* ${usedPrefix}${command} https://www.instagram.com/p/ByxKbUSnubS/`
+    
+    // Memberitahu user sedang diproses
+    m.reply('Sedang memproses, mohon tunggu...')
 
-	if (!text) throw 'Perihal Apah?'
-	var url = text.replace(/\s+/g, '+')
-		try {
-			const api = await fetch(`https://api.botcahx.eu.org/api/dowloader/igdowloader?url=${args[0]}&apikey=${btc}`)
-			const res = await api.json()
+    try {
+        let url = args[0]
+        let data;
 
-			const seen = new Set();
-			const filteredResults = [];
-			for (let item of res.result) {
-				if (!seen.has(item.url)) {
-					filteredResults.push(item);
-					seen.add(item.url);
-				}
-			}
+        // COBA SCRAPER 1 (aiopro)
+        try {
+            data = await aiopro(url)
+        } catch (e) {
+            // Jika gagal, COBA SCRAPER 2 (anydown)
+            try {
+                data = await anydown(url)
+            } catch (err) {
+                throw 'Kedua scraper gagal mengambil data. Coba lagi nanti.'
+            }
+        }
 
-			const limitnya = 999;
-			for (let i = 0; i < Math.min(limitnya, filteredResults.length); i++) {
-				await sleep(3000);
-				conn.sendFile(m.chat, filteredResults[i].url, null, `*Instagram Downloader*`, m)
-			}
-		} catch (e) {
-			m.reply('Server Error!');
-			console.log(e)
-		}
-	}
+        // Validasi data hasil scrape
+        if (!data) throw 'Tidak ada data yang ditemukan.'
+        
+        // Normalisasi hasil output (karena API sering berubah struktur)
+        // Biasanya API ini mengembalikan properti 'medias' atau 'url'
+        let results = []
+        
+        if (data.medias && data.medias.length > 0) {
+            results = data.medias
+        } else if (data.url) {
+            results = [{ url: data.url, extension: data.extension || 'mp4' }]
+        } else {
+            // Coba cari array di dalam object jika struktur beda
+            results = Object.values(data).filter(v => v && typeof v === 'object' && v.url)
+        }
 
+        if (results.length === 0) throw 'Konten tidak ditemukan atau url bersifat privat.'
 
-handler.help = ['instagram'].map(v => v + ' <url>')
+        // Filter duplikat URL dan ambil kualitas terbaik (jika ada opsi kualitas)
+        // Kita gunakan Set untuk menyimpan url unik
+        const seen = new Set();
+        const filteredResults = [];
+
+        for (let item of results) {
+            // Pastikan item punya url
+            if (item.url && !seen.has(item.url)) {
+                // Filter tambahan: kadang API kasih versi audio saja (m4a), kita skip kalau mau video/gambar saja
+                // Hapus baris 'item.extension === ...' jika ingin download semuanya termasuk audio
+                if (item.extension !== 'm4a') { 
+                    filteredResults.push(item);
+                    seen.add(item.url);
+                }
+            }
+        }
+
+        // Kirim hasil ke chat
+        const limitnya = 99; // Batasi jumlah file untuk mencegah spam jika albumnya banyak
+        
+        for (let i = 0; i < Math.min(limitnya, filteredResults.length); i++) {
+            let fileUrl = filteredResults[i].url
+            let isVideo = filteredResults[i].extension === 'mp4' || fileUrl.includes('.mp4')
+            
+            // Delay sedikit biar ga ke-banned WA
+            if (i > 0) await sleep(150);
+
+            await conn.sendFile(m.chat, fileUrl, null, `*Instagram Downloader* (${i + 1}/${Math.min(limitnya, filteredResults.length)})`, m)
+        }
+
+    } catch (e) {
+        console.error(e)
+        m.reply(`Terjadi kesalahan: ${e}`)
+    }
+}
+
+handler.help = ['instagram', 'ig'].map(v => v + ' <url>')
 handler.tags = ['downloader']
-handler.command = /^(ig|instagram|igdl|instagramdl|igstroy)$/i
+handler.command = /^(ig|instagram|igdl|instagramdl|igstory)$/i
 handler.limit = true
+
 export default handler
 
 function sleep(ms) {
-	return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
