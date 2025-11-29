@@ -15,11 +15,11 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         try {
             data = await aiopro(url)
         } catch (e) {
-            // Jika gagal, COBA SCRAPER 2 (anydown)
+            console.error(e);
             try {
                 data = await anydown(url)
             } catch (err) {
-                throw 'Coba lagi nanti.'
+				console.error(err);	
             }
         }
 
@@ -73,7 +73,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
     } catch (e) {
         console.error(e)
-        m.reply(`Terjadi kesalahan: ${e}`)
+        m.reply(`Server down coba lagi nanti ya niggs`)
     }
 }
 
