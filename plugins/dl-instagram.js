@@ -19,8 +19,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
             try {
                 data = await anydown(url)
             } catch (err) {
-				console.error(err)
-                throw 'Kedua scraper gagal mengambil data. Coba lagi nanti.'
+                throw 'Coba lagi nanti.'
             }
         }
 
