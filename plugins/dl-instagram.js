@@ -1,89 +1,160 @@
-import { aiopro, anydown } from '../lib/scrape.js';
+import axios from 'axios';
+import * as cheerio from 'cheerio';
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
-    // Cek input url
-    if (!args[0]) throw `*Contoh:* ${usedPrefix}${command} https://www.instagram.com/p/ByxKbUSnubS/`
+    // Validasi input URL
+    if (!args[0]) throw `*Contoh:* ${usedPrefix}${command} https://www.instagram.com/p/ByxKbUSnubS/`;
     
-    // Memberitahu user sedang diproses
-    m.reply('Sedang memproses, mohon tunggu...')
+    const url = args[0];
+    
+    // Validasi URL Instagram
+    if (!url.match(/instagram\.com\/(p|reel|tv|stories)\/[\w-]+/i)) {
+        throw 'URL Instagram tidak valid!';
+    }
+    
+    m.reply('Sedang memproses, mohon tunggu...');
 
     try {
-        let url = args[0]
-        let data;
-
-        // COBA SCRAPER 1 (aiopro)
-        try {
-            data = await aiopro(url)
-        } catch (e) {
-            console.error(e);
-            try {
-                data = await anydown(url)
-            } catch (err) {
-				console.error(err);	
-            }
+        const mediaUrls = await instasaveDownload(url);
+        
+        if (!mediaUrls || mediaUrls.length === 0) {
+            throw 'Konten tidak ditemukan atau URL bersifat privat.';
         }
 
-        // Validasi data hasil scrape
-        if (!data) throw 'Tidak ada data yang ditemukan.'
-        
-        // Normalisasi hasil output (karena API sering berubah struktur)
-        // Biasanya API ini mengembalikan properti 'medias' atau 'url'
-        let results = []
-        
-        if (data.medias && data.medias.length > 0) {
-            results = data.medias
-        } else if (data.url) {
-            results = [{ url: data.url, extension: data.extension || 'mp4' }]
-        } else {
-            // Coba cari array di dalam object jika struktur beda
-            results = Object.values(data).filter(v => v && typeof v === 'object' && v.url)
-        }
+        const limit = 10; // Batasi maksimal 10 media
+        const totalMedia = Math.min(limit, mediaUrls.length);
 
-        if (results.length === 0) throw 'Konten tidak ditemukan atau url bersifat privat.'
-
-        // Filter duplikat URL dan ambil kualitas terbaik (jika ada opsi kualitas)
-        // Kita gunakan Set untuk menyimpan url unik
-        const seen = new Set();
-        const filteredResults = [];
-
-        for (let item of results) {
-            // Pastikan item punya url
-            if (item.url && !seen.has(item.url)) {
-                // Filter tambahan: kadang API kasih versi audio saja (m4a), kita skip kalau mau video/gambar saja
-                // Hapus baris 'item.extension === ...' jika ingin download semuanya termasuk audio
-                if (item.extension !== 'm4a') { 
-                    filteredResults.push(item);
-                    seen.add(item.url);
-                }
-            }
-        }
-
-        // Kirim hasil ke chat
-        const limitnya = 99; // Batasi jumlah file untuk mencegah spam jika albumnya banyak
-        
-        for (let i = 0; i < Math.min(limitnya, filteredResults.length); i++) {
-            let fileUrl = filteredResults[i].url
-            let isVideo = filteredResults[i].extension === 'mp4' || fileUrl.includes('.mp4')
+        for (let i = 0; i < totalMedia; i++) {
+            const { url: mediaUrl, type } = mediaUrls[i];
             
-            // Delay sedikit biar ga ke-banned WA
-            if (i > 0) await sleep(150);
+            // Delay untuk mencegah banned
+            if (i > 0) await sleep(200);
 
-            await conn.sendFile(m.chat, fileUrl, null, `*Instagram Downloader* (${i + 1}/${Math.min(limitnya, filteredResults.length)})`, m)
+            try {
+                await conn.sendFile(
+                    m.chat, 
+                    mediaUrl, 
+                    null, 
+                    `*Instagram Downloader*\nTipe: ${type}\n(${i + 1}/${totalMedia})`, 
+                    m
+                );
+            } catch (err) {
+                console.error(`Gagal mengirim media ${i + 1}:`, err);
+            }
         }
 
     } catch (e) {
-        console.error(e)
-        m.reply(`Server down coba lagi nanti ya niggs`)
+        console.error(e);
+        const errorMsg = e.message || 'Terjadi kesalahan saat memproses.';
+        m.reply(`❌ ${errorMsg}\n\nCoba lagi nanti atau gunakan URL yang berbeda.`);
     }
 }
 
-handler.help = ['instagram', 'ig'].map(v => v + ' <url>')
-handler.tags = ['downloader']
-handler.command = /^(ig|instagram|igdl|instagramdl|igstory)$/i
-handler.limit = true
 
-export default handler
+handler.help = ['instagram', 'ig'].map(v => v + ' <url>');
+handler.tags = ['downloader'];
+handler.command = /^(ig|instagram|igdl|instagramdl|igreels?)$/i;
+handler.limit = true;
 
+export default handler;
+
+
+/**
+ * Download dari instasave.website dengan deteksi tipe media
+ */
+async function instasaveDownload(url) {
+    try {
+        // Request ke API instasave
+        const response = await axios.post(
+            'https://api.instasave.website/media',
+            `url=${encodeURIComponent(url)}`,
+            {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                },
+                timeout: 30000
+            }
+        );
+
+        const html = response.data;
+        
+        // Extract semua URL CDN menggunakan regex
+        const cdnUrlRegex = /https:\/\/cdn\.instasave\.website\/\?token=[^"'\s\\]+/g;
+        const matches = html.match(cdnUrlRegex);
+        
+        if (!matches || matches.length === 0) {
+            throw new Error('Tidak ada media ditemukan');
+        }
+
+        // Hapus duplikat
+        const uniqueUrls = [...new Set(matches)];
+        
+        // Deteksi tipe media untuk setiap URL
+        const mediaList = await Promise.all(
+            uniqueUrls.map(async (cdnUrl) => {
+                const type = await detectMediaType(cdnUrl);
+                return { url: cdnUrl, type };
+            })
+        );
+
+        return mediaList;
+
+    } catch (error) {
+        console.error('Error instasaveDownload:', error.message);
+        throw new Error('Gagal mengambil data dari Instagram');
+    }
+}
+
+/**
+ * Deteksi tipe media melalui HEAD request dan analisis URL
+ */
+async function detectMediaType(url) {
+    try {
+        // Cek dari URL pattern terlebih dahulu (lebih cepat)
+        const urlLower = url.toLowerCase();
+        
+        // Decode JWT token untuk cek filename
+        if (url.includes('?token=')) {
+            try {
+                const token = url.split('?token=')[1];
+                const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+                
+                if (payload.filename) {
+                    const ext = payload.filename.split('.').pop().toLowerCase();
+                    if (ext === 'mp4' || ext === 'mov') return 'video';
+                    if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return 'image';
+                }
+            } catch (e) {
+                // Jika gagal decode, lanjut ke method lain
+            }
+        }
+
+        // Fallback: HEAD request untuk cek Content-Type
+        const response = await axios.head(url, {
+            timeout: 5000,
+            maxRedirects: 5,
+            validateStatus: () => true
+        });
+
+        const contentType = response.headers['content-type'] || '';
+        
+        if (contentType.includes('video')) return 'video';
+        if (contentType.includes('image')) return 'image';
+        
+        // Default ke image jika tidak terdeteksi
+        return 'image';
+
+    } catch (error) {
+        console.error('Error detectMediaType:', error.message);
+        // Default return image jika error
+        return 'image';
+    }
+}
+
+/**
+ * Helper function untuk delay
+ */
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
