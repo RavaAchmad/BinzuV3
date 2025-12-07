@@ -21,7 +21,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
             throw 'Konten tidak ditemukan atau URL bersifat privat.';
         }
 
-        const limit = 10; // Batasi maksimal 10 media
+        const limit = 99; // Batasi maksimal 10 media
         const totalMedia = Math.min(limit, mediaUrls.length);
 
         for (let i = 0; i < totalMedia; i++) {
@@ -89,10 +89,10 @@ async function instasaveDownload(url) {
 
         // Hapus duplikat
         const uniqueUrls = [...new Set(matches)];
-        
+        const mediaUrls = uniqueUrls.slice(1);
         // Deteksi tipe media untuk setiap URL
         const mediaList = await Promise.all(
-            uniqueUrls.map(async (cdnUrl) => {
+            mediaUrls.map(async (cdnUrl) => {
                 const type = await detectMediaType(cdnUrl);
                 return { url: cdnUrl, type };
             })
