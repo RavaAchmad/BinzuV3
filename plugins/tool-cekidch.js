@@ -12,8 +12,8 @@ let handler = async (m, { conn, text }) => {
 
     try {
         // Ambil kode channel
-        texts = text?.trim?.() || ""
-        const code = texts.match(/channel\/([A-Za-z0-9]+)/)?.[1]
+        text = text?.trim?.() || ""
+        const code = text.match(/channel\/([A-Za-z0-9]+)/)?.[1]
         if (!code) return m.reply('Kode channel-nya ga ketangkep bro 😭')
 
         // Ambil metadata dari Baileys
