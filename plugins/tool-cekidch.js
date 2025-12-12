@@ -53,11 +53,11 @@ ${metadata.description || '(No Description)'}
 
         // Kirim hasil
         await conn.relayMessage(m.chat, msg.message, { messageId: msg.key.id })
-        return m.sendReact('✅')
+        return conn.sendMessage(m.chat, { react: { text: '✅', key: m.key }})
 
     } catch (err) {
         console.log(err)
-        m.sendReact('❌')
+        conn.sendMessage(m.chat, { react: { text: '❌', key: m.key }})
         return m.reply('Gagal ambil informasi channel bro 😭\nCek link atau coba lagi.')
     }
 }
