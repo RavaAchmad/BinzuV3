@@ -18,7 +18,11 @@ let handler = async (m, { conn, text }) => {
 
         // Ambil metadata dari Baileys
         const metadata = await conn.newsletterMetadata('invite', code)
-        await m.reply('*RAW METADATA*\n```json\n' + JSON.stringify(metadata, null, 2) + '\n```')
+        // await m.reply('*RAW METADATA*\n```json\n' + JSON.stringify(metadata, null, 2) + '\n```')
+        const name = metadata.name ?? metadata.thread_metadata?.name?.text ?? '-'
+        const sub = metadata.subscribers_count ?? metadata.subscribers ?? '-'
+        const desc = metadata.description ?? metadata.thread_metadata?.description?.text ?? '(No Description)'
+
         // Build pesan info channel
         const msg = generateWAMessageFromContent(
             m.chat,
@@ -26,13 +30,13 @@ let handler = async (m, { conn, text }) => {
                 extendedTextMessage: {
                     text: `╭─「 CHANNEL INFO 」
 ├ ID: ${metadata.id}
-├ Name: ${metadata.name}
-├ Created: ${unixToDate(metadata.creation_time)}
-├ Subscribers: ${metadata.subscribers}
-├ Link: https://whatsapp.com/channel/${metadata.invite}
+├ Name: ${name}
+├ Created: ${unixToDate(metadata.thread_metadata?.creation_time)}
+├ Subscribers: ${sub}
+├ Link: https://whatsapp.com/channel/${metadata.thread_metadata?.invite}
 │
 ├ Description:
-${metadata.description || '(No Description)'}
+${desc}
 ╰──────────────────`,
                     contextInfo: {
                         isForwarded: true,
