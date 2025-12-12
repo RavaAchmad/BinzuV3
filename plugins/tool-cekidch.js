@@ -12,15 +12,13 @@ let handler = async (m, { conn, text }) => {
 
     try {
         // Ambil kode channel
-        text = text?.trim?.() || ""
-        if (typeof text === 'object')
-        text = JSON.stringify(text, null, 2)
-        const code = text.match(/channel\/([A-Za-z0-9]+)/)?.[1]
+        texts = text?.trim?.() || ""
+        const code = texts.match(/channel\/([A-Za-z0-9]+)/)?.[1]
         if (!code) return m.reply('Kode channel-nya ga ketangkep bro 😭')
 
         // Ambil metadata dari Baileys
         const metadata = await conn.newsletterMetadata('invite', code)
-        await m.reply(metadata)
+        await m.reply('*RAW METADATA*\n```json\n' + JSON.stringify(metadata, null, 2) + '\n```')
         // Build pesan info channel
         const msg = generateWAMessageFromContent(
             m.chat,
