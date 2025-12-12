@@ -21,6 +21,7 @@ Pilih kitab hadits yang mau dicari:
 *Cara pakai:*
 ${usedPrefix + command} bukhari 1
 ${usedPrefix + command} muslim random
+${usedPrefix + command} (pilih hadits) random
 
 ╰─━━━━━━「 hadits.id 」━━━━━━─╯`)
         }
