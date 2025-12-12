@@ -57,7 +57,7 @@ ${metadata.description || '(No Description)'}
 
     } catch (err) {
         console.log(err)
-        m.react('❌')
+        m.sendReact('❌')
         return m.reply('Gagal ambil informasi channel bro 😭\nCek link atau coba lagi.')
     }
 }
