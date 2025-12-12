@@ -17,7 +17,7 @@ let handler = async (m, { conn, text }) => {
 
         // Ambil metadata dari Baileys
         const metadata = await conn.newsletterMetadata('invite', code)
-
+        await m.reply(metadata)
         // Build pesan info channel
         const msg = generateWAMessageFromContent(
             m.chat,
