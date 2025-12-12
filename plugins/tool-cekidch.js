@@ -1,44 +1,64 @@
+// tool-cekidch.js
+import { proto, generateWAMessageFromContent } from 'baileys'
 
 let handler = async (m, { conn, text }) => {
-    if (!text) return m.reply('Kirim link channel dulu bro 😭\ncontoh:\n.cekidch https://whatsapp.com/channel/0029VaEYcmbBfxo8vhE5iS1b')
-
-    let url = text.trim()
-
-    if (!/https?:\/\/(www\.)?whatsapp\.com\/channel\//i.test(url)) {
-        return m.reply('Linknya ga valid bro 💀\nHarus link channel WA.')
+    if (!text) {
+        return m.reply('Kirim link channel dulu bro 😭\ncontoh:\n.cekidch https://whatsapp.com/channel/0029VaEYcmbBfxo8vhE5iS1b')
     }
 
-    // ambil ID public dari link
-    let publicId = url.split('/').pop()
-
-    if (!/^[A-Za-z0-9]+$/.test(publicId)) {
-        return m.reply('ID channel ga bisa diambil. Linknya invalid.')
+    if (!text.includes('whatsapp.com/channel/')) {
+        return m.reply('Bro itu bukan link channel 😭\nPake format:\nhttps://whatsapp.com/channel/KODE')
     }
-
-    let fakeJid = publicId + '@newsletter' // public JID
 
     try {
-        // JOIN channel (WA otomatis convert ke numeric JID)
-        let follow = await conn.newsletterFollow(fakeJid)
+        // Ambil kode channel
+        const code = text.match(/channel\/([A-Za-z0-9]+)/)?.[1]
+        if (!code) return m.reply('Kode channel-nya ga ketangkep bro 😭')
 
-        let numericJid = follow?.jid || null
-        if (!numericJid) return m.reply('Gagal ambil numeric JID bro')
+        // Ambil metadata dari Baileys
+        const metadata = await conn.newsletterMetadata('invite', code)
 
-        // SILENT LEAVE (hapus follow state lokal, tanpa spam unsub)
-        delete conn.chats[numericJid]
-        if (conn.store) await conn.store.save()
+        // Build pesan info channel
+        const msg = generateWAMessageFromContent(
+            m.chat,
+            proto.Message.fromObject({
+                extendedTextMessage: {
+                    text: `╭─「 CHANNEL INFO 」
+├ ID: ${metadata.id}
+├ Name: ${metadata.name}
+├ Created: ${unixToDate(metadata.creation_time)}
+├ Subscribers: ${metadata.subscribers}
+├ Link: https://whatsapp.com/channel/${metadata.invite}
+│
+├ Description:
+${metadata.description || '(No Description)'}
+╰──────────────────`,
+                    contextInfo: {
+                        isForwarded: true,
+                        forwardingScore: 999999,
+                        externalAdReply: {
+                            title: `乂 ${metadata.name} 乂`,
+                            body: `Channel Information`,
+                            mediaType: 1,
+                            previewType: 0,
+                            renderLargerThumbnail: true,
+                            thumbnailUrl: metadata.pictureUrl || global.thum,
+                            sourceUrl: `https://whatsapp.com/channel/${metadata.invite}`
+                        }
+                    }
+                }
+            }),
+            { userJid: m.chat, quoted: m }
+        )
 
-        // hasil
-        let out = `🔥 *Numeric JID Berhasil Dicuri!*\n\n` +
-                  `🔗 Link: ${url}\n` +
-                  `🆔 Public ID: *${publicId}@newsletter*\n` +
-                  `📡 Numeric JID Asli: *${numericJid}*\n\n` +
-
-        await conn.reply(m.chat, out, m)
+        // Kirim hasil
+        await conn.relayMessage(m.chat, msg.message, { messageId: msg.key.id })
+        return m.react('✅')
 
     } catch (err) {
         console.log(err)
-        return m.reply('Error pas join bro… mungkin link udah mati atau WA ngeblok.\n' + err)
+        m.react('❌')
+        return m.reply('Gagal ambil informasi channel bro 😭\nCek link atau coba lagi.')
     }
 }
 
@@ -47,3 +67,25 @@ handler.tags = ['tools']
 handler.command = /^cekidch$/i
 
 export default handler
+
+
+// =============================
+// FUNCTION — unixToDate()
+// =============================
+function unixToDate(ts) {
+    if (!ts) return '-'
+
+    // Normalisasi detik/milidetik
+    if (String(ts).length === 10) ts = ts * 1000
+
+    const d = new Date(ts)
+    if (isNaN(d.getTime())) return '-'
+
+    return d.toLocaleString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    })
+}
