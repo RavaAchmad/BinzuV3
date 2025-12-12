@@ -12,6 +12,9 @@ let handler = async (m, { conn, text }) => {
 
     try {
         // Ambil kode channel
+        text = text?.trim?.() || ""
+        if (typeof text === 'object')
+        text = JSON.stringify(text, null, 2)
         const code = text.match(/channel\/([A-Za-z0-9]+)/)?.[1]
         if (!code) return m.reply('Kode channel-nya ga ketangkep bro 😭')
 
