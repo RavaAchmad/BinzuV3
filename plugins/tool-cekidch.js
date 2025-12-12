@@ -53,7 +53,7 @@ ${metadata.description || '(No Description)'}
 
         // Kirim hasil
         await conn.relayMessage(m.chat, msg.message, { messageId: msg.key.id })
-        return m.react('✅')
+        return m.sendReact('✅')
 
     } catch (err) {
         console.log(err)
