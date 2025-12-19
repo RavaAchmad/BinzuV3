@@ -15,77 +15,49 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     });
     
     try {
-        // Fetch video info dengan retry
+        // Fetch video info
         await conn.sendMessage(m.chat, {
             text: '🔍 Mengambil informasi video...',
             edit: statusMsg.key
         });
         
-        let json;
-        let lastError;
-        
-        // Coba beberapa kali dengan delay
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            try {
-                const res = await fetch(`https://api.ryzumi.vip/api/downloader/fbdl?url=${encodeURIComponent(args[0])}`, {
-                    method: 'GET',
-                    headers: {
-                        'accept': 'application/json',
-                        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-                        'referer': 'https://api.ryzumi.vip/',
-                        'origin': 'https://api.ryzumi.vip',
-                        'accept-language': 'en-US,en;q=0.9',
-                        'accept-encoding': 'gzip, deflate, br',
-                        'sec-ch-ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-                        'sec-ch-ua-mobile': '?0',
-                        'sec-ch-ua-platform': '"Windows"',
-                        'sec-fetch-dest': 'empty',
-                        'sec-fetch-mode': 'cors',
-                        'sec-fetch-site': 'same-origin'
-                    },
-                    timeout: 30000
-                });
-                
-                if (res.ok) {
-                    json = await res.json();
-                    break;
-                } else {
-                    lastError = `HTTP ${res.status}: ${res.statusText}`;
-                    
-                    if (attempt < 3) {
-                        await conn.sendMessage(m.chat, {
-                            text: `⚠️ Percobaan ${attempt} gagal (${res.status})\n🔄 Mencoba lagi...`,
-                            edit: statusMsg.key
-                        });
-                        await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Delay bertahap
-                    }
-                }
-            } catch (err) {
-                lastError = err.message;
-                
-                if (attempt < 3) {
-                    await conn.sendMessage(m.chat, {
-                        text: `⚠️ Percobaan ${attempt} gagal\n🔄 Mencoba lagi...`,
-                        edit: statusMsg.key
-                    });
-                    await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
-                }
+        const res = await fetch(`https://api.ryzumi.vip/api/downloader/fbdl?url=${encodeURIComponent(args[0])}`, {
+            method: 'GET',
+            headers: {
+                'accept': 'application/json',
+                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
             }
+        });
+        
+        if (!res.ok) {
+            throw `HTTP Error: ${res.status} ${res.statusText}`;
         }
         
-        if (!json) {
-            throw `Gagal mengambil data setelah 3 percobaan.\nError: ${lastError}\n\nKemungkinan:\n• API sedang down\n• Rate limit exceeded\n• Link tidak valid\n• Video private/terhapus`;
-        }
+        const json = await res.json();
         
         if (!json.status || !json.data || json.data.length === 0) {
             throw `Video tidak ditemukan atau link tidak valid`;
         }
         
-        // Cari video dengan resolusi tertinggi (HD/720p)
-        let videoData = json.data.find(v => v.resolution && v.resolution.includes('HD')) || json.data[0];
+        // Prioritas: 1080p > 720p HD
+        // Tapi 1080p perlu di-render dulu, jadi pilih 720p HD untuk simplicity
+        let videoData = json.data.find(v => 
+            v.type === 'video' && 
+            v.resolution && 
+            v.resolution.includes('HD')
+        ) || json.data.find(v => v.type === 'video') || json.data[0];
         
         if (!videoData || !videoData.url) {
             throw `URL video tidak ditemukan dalam response`;
+        }
+        
+        // Jika tipe image dengan shouldRender, skip (perlu proses render yang kompleks)
+        if (videoData.type === 'image' && videoData.shouldRender) {
+            // Cari alternatif video direct
+            videoData = json.data.find(v => v.type === 'video');
+            if (!videoData || !videoData.url) {
+                throw `Video memerlukan rendering. Coba gunakan link Facebook lain atau tunggu beberapa saat.`;
+            }
         }
         
         await conn.sendMessage(m.chat, {
@@ -97,23 +69,19 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         const videoUrl = videoData.url;
         const tempFile = path.join(tmpdir(), `fb_${Date.now()}.mp4`);
         
-        // Download dengan headers yang lebih lengkap
+        // Download dengan headers yang sesuai
         const downloadResponse = await fetch(videoUrl, {
             method: 'GET',
             headers: {
                 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
                 'accept': 'video/mp4,video/*,*/*',
-                'accept-encoding': 'identity',
                 'accept-language': 'en-US,en;q=0.9',
                 'referer': 'https://www.facebook.com/',
-                'origin': 'https://www.facebook.com',
                 'sec-fetch-dest': 'video',
                 'sec-fetch-mode': 'no-cors',
-                'sec-fetch-site': 'cross-site',
-                'range': 'bytes=0-'
+                'sec-fetch-site': 'cross-site'
             },
-            redirect: 'follow',
-            timeout: 60000
+            redirect: 'follow'
         });
         
         if (!downloadResponse.ok) {
@@ -122,7 +90,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         
         const totalSize = parseInt(downloadResponse.headers.get('content-length') || '0');
         let downloadedSize = 0;
-        let lastProgress = -10; // Mulai dari -10 agar update pertama langsung muncul
+        let lastProgress = -10;
         let lastUpdateTime = Date.now();
         
         // Create write stream
@@ -136,7 +104,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
                 const progress = Math.floor((downloadedSize / totalSize) * 100);
                 const now = Date.now();
                 
-                // Update setiap 10% atau setiap 3 detik (mana yang lebih dulu)
+                // Update setiap 10% atau setiap 3 detik
                 if (progress - lastProgress >= 10 || now - lastUpdateTime >= 3000) {
                     lastProgress = progress;
                     lastUpdateTime = now;
@@ -155,7 +123,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
                     }
                 }
             } else {
-                // Jika content-length tidak ada, update berdasarkan waktu
+                // Fallback jika tidak ada content-length
                 const now = Date.now();
                 if (now - lastUpdateTime >= 5000) {
                     lastUpdateTime = now;
@@ -187,6 +155,10 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         
         if (fileSizeMB > 100) {
             throw `Video terlalu besar (${fileSizeMB.toFixed(2)} MB). Maksimal 100 MB.`;
+        }
+        
+        if (fileSizeMB < 0.1) {
+            throw `File video terlalu kecil atau corrupt (${fileSizeMB.toFixed(2)} MB)`;
         }
         
         // Kirim video
@@ -221,11 +193,10 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
             errorMessage += `${error}\n`;
         }
         
-        errorMessage += '\n💡 Solusi:\n';
+        errorMessage += '\n💡 Tips:\n';
         errorMessage += '• Pastikan link Facebook valid\n';
         errorMessage += '• Video tidak private/terhapus\n';
-        errorMessage += '• Coba beberapa saat lagi\n';
-        errorMessage += '• Gunakan link alternatif (fb.watch atau facebook.com)';
+        errorMessage += '• Coba link alternatif (fb.watch)';
         
         try {
             await conn.sendMessage(m.chat, {
@@ -233,7 +204,6 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
                 edit: statusMsg.key
             });
         } catch (e) {
-            // Jika edit gagal, kirim pesan baru
             m.reply(errorMessage);
         }
     }
@@ -241,7 +211,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
 // Fungsi untuk membuat progress bar
 function createProgressBar(percentage) {
-    const filled = Math.floor(percentage / 5); // 20 blok untuk 100%
+    const filled = Math.floor(percentage / 5);
     const empty = 20 - filled;
     const bar = '█'.repeat(filled) + '░'.repeat(empty);
     return `[${bar}]`;
