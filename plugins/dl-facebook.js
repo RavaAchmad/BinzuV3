@@ -5,19 +5,14 @@ import fs from 'fs';
 import path from 'path';
 import { tmpdir } from 'os';
 import { exec } from 'child_process';
-import { JSDOM } from 'jsdom';
 
 const streamPipeline = promisify(pipeline);
 const execPromise = promisify(exec);
 
 // ============================================================
-// SNAPVID AJAX CORE
+// SNAPVID AJAX - DEFENSIVE APPROACH
 // ============================================================
 
-/**
- * AJAX request ke SnapVid endpoint
- * Returns: { success: boolean, data: string (HTML) }
- */
 async function fetchSnapVidAjax(fbUrl) {
     const endpoint = 'https://snapvid.net/api/ajaxSearch';
     
@@ -39,12 +34,11 @@ async function fetchSnapVidAjax(fbUrl) {
         'Sec-Fetch-Site': 'same-origin'
     };
     
-    // Build form data
     const formData = new URLSearchParams({
         'q': fbUrl,
         'lang': 'en',
         'v': 'facebook',
-        'cftoken': '' // Empty or placeholder
+        'cftoken': ''
     });
     
     try {
@@ -53,18 +47,28 @@ async function fetchSnapVidAjax(fbUrl) {
             headers: headers,
             body: formData.toString(),
             redirect: 'follow',
-            compress: true
+            compress: true,
+            timeout: 30000
         });
         
         if (!response.ok) {
-            throw new Error(`SnapVid AJAX failed: ${response.status} ${response.statusText}`);
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
         const json = await response.json();
         
-        // Validate response structure
-        if (!json.data || typeof json.data !== 'string') {
-            throw new Error('Invalid SnapVid response structure');
+        // ✅ DEFENSIVE VALIDATION (bukan expect struktur fix)
+        // Yang penting ada data string, apapun field lainnya
+        if (!json || typeof json.data !== 'string') {
+            // Coba field alternatif
+            if (json.msg && typeof json.msg === 'string') {
+                return { success: true, data: json.msg };
+            }
+            if (json.html && typeof json.html === 'string') {
+                return { success: true, data: json.html };
+            }
+            
+            throw new Error('SnapVid response has no HTML data');
         }
         
         return {
@@ -82,100 +86,123 @@ async function fetchSnapVidAjax(fbUrl) {
 }
 
 // ============================================================
-// HTML PARSER (CRITICAL SECTION)
+// HTML PARSER - CHAOS-READY
 // ============================================================
 
 /**
- * Parse HTML dari SnapVid response
- * Returns: Array of { quality, type, videoUrl, audioUrl }
- * 
- * RAWAN ERROR:
- * - HTML structure berubah
- * - Class names berubah
- * - Attribute names berubah
+ * Parse HTML chaos dari SnapVid
+ * Tiga layer parsing:
+ * 1. Multi-regex patterns (cover berbagai format HTML)
+ * 2. URL extraction fallback
+ * 3. Emergency fbcdn.net scraper
  */
 function parseSnapVidHTML(htmlString) {
     const results = [];
     
+    // 🐛 DEBUG MODE (uncomment untuk investigasi)
+    // fs.writeFileSync('/tmp/snapvid_debug.html', htmlString);
+    // console.log('[DEBUG] HTML saved to /tmp/snapvid_debug.html');
+    
     try {
-        const dom = new JSDOM(htmlString);
-        const document = dom.window.document;
+        // ============================================================
+        // PATTERN 1: Link dengan quality explicit
+        // <a href="URL">Download 1080p</a>
+        // <a href="URL">Render 720p (HD)</a>
+        // ============================================================
+        const pattern1 = /<a[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi;
+        let match;
         
-        // Find all download links/buttons
-        // PATTERN 1: <a> tags dengan class download-link
-        const downloadLinks = document.querySelectorAll('a.download-link, a[href*="fbcdn"], a[href*="video"]');
-        
-        downloadLinks.forEach(link => {
-            const href = link.getAttribute('href');
-            const text = link.textContent.trim().toLowerCase();
+        while ((match = pattern1.exec(htmlString)) !== null) {
+            const url = match[1];
+            const linkText = match[2];
             
-            // Skip invalid URLs
-            if (!href || href === '#' || href === 'javascript:void(0)') return;
+            // Skip invalid links
+            if (!url || url === '#' || url.startsWith('javascript:')) continue;
             
-            // Extract quality dari text atau data attribute
-            let quality = 'Unknown';
-            const qualityMatch = text.match(/(\d+p)|(\d+x\d+)|(hd)|(sd)/i);
-            if (qualityMatch) {
-                quality = qualityMatch[0];
-            }
+            // Skip snapcdn token URLs (expire dalam 1 jam)
+            if (url.includes('snapcdn.app') && url.includes('token=')) continue;
             
-            // Data attributes fallback
-            if (link.hasAttribute('data-quality')) {
-                quality = link.getAttribute('data-quality');
-            }
+            // Extract quality dari text
+            const qualityMatch = linkText.match(/(\d+p|HD|SD|Full\s*HD|1080|720|480|360)/i);
+            const quality = qualityMatch ? qualityMatch[1].toUpperCase() : 'Unknown';
             
-            // Determine type: direct atau render
-            let type = 'direct';
-            if (text.includes('render') || link.classList.contains('render-required')) {
-                type = 'render';
-            }
+            // Detect type
+            const isRender = linkText.toLowerCase().includes('render');
+            const type = isRender ? 'render' : 'direct';
             
             results.push({
                 quality: quality,
                 type: type,
-                videoUrl: href,
+                videoUrl: url,
                 audioUrl: null
             });
-        });
+        }
         
-        // PATTERN 2: Render required dengan separate video + audio
-        const renderSections = document.querySelectorAll('.render-section, .quality-item');
+        // ============================================================
+        // PATTERN 2: Data attributes
+        // <div data-url="VIDEO_URL" data-quality="1080p">
+        // ============================================================
+        const pattern2 = /data-url=["']([^"']+)["'][^>]*data-quality=["']([^"']+)["']/gi;
         
-        renderSections.forEach(section => {
-            const qualityEl = section.querySelector('.quality-label, .resolution');
-            const videoLink = section.querySelector('a[data-type="video"], a[href*="video"]');
-            const audioLink = section.querySelector('a[data-type="audio"], a[href*="audio"]');
+        while ((match = pattern2.exec(htmlString)) !== null) {
+            const url = match[1];
+            const quality = match[2];
             
-            if (videoLink) {
-                const quality = qualityEl ? qualityEl.textContent.trim() : 'Unknown';
-                const videoUrl = videoLink.getAttribute('href');
-                const audioUrl = audioLink ? audioLink.getAttribute('href') : null;
-                
-                results.push({
-                    quality: quality,
-                    type: 'render',
-                    videoUrl: videoUrl,
-                    audioUrl: audioUrl
-                });
-            }
-        });
+            if (!url || url === '#') continue;
+            if (url.includes('snapcdn.app') && url.includes('token=')) continue;
+            
+            results.push({
+                quality: quality.toUpperCase(),
+                type: 'direct',
+                videoUrl: url,
+                audioUrl: null
+            });
+        }
         
-        // PATTERN 3: Regex fallback jika DOM parsing gagal
+        // ============================================================
+        // PATTERN 3: Quality dalam class + href
+        // <a class="quality-720p" href="URL">
+        // ============================================================
+        const pattern3 = /<a[^>]*class=["'][^"']*quality[^"']*["'][^>]*href=["']([^"']+)["']/gi;
+        
+        while ((match = pattern3.exec(htmlString)) !== null) {
+            const url = match[1];
+            const fullMatch = match[0];
+            
+            if (!url || url === '#') continue;
+            if (url.includes('snapcdn.app') && url.includes('token=')) continue;
+            
+            const qualityMatch = fullMatch.match(/quality[-_]?(\d+p)/i);
+            const quality = qualityMatch ? qualityMatch[1].toUpperCase() : 'Unknown';
+            
+            results.push({
+                quality: quality,
+                type: 'direct',
+                videoUrl: url,
+                audioUrl: null
+            });
+        }
+        
+        // ============================================================
+        // PATTERN 4: Pure URL extraction (last resort)
+        // Ambil semua fbcdn.net URLs
+        // ============================================================
         if (results.length === 0) {
-            console.warn('[parseSnapVidHTML] DOM parsing failed, using regex fallback');
+            console.warn('[parseSnapVidHTML] No structured data found, using URL extraction');
             
-            // Regex untuk extract URLs dari HTML string
-            const urlRegex = /https?:\/\/[^"'\s<>]+(?:fbcdn|video)[^"'\s<>]*/gi;
-            const urls = htmlString.match(urlRegex) || [];
+            const urlPattern = /https?:\/\/[^\s"'<>]+fbcdn\.net[^\s"'<>]*/gi;
+            const urls = htmlString.match(urlPattern) || [];
             
             urls.forEach(url => {
-                // Skip snapcdn token URLs (they expire)
-                if (url.includes('snapcdn.app') && url.includes('token=')) {
-                    return;
+                // Try extract quality dari URL parameter
+                let quality = 'Unknown';
+                const qualityMatch = url.match(/(\d+p)|tag=dash[^&]*_(\d+p)/i);
+                if (qualityMatch) {
+                    quality = (qualityMatch[1] || qualityMatch[2]).toUpperCase();
                 }
                 
                 results.push({
-                    quality: 'Unknown',
+                    quality: quality,
                     type: 'direct',
                     videoUrl: url,
                     audioUrl: null
@@ -183,81 +210,63 @@ function parseSnapVidHTML(htmlString) {
             });
         }
         
-        // Filter duplicates
+        // ============================================================
+        // DEDUPLICATION
+        // ============================================================
         const seen = new Set();
         const unique = results.filter(item => {
-            const key = item.videoUrl;
-            if (seen.has(key)) return false;
-            seen.add(key);
+            // Normalize URL untuk comparison (remove query params untuk dedupe)
+            const baseUrl = item.videoUrl.split('?')[0];
+            if (seen.has(baseUrl)) return false;
+            seen.add(baseUrl);
             return true;
         });
+        
+        console.log(`[parseSnapVidHTML] Found ${unique.length} unique video URLs`);
         
         return unique;
         
     } catch (error) {
         console.error('[parseSnapVidHTML] Parse error:', error.message);
         
-        // EMERGENCY FALLBACK: Pure regex
-        return fallbackRegexParse(htmlString);
-    }
-}
-
-/**
- * Emergency fallback parser using pure regex
- */
-function fallbackRegexParse(htmlString) {
-    const results = [];
-    
-    // Extract all video URLs
-    const videoUrlRegex = /https:\/\/[^"'\s<>]*fbcdn\.net[^"'\s<>]*/gi;
-    const videoUrls = htmlString.match(videoUrlRegex) || [];
-    
-    videoUrls.forEach(url => {
-        // Skip snapcdn token URLs
-        if (url.includes('snapcdn') || url.includes('token=')) return;
+        // ============================================================
+        // EMERGENCY FALLBACK: Brute force fbcdn URLs
+        // ============================================================
+        console.warn('[parseSnapVidHTML] Using emergency fallback parser');
         
-        // Try to extract quality from URL parameters
-        let quality = 'Unknown';
-        const qualityMatch = url.match(/(\d+p)|tag=dash[^&]*_(\d+p)/i);
-        if (qualityMatch) {
-            quality = qualityMatch[1] || qualityMatch[2];
-        }
+        const fbcdnRegex = /https:\/\/video-[^"'\s<>]+fbcdn\.net[^"'\s<>]*/gi;
+        const urls = htmlString.match(fbcdnRegex) || [];
         
-        results.push({
-            quality: quality,
+        return urls.map(url => ({
+            quality: 'Unknown',
             type: 'direct',
             videoUrl: url,
             audioUrl: null
-        });
-    });
-    
-    return results;
+        }));
+    }
 }
 
 // ============================================================
-// QUALITY SELECTOR (PRIORITY LOGIC)
+// QUALITY SELECTOR - PRIORITY SCORING
 // ============================================================
 
-/**
- * Select best quality based on priority rules:
- * 1. Direct download + highest quality
- * 2. Render required + highest quality
- * 3. Skip snapcdn tokens
- * 4. Fallback to any working URL
- */
 function selectBestQuality(videoArray) {
-    if (!videoArray || videoArray.length === 0) return null;
+    if (!videoArray || videoArray.length === 0) {
+        console.error('[selectBestQuality] Empty video array');
+        return null;
+    }
     
-    // Filter out invalid URLs
+    // Filter valid URLs
     const valid = videoArray.filter(v => {
         if (!v.videoUrl) return false;
         
-        // Skip snapcdn token URLs (they expire in 1 hour)
+        // Skip snapcdn expired tokens
         if (v.videoUrl.includes('snapcdn.app') && v.videoUrl.includes('token=')) {
+            console.warn('[selectBestQuality] Skipping snapcdn token URL');
             return false;
         }
         
-        // Skip javascript: and # links
+        // Skip invalid protocols
         if (v.videoUrl.startsWith('javascript:') || v.videoUrl === '#') {
             return false;
         }
@@ -265,52 +274,71 @@ function selectBestQuality(videoArray) {
         return true;
     });
     
-    if (valid.length === 0) return null;
+    if (valid.length === 0) {
+        console.error('[selectBestQuality] No valid URLs after filtering');
+        return null;
+    }
     
-    // Quality priority map
-    const qualityPriority = {
-        '1080p': 100,
-        '720p': 80,
-        'hd': 70,
-        '480p': 60,
-        '360p': 40,
-        'sd': 30
+    console.log(`[selectBestQuality] ${valid.length} valid URLs to score`);
+    
+    // Quality scoring
+    const qualityMap = {
+        '1080P': 100,
+        '1080': 100,
+        'FULL HD': 95,
+        '720P': 80,
+        '720': 80,
+        'HD': 70,
+        '480P': 60,
+        '480': 60,
+        '360P': 40,
+        '360': 40,
+        'SD': 30
     };
     
-    // Score each video
     const scored = valid.map(v => {
         let score = 0;
         
         // Quality score
-        const qualityLower = v.quality.toLowerCase();
-        for (const [key, value] of Object.entries(qualityPriority)) {
-            if (qualityLower.includes(key)) {
+        const qualityUpper = v.quality.toUpperCase().replace(/\s/g, '');
+        for (const [key, value] of Object.entries(qualityMap)) {
+            if (qualityUpper.includes(key)) {
                 score += value;
                 break;
             }
         }
         
-        // Type bonus (direct > render)
+        // Type bonus
         if (v.type === 'direct') {
-            score += 50;
+            score += 50; // Direct download lebih baik dari render
         }
         
-        // fbcdn.net bonus (official Facebook CDN)
+        // CDN bonus
         if (v.videoUrl.includes('fbcdn.net')) {
-            score += 20;
+            score += 20; // Official Facebook CDN
+        }
+        
+        // Penalty for unknown quality
+        if (v.quality === 'Unknown') {
+            score -= 10;
         }
         
         return { ...v, score };
     });
     
-    // Sort by score (descending)
+    // Sort descending
     scored.sort((a, b) => b.score - a.score);
+    
+    console.log('[selectBestQuality] Top 3 results:');
+    scored.slice(0, 3).forEach((v, i) => {
+        console.log(`  ${i + 1}. ${v.quality} (${v.type}) - Score: ${v.score}`);
+    });
     
     return scored[0];
 }
 
 // ============================================================
-// CURL DOWNLOAD (REUSE EXISTING)
+// CURL DOWNLOAD
 // ============================================================
 
 async function downloadWithCurl(url, outputFile, onProgress) {
@@ -319,8 +347,10 @@ async function downloadWithCurl(url, outputFile, onProgress) {
         '-L',
         '-#',
         '--compressed',
+        '--max-time', '300', // 5 min timeout
         '-H', `"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"`,
         '-H', `"Referer: https://www.facebook.com/"`,
+        '-H', `"Accept: video/mp4,video/*,*/*"`,
         '-o', `"${outputFile}"`,
         `"${url}"`
     ].join(' ');
@@ -358,7 +388,7 @@ function createProgressBar(percentage) {
 }
 
 // ============================================================
-// MAIN HANDLER (INTEGRATED)
+// MAIN HANDLER
 // ============================================================
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
@@ -370,7 +400,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     
     try {
         await conn.sendMessage(m.chat, {
-            text: '🔍 Mengambil informasi video dari SnapVid...',
+            text: '🔍 Menghubungi SnapVid AJAX endpoint...',
             edit: statusMsg.key
         });
         
@@ -381,21 +411,34 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
             throw new Error(`SnapVid AJAX failed: ${ajaxResult.error}`);
         }
         
-        // STEP 2: Parse HTML
+        console.log(`[DEBUG] Received HTML length: ${ajaxResult.data.length} chars`);
+        
+        // STEP 2: Parse HTML chaos
+        await conn.sendMessage(m.chat, {
+            text: '🔍 Parsing HTML response...',
+            edit: statusMsg.key
+        });
+        
         const videoList = parseSnapVidHTML(ajaxResult.data);
         
         if (videoList.length === 0) {
-            throw new Error('No video URLs found in SnapVid response. HTML structure might have changed.');
+            // Save debug HTML
+            const debugFile = path.join(tmpdir(), `snapvid_debug_${Date.now()}.html`);
+            fs.writeFileSync(debugFile, ajaxResult.data);
+            
+            throw new Error(`No video URLs found in response. HTML structure might have changed. Debug saved to: ${debugFile}`);
         }
         
-        console.log(`[DEBUG] Found ${videoList.length} video options:`, videoList);
+        console.log(`[DEBUG] Parsed ${videoList.length} video options`);
         
-        // STEP 3: Select best quality
+        // STEP 3: Select best
         const videoData = selectBestQuality(videoList);
         
         if (!videoData) {
-            throw new Error('No valid video URL available after filtering');
+            throw new Error('No valid video URL after quality filtering');
         }
+        
+        console.log(`[DEBUG] Selected: ${videoData.quality} (${videoData.type})`);
         
         await conn.sendMessage(m.chat, {
             text: `📹 Video ditemukan!\n\n🎬 Quality: ${videoData.quality}\n📦 Type: ${videoData.type}\n⏬ Memulai download...`,
@@ -417,7 +460,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
                         edit: statusMsg.key
                     });
                 } catch (e) {
-                    // Ignore edit errors
+                    // Ignore
                 }
             }
         });
@@ -429,7 +472,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         
         // STEP 5: Validate & Send
         if (!fs.existsSync(tempFile)) {
-            throw new Error('File download gagal');
+            throw new Error('File download tidak ditemukan');
         }
         
         const stats = fs.statSync(tempFile);
@@ -442,7 +485,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         
         if (fileSizeMB < 0.1) {
             fs.unlinkSync(tempFile);
-            throw new Error(`File corrupt (${fileSizeMB.toFixed(2)} MB)`);
+            throw new Error(`File corrupt atau terlalu kecil (${fileSizeMB.toFixed(2)} MB)`);
         }
         
         const caption = [
@@ -451,6 +494,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
             `🎬 Quality: ${videoData.quality}`,
             `📦 Size: ${fileSizeMB.toFixed(2)} MB`,
             `🔗 Source: SnapVid Direct AJAX`,
+            `⚡ Type: ${videoData.type}`,
             ``,
             `✨ Download berhasil!`
         ].join('\n');
@@ -462,7 +506,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         try {
             fs.unlinkSync(tempFile);
         } catch (e) {
-            console.error('Cleanup error:', e);
+            console.error('[Cleanup]', e);
         }
         
     } catch (error) {
@@ -472,13 +516,17 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         errorMessage += `${error.message}\n`;
         
         if (error.message.includes('HTML structure')) {
-            errorMessage += '\n⚠️ SnapVid mungkin mengubah struktur HTML.\n';
-            errorMessage += '🔧 Parser perlu diupdate.';
+            errorMessage += '\n⚠️ CRITICAL: SnapVid mengubah struktur HTML\n';
+            errorMessage += '🔧 Parser perlu update segera\n';
+            errorMessage += '📁 Debug file tersimpan untuk investigasi';
         } else if (error.message.includes('AJAX failed')) {
-            errorMessage += '\n⚠️ SnapVid endpoint tidak responsif.\n';
-            errorMessage += '💡 Coba lagi atau gunakan API fallback.';
+            errorMessage += '\n⚠️ SnapVid endpoint tidak responsif\n';
+            errorMessage += '💡 Coba lagi dalam beberapa menit';
         } else if (error.message.includes('curl')) {
             errorMessage += '\n🔧 Install curl: apt install curl';
+        } else if (error.message.includes('No video URLs')) {
+            errorMessage += '\n⚠️ Parsing gagal - HTML structure berubah\n';
+            errorMessage += '🐛 Mode debug aktif, check console logs';
         }
         
         try {
@@ -497,11 +545,5 @@ handler.command = /^(fb|facebook|facebookdl|fbdl|fbdown|dlfb)$/i;
 handler.tags = ['downloader'];
 handler.limit = true;
 handler.group = false;
-handler.premium = false;
-handler.owner = false;
-handler.admin = false;
-handler.botAdmin = false;
-handler.fail = null;
-handler.private = false;
 
 export default handler;
