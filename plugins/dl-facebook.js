@@ -246,3 +246,17 @@ function createProgressBar(percentage) {
     const bar = '█'.repeat(filled) + '░'.repeat(empty);
     return `[${bar}]`;
 }
+
+handler.help = ['facebook'].map(v => v + ' <url>');
+handler.command = /^(fb|facebook|facebookdl|fbdl|fbdown|dlfb)$/i;
+handler.tags = ['downloader'];
+handler.limit = true;
+handler.group = false;
+handler.premium = false;
+handler.owner = false;
+handler.admin = false;
+handler.botAdmin = false;
+handler.fail = null;
+handler.private = false;
+
+export default handler;
