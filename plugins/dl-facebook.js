@@ -23,7 +23,7 @@ async function fetchSnapVidAjax(fbUrl) {
     
     const headers = {
         'Accept': '*/*',
-        'Accept-Encoding': 'gzip, deflate, br, zstd',
+        'accept-encoding': 'gzip, deflate, br',
         'Accept-Language': 'en-GB,en;q=0.9,en-US;q=0.8,id;q=0.7',
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
         'DNT': '1',
