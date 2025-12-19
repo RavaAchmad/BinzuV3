@@ -21,7 +21,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
             edit: statusMsg.key
         });
         
-        const res = await fetch(`https://api.ryzumi.vip/api/downloader/fbdl?url=${encodeURIComponent(args[0])}`, {
+        const res = await fetch(`https://api.ryzumi.vip/api/downloader/fbdl?url=${args[0]}`, {
             headers: {
                 'accept': 'application/json',
                 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
