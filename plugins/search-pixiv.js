@@ -52,6 +52,7 @@ handler.help = ['pixiv'].map(v => v + ' query')
 handler.tags = ['search', 'nsfw', 'premium']
 handler.command = /^(pixiv)$/i
 handler.register = true 
+handler.premium = true
 handler.limit = true
 handler.nsfw = true
 
