@@ -145,124 +145,117 @@ async function dlpanda(instagramUrl) {
         console.log('✓ Submit status:', response2.status)
 
         const $2 = cheerio.load(response2.data);
+        
+        // CEK ERROR/WARNING MESSAGES DULU
+        console.log('🔍 Checking for error messages...')
+        
+        const alertWarning = $2('.alert-warning').text().trim();
+        const alertDanger = $2('.alert-danger').text().trim();
+        
+        if (alertWarning) {
+            console.log('⚠️ Warning:', alertWarning)
+        }
+        if (alertDanger) {
+            console.log('❌ Error:', alertDanger)
+            throw new Error(`DLPanda error: ${alertDanger}`)
+        }
+        
+        // CEK apakah ada download button disabled
+        const downloadBtn = $2('#download-video-btn');
+        if (downloadBtn.length > 0) {
+            const btnDisabled = downloadBtn.attr('disabled');
+            const btnText = downloadBtn.text().trim();
+            console.log('🔘 Download button:', btnText, btnDisabled ? '(disabled)' : '(enabled)')
+        }
+        
         const downloadLinks = new Set();
         
         console.log('🔍 Step 3: Extracting links...')
         
-        // Method 1: Cari semua script tags
-        let allScripts = [];
+        // Method 1: Cari di script untuk variable target atau videoUrl
+        let foundTarget = false;
         $2('script').each((_, el) => {
             const scriptContent = $2(el).html();
-            if (scriptContent) {
-                allScripts.push(scriptContent);
-            }
-        });
-        
-        console.log('✓ Found', allScripts.length, 'script tags')
-        
-        // Gabungkan semua script jadi satu string
-        const fullScript = allScripts.join('\n');
-        
-        // Method 2: Multiple regex patterns untuk extract URL
-        const patterns = [
-            // Pattern 1: videoUrl = "..."
-            /videoUrl\s*=\s*["']([^"']+)["']/g,
-            // Pattern 2: var videoUrl = "..."
-            /var\s+videoUrl\s*=\s*["']([^"']+)["']/g,
-            // Pattern 3: window.open("...")
-            /window\.open\s*\(\s*["']([^"']+)["']/g,
-            // Pattern 4: downloadFile("...")
-            /downloadFile\s*\(\s*["']([^"']+)["']/g,
-            // Pattern 5: Direct CDN Instagram URLs
-            /https:\/\/scontent[^"'\s]*/g,
-            // Pattern 6: Any cdninstagram.com URL
-            /https:\/\/[^"'\s]*cdninstagram\.com[^"'\s]*/g,
-            // Pattern 7: href dengan cdninstagram
-            /href\s*=\s*["']([^"']*cdninstagram[^"']*)["']/g,
-        ];
-        
-        console.log('🔍 Trying', patterns.length, 'regex patterns...')
-        
-        patterns.forEach((pattern, index) => {
-            const matches = fullScript.matchAll(pattern);
-            let count = 0;
-            for (const match of matches) {
-                let url = match[1] || match[0]; // match[1] untuk capture group, match[0] untuk full match
-                url = url.replace(/&amp;/g, '&');
+            if (scriptContent && scriptContent.includes('target')) {
+                // Extract: let target = "URL";
+                const targetMatch = scriptContent.match(/let\s+target\s*=\s*["']([^"']+)["']/);
+                if (targetMatch && targetMatch[1]) {
+                    let url = targetMatch[1].replace(/&amp;/g, '&');
+                    if (url && url.startsWith('http')) {
+                        downloadLinks.add(url);
+                        foundTarget = true;
+                        console.log('  ✓ Found target variable:', url.substring(0, 80) + '...')
+                    } else if (url === '') {
+                        console.log('  ⚠️ target variable is empty - post might be private/deleted')
+                    }
+                }
                 
-                // Filter valid URLs
-                if (url.startsWith('http') && (
-                    url.includes('cdninstagram.com') || 
-                    url.includes('scontent') ||
-                    url.includes('.mp4') || 
-                    url.includes('.jpg')
-                )) {
-                    downloadLinks.add(url);
-                    count++;
+                // Extract: var videoUrl = "URL";
+                const videoMatch = scriptContent.match(/(?:var|let|const)\s+videoUrl\s*=\s*["']([^"']+)["']/);
+                if (videoMatch && videoMatch[1]) {
+                    let url = videoMatch[1].replace(/&amp;/g, '&');
+                    if (url && url.startsWith('http')) {
+                        downloadLinks.add(url);
+                        foundTarget = true;
+                        console.log('  ✓ Found videoUrl variable:', url.substring(0, 80) + '...')
+                    }
+                }
+                
+                // Extract: window.location.href = "URL"
+                const locationMatch = scriptContent.match(/window\.location\.href\s*=\s*["']([^"']+)["']/);
+                if (locationMatch && locationMatch[1]) {
+                    let url = locationMatch[1].replace(/&amp;/g, '&');
+                    if (url && url.startsWith('http')) {
+                        downloadLinks.add(url);
+                        foundTarget = true;
+                        console.log('  ✓ Found location.href:', url.substring(0, 80) + '...')
+                    }
                 }
             }
-            if (count > 0) {
-                console.log(`  ✓ Pattern ${index + 1} found ${count} URLs`)
-            }
         });
         
-        // Method 3: Cari di <a> tags
-        console.log('🔍 Checking <a> tags...')
-        let linkCount = 0;
-        $2('a').each((_, el) => {
+        // Method 2: Cari direct CDN URLs
+        const allScripts = [];
+        $2('script').each((_, el) => {
+            const scriptContent = $2(el).html();
+            if (scriptContent) allScripts.push(scriptContent);
+        });
+        
+        const fullScript = allScripts.join('\n');
+        
+        // Regex untuk CDN URLs
+        const cdnMatches = fullScript.matchAll(/https:\/\/[^"'\s]*(?:cdninstagram\.com|scontent[^"'\s]*)[^"'\s]*/g);
+        for (const match of cdnMatches) {
+            let url = match[0].replace(/&amp;/g, '&');
+            if (url.includes('.mp4') || url.includes('.jpg')) {
+                downloadLinks.add(url);
+                console.log('  ✓ Found CDN URL:', url.substring(0, 80) + '...')
+            }
+        }
+        
+        // Method 3: Cari di <a> tags dan download links
+        $2('a[download], a[href*="cdninstagram"], a[href*="scontent"]').each((_, el) => {
             let href = $2(el).attr('href');
             if (href) {
                 href = href.replace(/&amp;/g, '&');
-                if ((href.includes('cdninstagram.com') || href.includes('scontent') || href.includes('.mp4') || href.includes('.jpg')) && !href.includes('/article/')) {
-                    if (href.startsWith('//')) href = 'https:' + href;
-                    if (href.startsWith('http')) {
-                        downloadLinks.add(href);
-                        linkCount++;
-                    }
-                }
-            }
-            
-            // Cek onclick attribute
-            let onclick = $2(el).attr('onclick');
-            if (onclick) {
-                const onclickMatch = onclick.match(/["'](https?:\/\/[^"']+)["']/);
-                if (onclickMatch) {
-                    let url = onclickMatch[1].replace(/&amp;/g, '&');
-                    if (url.includes('cdninstagram') || url.includes('scontent')) {
-                        downloadLinks.add(url);
-                        linkCount++;
-                    }
+                if (href.startsWith('http') && !href.includes('/article/')) {
+                    downloadLinks.add(href);
+                    console.log('  ✓ Found download link:', href.substring(0, 80) + '...')
                 }
             }
         });
-        
-        if (linkCount > 0) {
-            console.log('✓ Found', linkCount, 'links from <a> tags')
-        }
 
         console.log('✓ Total unique links:', downloadLinks.size)
 
         if (downloadLinks.size === 0) {
             console.error('❌ No download links found')
             
-            // FULL DEBUG: Print semua script content
-            console.log('\n========== FULL SCRIPT DEBUG ==========')
-            allScripts.forEach((script, i) => {
-                if (script.length < 1000) { // Print scripts yang ga terlalu panjang
-                    console.log(`\n--- Script ${i + 1} (${script.length} chars) ---`)
-                    console.log(script)
-                } else {
-                    console.log(`\n--- Script ${i + 1} (${script.length} chars - truncated) ---`)
-                    console.log(script.substring(0, 500) + '\n...\n' + script.substring(script.length - 500))
-                }
-            });
-            console.log('\n========== END DEBUG ==========\n')
+            // Check if sessionid is needed
+            if (alertWarning && alertWarning.includes('sessionid')) {
+                throw new Error('Post membutuhkan sessionid (post private atau restricted). Gunakan sessionid Instagram Anda.')
+            }
             
-            // Print body text
-            const bodyText = $2('body').text().replace(/\s+/g, ' ').substring(0, 500);
-            console.log('📄 Body text:', bodyText + '...')
-            
-            throw new Error('No download links found');
+            throw new Error('No download links found - post might be deleted, private, or restricted');
         }
 
         const uniqueLinks = [...downloadLinks];
