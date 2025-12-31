@@ -1,232 +1,265 @@
-import fetch from 'node-fetch';
 import axios from 'axios';
-import cheerio from 'cheerio';
-import moment from 'moment-timezone';
-import FormData from "form-data";
+import * as cheerio from 'cheerio';
 
-let handler = async (m, { conn, args, usedPrefix, text, command }) => {
-    var delay = time => new Promise(res => setTimeout(res, time))
-    if (!args || !args[0]) throw `✳️ Contoh :\n${usedPrefix + command} https://www.tiktok.com/xxxxx`
-    if (!(args[0].includes('http://') || args[0].includes('https://'))) return m.reply(`url invalid, please input a valid url. Try with add http:// or https://`)
-    if (!args[0].includes('tiktok.com')) return m.reply(`Invalid Tiktok URL.`)
+let handler = async (m, { conn, args, usedPrefix, command }) => {
+    if (!args[0]) throw `*Contoh:* ${usedPrefix}${command} https://www.instagram.com/p/ByxKbUSnubS/`
+    
+    await m.reply('🔍 Sedang memproses, mohon tunggu...')
 
-    await conn.sendMessage(m.chat, {
-        react: {
-            text: "⚡",
-            key: m.key,
+    try {
+        let url = args[0]
+        console.log('📡 Starting Instagram download for:', url)
+        
+        let data;
+
+        try {
+            data = await dlpanda(url)
+            console.log('✅ DLPanda success!')
+        } catch (e) {
+            console.error('❌ DLPanda failed:', e.message)
+            throw 'Scraper gagal mengambil data. Coba lagi nanti.'
         }
-    })
-    var body = text.replace(/\s+/g, '+')
-    switch (command) {
-        case 'tt':
-        case 'ttv':
 
- try {
-    let res
-    let images = []
+        if (!data || !data.success) {
+            console.error('❌ Data validation failed:', data?.error || 'No data')
+            throw data?.error || 'Tidak ada data yang ditemukan.'
+        }
+        
+        console.log('📦 Data received:', data.data.length, 'files')
+        
+        let results = data.data
 
-    const dataV1 = await tiktokV1(text)
-    if (dataV1?.data) {
-      const d = dataV1.data
-      if (Array.isArray(d.images) && d.images.length > 0) {
-        images = d.images
-      } else if (Array.isArray(d.image_post) && d.image_post.length > 0) {
-        images = d.image_post
-      }
-      res = {
-        title: d.title,
-        region: d.region,
-        duration: d.duration,
-        create_time: d.create_time,
-        play_count: d.play_count,
-        digg_count: d.digg_count,
-        comment_count: d.comment_count,
-        share_count: d.share_count,
-        download_count: d.download_count,
-        author: {
-          unique_id: d.author?.unique_id,
-          nickname: d.author?.nickname
-        },
-        music_info: {
-          title: d.music_info?.title,
-          author: d.music_info?.author
-        },
-        cover: d.cover,
-        play: d.play,
-        hdplay: d.hdplay,
-        wmplay: d.wmplay
-      }
-    }
+        if (results.length === 0) {
+            console.error('❌ No results found')
+            throw 'Konten tidak ditemukan atau url bersifat privat.'
+        }
 
-    const dataV2 = await tiktokV2(text)
-    if ((!res?.play && images.length === 0) && dataV2.video_url) {
-      res = res || { play: dataV2.video_url }
-    }
-    if (Array.isArray(dataV2.slide_images) && dataV2.slide_images.length > 0) {
-      images = dataV2.slide_images
-    }
+        // Filter duplikat URL
+        const seen = new Set();
+        const filteredResults = [];
 
-    if (images.length > 0) {
-      await m.reply(`terdeteksi gambar ${images.length} wett`)
-      for (const img of images) {
-        await conn.sendMessage(m.chat, {
-          image: { url: img },
-          caption: res.title || ''
-        }, { quoted: m })
-      }
-      return
-    }
-
-const time = res.create_time
-  ? moment.unix(res.create_time).tz('Asia/Jakarta').format('dddd, D MMMM YYYY [pukul] HH:mm:ss')
-  : '-'
-
-const caption = `🎬 *Video TikTok Info*  
-
-✨ *Judul*      : ${res.title || '-'}  
-🌍 *Region*     : ${res.region || 'N/A'}  
-⏳ *Durasi*     : ${res.duration || '-'} detik  
-📅 *Upload*     : ${time}  
-
-───────────────  
-📊 *Statistik*  
-👀 *Views*      : ${formatK(res.play_count || 0)}  
-❤️ *Likes*      : ${formatK(res.digg_count || 0)}  
-💬 *Komentar*   : ${formatK(res.comment_count || 0)}  
-🔗 *Share*      : ${formatK(res.share_count || 0)}  
-⬇️ *Downloads*  : ${formatK(res.download_count || 0)}  
-
-───────────────  
-🧑‍🎤 *Author*  
-🔖 *Username*   : ${res.author?.unique_id || '-'}  
-💎 *Nama*       : ${res.author?.nickname || '-'}  
-`
-
-const videoUrl = res.play || res.hdplay || res.wmplay
-if (videoUrl) {
-  await conn.sendMessage(m.chat, { video: { url: videoUrl }, caption }, { quoted: m })
-} else if (res.cover) {
-  await conn.sendMessage(m.chat, { image: { url: res.cover }, caption: '🎨 Cover Video' }, { quoted: m })
-}
-  } catch (e) {
-    console.log(`Eror kak : ${e.message}`)
-            try {
-                const response = await axios.get(`https://api.botcahx.eu.org/api/dowloader/tiktok?url=${text}&apikey=${btc}`);
-                const res = await response.data.result;
-                if (res) {
-                    var { video, title, title_audio, audio } = res;
-
-                    const videoUrl = Array.isArray(video) ? video[0] : video;
-                    let isVideo = false;
-
-                    try {
-                        const contentCheck = await axios.head(videoUrl);
-                        const contentType = contentCheck.headers['content-type'];
-                        isVideo = contentType && (contentType.includes('video/') || contentType.includes('application/octet-stream'));
-                    } catch (verifyError) {
-                        console.log('Content verification failed:', verifyError);
-                    }
-
-                    let capt = `乂 *T I K T O K*\n\n`;
-                    capt += `◦ *Title* : ${title || 'No Title'}\n`;
-                    capt += `◦ *Audio* : ${title_audio || 'No Audio Title'}\n\n`;
-
-                    if (isVideo) {
-                        await conn.sendFile(m.chat, videoUrl, null, capt, m);
-                    } else {
-                        if (Array.isArray(video)) {
-                            await conn.sendFile(m.chat, video[0], null, capt, m);
-                            for (let i = 1; i < video.length; i++) {
-                                await conn.sendFile(m.chat, video[i], null, '', m);
-                            }
-                        } else {
-                            await conn.sendFile(m.chat, video, null, capt, m);
-                        }
-                    }
-
-                    if (audio && audio[0]) {
-                        conn.sendMessage(m.chat, { audio: { url: audio[0] }, mimetype: 'audio/mpeg' }, { quoted: m });
-                    }
+        for (let item of results) {
+            let itemUrl = item.url || item;
+            
+            if (typeof itemUrl === 'string' && !seen.has(itemUrl)) {
+                if (!itemUrl.includes('.m4a')) { 
+                    filteredResults.push({
+                        url: itemUrl,
+                        type: item.type || (itemUrl.includes('.mp4') ? 'video' : 'image')
+                    });
+                    seen.add(itemUrl);
                 }
-            } catch (e) {
-                console.log(e);
-                m.reply('❌ Error: Failed to process TikTok download');
             }
         }
-            break;
-        case 'tta':
-            try {
-                const response = await fetch(`https://zenzxz.dpdns.org/downloader/tiktok?url=${args[0]}`, {
-                    method: 'GET',
-                });
-                const data = await response.json();
 
-                const musicUrl = data.result?.data?.music;
-                await conn.sendMessage(m.chat, {
-                    audio: { url: musicUrl },
-                }, { quoted: m });
-            } catch (e) {
-                console.log(e);
-                m.reply('Silahkan pilih video saja kak, lalu ketik commannd ".tomp4" pada video tersebut');
+        console.log('✓ Filtered results:', filteredResults.length, 'unique files')
+
+        const limitnya = 10;
+        console.log('📤 Sending', Math.min(limitnya, filteredResults.length), 'files...')
+        
+        for (let i = 0; i < Math.min(limitnya, filteredResults.length); i++) {
+            let fileUrl = filteredResults[i].url
+            let fileType = filteredResults[i].type === 'video' ? '🎥 Video' : '🖼️ Foto'
+            
+            console.log(`📤 Sending file ${i + 1}:`, fileType, fileUrl.substring(0, 80) + '...')
+            
+            if (i > 0) await sleep(150);
+
+            try {
+                await conn.sendFile(
+                    m.chat, 
+                    fileUrl, 
+                    null, 
+                    `*Instagram Downloader*\n${fileType} (${i + 1}/${Math.min(limitnya, filteredResults.length)})`, 
+                    m
+                )
+                console.log(`✅ File ${i + 1} sent successfully`)
+            } catch (sendErr) {
+                console.error(`❌ Failed to send file ${i + 1}:`, sendErr.message)
             }
-            break;
+        }
+
+        console.log('✅ Process completed!')
+        await m.reply('✅ Semua file berhasil dikirim!')
+
+    } catch (e) {
+        console.error('❌ MAIN ERROR:', e)
+        await m.reply(`❌ *Error Terjadi:*\n${e}`)
     }
 }
 
-handler.command = ['ttv', 'tta', 'tt'];
-handler.xmaze = true;
-handler.limit = true;
+handler.help = ['instagram', 'ig'].map(v => v + ' <url>')
+handler.tags = ['downloader']
+handler.command = /^(ig|instagram|igdl|instagramdl|igstory)$/i
+handler.limit = true
+
 export default handler
 
-function formatK(num) {
-    return new Intl.NumberFormat('en-US', {
-        notation: 'compact',
-        maximumFractionDigits: 1
-    }).format(num)
+// ========== SCRAPER DLPANDA ==========
+
+async function dlpanda(instagramUrl) {
+    const BASE_URL = 'https://dlpanda.com/id';
+    
+    try {
+        console.log('🌐 Step 1: Getting homepage...')
+        
+        // Step 1: Get token
+        const response1 = await axios.get(BASE_URL, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            },
+            timeout: 15000
+        });
+
+        console.log('✓ Homepage status:', response1.status)
+
+        const $1 = cheerio.load(response1.data);
+        const token = $1('#token').val() || $1('input[name="token"]').val();
+        
+        console.log('✓ Token found:', token ? 'YES' : 'NO')
+        if (token) console.log('  Token value:', token.substring(0, 20) + '...')
+
+        // Step 2: Submit Instagram URL (TANPA sessionid)
+        const params = new URLSearchParams({ 
+            'ig-sessionid': '',  // Kosong tapi tetap kirim
+            url: instagramUrl 
+        });
+        if (token) params.append('token', token);
+        
+        const targetUrl = `${BASE_URL}?${params.toString()}`;
+        
+        console.log('🌐 Step 2: Submitting URL...')
+        console.log('  Target:', targetUrl.substring(0, 100) + '...')
+        
+        const response2 = await axios.get(targetUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Referer': BASE_URL,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            },
+            maxRedirects: 5,
+            timeout: 15000
+        });
+
+        console.log('✓ Submit status:', response2.status)
+
+        const $2 = cheerio.load(response2.data);
+        const downloadLinks = new Set();
+        
+        console.log('🔍 Step 3: Extracting links from JavaScript...')
+        
+        // FOKUS: Extract dari script tags
+        let scriptCount = 0;
+        $2('script').each((_, el) => {
+            const scriptContent = $2(el).html();
+            if (scriptContent) {
+                // Method 1: videoUrl variable (PALING PENTING!)
+                const videoMatch = scriptContent.match(/videoUrl\s*=\s*["']([^"']+)["']/);
+                if (videoMatch) {
+                    let url = videoMatch[1].replace(/&amp;/g, '&');
+                    downloadLinks.add(url);
+                    scriptCount++;
+                    console.log('  ✓ Found videoUrl:', url.substring(0, 80) + '...')
+                }
+                
+                // Method 2: Direct CDN URLs
+                const cdnMatches = scriptContent.matchAll(/https:\/\/[^"'\s]*cdninstagram\.com[^"'\s]*/g);
+                for (const match of cdnMatches) {
+                    let url = match[0].replace(/&amp;/g, '&');
+                    downloadLinks.add(url);
+                    scriptCount++;
+                    console.log('  ✓ Found CDN URL:', url.substring(0, 80) + '...')
+                }
+                
+                // Method 3: window.open atau downloadFile
+                const onclickMatches = scriptContent.matchAll(/(?:window\.open|downloadFile)\s*\(\s*["']([^"']+)["']/g);
+                for (const match of onclickMatches) {
+                    let url = match[1].replace(/&amp;/g, '&');
+                    if (url.includes('cdninstagram.com') || url.includes('.mp4') || url.includes('.jpg')) {
+                        downloadLinks.add(url);
+                        scriptCount++;
+                        console.log('  ✓ Found onclick URL:', url.substring(0, 80) + '...')
+                    }
+                }
+            }
+        });
+
+        console.log('✓ Found', scriptCount, 'links from <script> tags')
+        
+        // Backup: Cari di <a> tags juga
+        let linkCount = 0;
+        $2('a').each((_, el) => {
+            let href = $2(el).attr('href');
+            if (href && (href.includes('cdninstagram.com') || href.includes('.mp4') || href.includes('.jpg'))) {
+                href = href.replace(/&amp;/g, '&');
+                if (!href.includes('/article/')) {
+                    if (href.startsWith('//')) href = 'https:' + href;
+                    downloadLinks.add(href);
+                    linkCount++;
+                    console.log('  ✓ Found <a> href:', href.substring(0, 80) + '...')
+                }
+            }
+        });
+
+        if (linkCount > 0) {
+            console.log('✓ Found', linkCount, 'links from <a> tags (backup)')
+        }
+
+        console.log('✓ Total unique links:', downloadLinks.size)
+
+        if (downloadLinks.size === 0) {
+            console.error('❌ No download links found')
+            
+            // Debug: Show script content
+            let scriptPreview = '';
+            $2('script').each((i, el) => {
+                const content = $2(el).html();
+                if (content && (content.includes('videoUrl') || content.includes('cdninstagram'))) {
+                    scriptPreview = content.substring(0, 500);
+                    return false; // break
+                }
+            });
+            
+            if (scriptPreview) {
+                console.log('📄 Script preview:', scriptPreview + '...')
+            } else {
+                console.log('📄 No relevant scripts found')
+                // Show body text untuk debug
+                const bodyText = $2('body').text().substring(0, 300);
+                console.log('📄 Body preview:', bodyText + '...')
+            }
+            
+            throw new Error('No download links found in scripts');
+        }
+
+        const uniqueLinks = [...downloadLinks];
+
+        console.log('✅ Final links:', uniqueLinks.length)
+        uniqueLinks.forEach((link, i) => {
+            const type = link.includes('.mp4') ? 'VIDEO' : 'IMAGE';
+            console.log(`  ${i + 1}. [${type}]`, link)
+        })
+
+        return {
+            success: true,
+            data: uniqueLinks.map(url => ({
+                url,
+                type: url.includes('.mp4') ? 'video' : 'image'
+            }))
+        };
+
+    } catch (error) {
+        console.error('❌ DLPanda Error:', error.message)
+        if (error.response) {
+            console.error('  HTTP Status:', error.response.status)
+            console.error('  Response data:', JSON.stringify(error.response.data).substring(0, 200))
+        }
+        
+        throw error;
+    }
 }
 
-async function tiktokV1(query) {
-  const encodedParams = new URLSearchParams()
-  encodedParams.set('url', query)
-  encodedParams.set('hd', '1')
-
-  const { data } = await axios.post('https://tikwm.com/api/', encodedParams, {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      Cookie: 'current_language=en',
-      'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36'
-    }
-  })
-
-  return data
-}
-
-async function tiktokV2(query) {
-  const form = new FormData()
-  form.append('q', query)
-
-  const { data } = await axios.post('https://savetik.co/api/ajaxSearch', form, {
-    headers: {
-      ...form.getHeaders(),
-      'Accept': '*/*',
-      'Origin': 'https://savetik.co',
-      'Referer': 'https://savetik.co/en2',
-      'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36',
-      'X-Requested-With': 'XMLHttpRequest'
-    }
-  })
-
-  const rawHtml = data.data
-  const $ = cheerio.load(rawHtml)
-  const title = $('.thumbnail .content h3').text().trim()
-  const thumbnail = $('.thumbnail .image-tik img').attr('src')
-  const video_url = $('video#vid').attr('data-src')
-
-  const slide_images = []
-  $('.photo-list .download-box li').each((_, el) => {
-    const imgSrc = $(el).find('.download-items__thumb img').attr('src')
-    if (imgSrc) slide_images.push(imgSrc)
-  })
-
-  return { title, thumbnail, video_url, slide_images }
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
