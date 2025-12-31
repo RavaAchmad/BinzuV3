@@ -66,8 +66,6 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
             }
         }
 
-        await m.reply('✅ Semua file berhasil dikirim!')
-
     } catch (e) {
         await m.reply(`❌ *Error Terjadi:*\n${e}`)
     }
