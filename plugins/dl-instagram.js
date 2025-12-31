@@ -120,9 +120,9 @@ async function dlpanda(instagramUrl) {
         console.log('✓ Token found:', token ? 'YES' : 'NO')
         if (token) console.log('  Token value:', token.substring(0, 20) + '...')
 
-        // Step 2: Submit Instagram URL (TANPA sessionid)
+        // Step 2: Submit Instagram URL
         const params = new URLSearchParams({ 
-            'ig-sessionid': '',  // Kosong tapi tetap kirim
+            'ig-sessionid': '',
             url: instagramUrl 
         });
         if (token) params.append('token', token);
@@ -147,63 +147,97 @@ async function dlpanda(instagramUrl) {
         const $2 = cheerio.load(response2.data);
         const downloadLinks = new Set();
         
-        console.log('🔍 Step 3: Extracting links from JavaScript...')
+        console.log('🔍 Step 3: Extracting links...')
         
-        // FOKUS: Extract dari script tags
-        let scriptCount = 0;
+        // Method 1: Cari semua script tags
+        let allScripts = [];
         $2('script').each((_, el) => {
             const scriptContent = $2(el).html();
             if (scriptContent) {
-                // Method 1: videoUrl variable (PALING PENTING!)
-                const videoMatch = scriptContent.match(/videoUrl\s*=\s*["']([^"']+)["']/);
-                if (videoMatch) {
-                    let url = videoMatch[1].replace(/&amp;/g, '&');
-                    downloadLinks.add(url);
-                    scriptCount++;
-                    console.log('  ✓ Found videoUrl:', url.substring(0, 80) + '...')
-                }
+                allScripts.push(scriptContent);
+            }
+        });
+        
+        console.log('✓ Found', allScripts.length, 'script tags')
+        
+        // Gabungkan semua script jadi satu string
+        const fullScript = allScripts.join('\n');
+        
+        // Method 2: Multiple regex patterns untuk extract URL
+        const patterns = [
+            // Pattern 1: videoUrl = "..."
+            /videoUrl\s*=\s*["']([^"']+)["']/g,
+            // Pattern 2: var videoUrl = "..."
+            /var\s+videoUrl\s*=\s*["']([^"']+)["']/g,
+            // Pattern 3: window.open("...")
+            /window\.open\s*\(\s*["']([^"']+)["']/g,
+            // Pattern 4: downloadFile("...")
+            /downloadFile\s*\(\s*["']([^"']+)["']/g,
+            // Pattern 5: Direct CDN Instagram URLs
+            /https:\/\/scontent[^"'\s]*/g,
+            // Pattern 6: Any cdninstagram.com URL
+            /https:\/\/[^"'\s]*cdninstagram\.com[^"'\s]*/g,
+            // Pattern 7: href dengan cdninstagram
+            /href\s*=\s*["']([^"']*cdninstagram[^"']*)["']/g,
+        ];
+        
+        console.log('🔍 Trying', patterns.length, 'regex patterns...')
+        
+        patterns.forEach((pattern, index) => {
+            const matches = fullScript.matchAll(pattern);
+            let count = 0;
+            for (const match of matches) {
+                let url = match[1] || match[0]; // match[1] untuk capture group, match[0] untuk full match
+                url = url.replace(/&amp;/g, '&');
                 
-                // Method 2: Direct CDN URLs
-                const cdnMatches = scriptContent.matchAll(/https:\/\/[^"'\s]*cdninstagram\.com[^"'\s]*/g);
-                for (const match of cdnMatches) {
-                    let url = match[0].replace(/&amp;/g, '&');
+                // Filter valid URLs
+                if (url.startsWith('http') && (
+                    url.includes('cdninstagram.com') || 
+                    url.includes('scontent') ||
+                    url.includes('.mp4') || 
+                    url.includes('.jpg')
+                )) {
                     downloadLinks.add(url);
-                    scriptCount++;
-                    console.log('  ✓ Found CDN URL:', url.substring(0, 80) + '...')
+                    count++;
                 }
-                
-                // Method 3: window.open atau downloadFile
-                const onclickMatches = scriptContent.matchAll(/(?:window\.open|downloadFile)\s*\(\s*["']([^"']+)["']/g);
-                for (const match of onclickMatches) {
-                    let url = match[1].replace(/&amp;/g, '&');
-                    if (url.includes('cdninstagram.com') || url.includes('.mp4') || url.includes('.jpg')) {
+            }
+            if (count > 0) {
+                console.log(`  ✓ Pattern ${index + 1} found ${count} URLs`)
+            }
+        });
+        
+        // Method 3: Cari di <a> tags
+        console.log('🔍 Checking <a> tags...')
+        let linkCount = 0;
+        $2('a').each((_, el) => {
+            let href = $2(el).attr('href');
+            if (href) {
+                href = href.replace(/&amp;/g, '&');
+                if ((href.includes('cdninstagram.com') || href.includes('scontent') || href.includes('.mp4') || href.includes('.jpg')) && !href.includes('/article/')) {
+                    if (href.startsWith('//')) href = 'https:' + href;
+                    if (href.startsWith('http')) {
+                        downloadLinks.add(href);
+                        linkCount++;
+                    }
+                }
+            }
+            
+            // Cek onclick attribute
+            let onclick = $2(el).attr('onclick');
+            if (onclick) {
+                const onclickMatch = onclick.match(/["'](https?:\/\/[^"']+)["']/);
+                if (onclickMatch) {
+                    let url = onclickMatch[1].replace(/&amp;/g, '&');
+                    if (url.includes('cdninstagram') || url.includes('scontent')) {
                         downloadLinks.add(url);
-                        scriptCount++;
-                        console.log('  ✓ Found onclick URL:', url.substring(0, 80) + '...')
+                        linkCount++;
                     }
                 }
             }
         });
-
-        console.log('✓ Found', scriptCount, 'links from <script> tags')
         
-        // Backup: Cari di <a> tags juga
-        let linkCount = 0;
-        $2('a').each((_, el) => {
-            let href = $2(el).attr('href');
-            if (href && (href.includes('cdninstagram.com') || href.includes('.mp4') || href.includes('.jpg'))) {
-                href = href.replace(/&amp;/g, '&');
-                if (!href.includes('/article/')) {
-                    if (href.startsWith('//')) href = 'https:' + href;
-                    downloadLinks.add(href);
-                    linkCount++;
-                    console.log('  ✓ Found <a> href:', href.substring(0, 80) + '...')
-                }
-            }
-        });
-
         if (linkCount > 0) {
-            console.log('✓ Found', linkCount, 'links from <a> tags (backup)')
+            console.log('✓ Found', linkCount, 'links from <a> tags')
         }
 
         console.log('✓ Total unique links:', downloadLinks.size)
@@ -211,26 +245,24 @@ async function dlpanda(instagramUrl) {
         if (downloadLinks.size === 0) {
             console.error('❌ No download links found')
             
-            // Debug: Show script content
-            let scriptPreview = '';
-            $2('script').each((i, el) => {
-                const content = $2(el).html();
-                if (content && (content.includes('videoUrl') || content.includes('cdninstagram'))) {
-                    scriptPreview = content.substring(0, 500);
-                    return false; // break
+            // FULL DEBUG: Print semua script content
+            console.log('\n========== FULL SCRIPT DEBUG ==========')
+            allScripts.forEach((script, i) => {
+                if (script.length < 1000) { // Print scripts yang ga terlalu panjang
+                    console.log(`\n--- Script ${i + 1} (${script.length} chars) ---`)
+                    console.log(script)
+                } else {
+                    console.log(`\n--- Script ${i + 1} (${script.length} chars - truncated) ---`)
+                    console.log(script.substring(0, 500) + '\n...\n' + script.substring(script.length - 500))
                 }
             });
+            console.log('\n========== END DEBUG ==========\n')
             
-            if (scriptPreview) {
-                console.log('📄 Script preview:', scriptPreview + '...')
-            } else {
-                console.log('📄 No relevant scripts found')
-                // Show body text untuk debug
-                const bodyText = $2('body').text().substring(0, 300);
-                console.log('📄 Body preview:', bodyText + '...')
-            }
+            // Print body text
+            const bodyText = $2('body').text().replace(/\s+/g, ' ').substring(0, 500);
+            console.log('📄 Body text:', bodyText + '...')
             
-            throw new Error('No download links found in scripts');
+            throw new Error('No download links found');
         }
 
         const uniqueLinks = [...downloadLinks];
@@ -238,7 +270,7 @@ async function dlpanda(instagramUrl) {
         console.log('✅ Final links:', uniqueLinks.length)
         uniqueLinks.forEach((link, i) => {
             const type = link.includes('.mp4') ? 'VIDEO' : 'IMAGE';
-            console.log(`  ${i + 1}. [${type}]`, link)
+            console.log(`  ${i + 1}. [${type}]`, link.substring(0, 100) + '...')
         })
 
         return {
@@ -253,7 +285,6 @@ async function dlpanda(instagramUrl) {
         console.error('❌ DLPanda Error:', error.message)
         if (error.response) {
             console.error('  HTTP Status:', error.response.status)
-            console.error('  Response data:', JSON.stringify(error.response.data).substring(0, 200))
         }
         
         throw error;
