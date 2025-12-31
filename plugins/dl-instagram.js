@@ -97,7 +97,7 @@ async function dlpanda(instagramUrl) {
         // Step 1: Get token
         const response1 = await axios.get(BASE_URL, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             },
             timeout: 15000
@@ -106,11 +106,10 @@ async function dlpanda(instagramUrl) {
         const $1 = cheerio.load(response1.data);
         const token = $1('#token').val() || $1('input[name="token"]').val();
 
-        // Step 2: Submit Instagram URL
-        const params = new URLSearchParams({ url: instagramUrl });
-        if (token) params.append('token', token);
-        
-        const targetUrl = `${BASE_URL}?${params.toString()}`;
+        // Step 2: Submit URL
+        const targetUrl = token 
+            ? `${BASE_URL}?url=${encodeURIComponent(instagramUrl)}&token=${token}`
+            : `${BASE_URL}?url=${encodeURIComponent(instagramUrl)}`;
         
         const response2 = await axios.get(targetUrl, {
             headers: {
@@ -124,64 +123,34 @@ async function dlpanda(instagramUrl) {
         const $2 = cheerio.load(response2.data);
         const downloadLinks = new Set();
         
-        // Extract dari attributes
-        $2('a, button').each((_, el) => {
-            let href = $2(el).attr('href') || $2(el).attr('onclick');
+        // Step 3: Cari tombol download (sama kayak TikTok)
+        $2('a').each((_, el) => {
+            let href = $2(el).attr('href');
             
-            if (href) {
-                if (href.includes('downloadFile') || href.includes('window.open')) {
-                    const match = href.match(/['"](https?:\/\/[^'"]+)['"]/);
-                    if (match) href = match[1];
-                }
-                
-                href = href.replace(/&amp;/g, '&');
-                
-                if (href.includes('cdninstagram.com') || 
-                    href.includes('.mp4') || 
-                    href.includes('.jpg') ||
-                    href.includes('pass.work.ink')) {
+            if (href && (
+                href.includes('cdninstagram.com') || 
+                href.includes('.mp4') || 
+                href.includes('.jpg') ||
+                href.includes('pass.work.ink')
+            )) {
+                if (!href.includes('/article/')) {
+                    href = href.replace(/&amp;/g, '&');
+                    if (href.startsWith('//')) href = 'https:' + href;
                     downloadLinks.add(href);
                 }
             }
         });
 
-        // Extract dari script tags
-        $2('script').each((_, el) => {
-            const scriptContent = $2(el).html();
-            if (scriptContent) {
-                const videoMatch = scriptContent.match(/videoUrl\s*=\s*["']([^"']+)["']/);
-                if (videoMatch) {
-                    downloadLinks.add(videoMatch[1].replace(/&amp;/g, '&'));
-                }
-                
-                const cdnMatches = scriptContent.matchAll(/https:\/\/[^"'\s]*cdninstagram\.com[^"'\s]*/g);
-                for (const match of cdnMatches) {
-                    downloadLinks.add(match[0].replace(/&amp;/g, '&'));
-                }
-            }
-        });
-
-        // Resolve redirects
+        // Step 4: Resolve redirects (ini yang beda dari TikTok)
         const finalLinks = [];
-        
         for (const link of downloadLinks) {
             if (link.includes('pass.work.ink')) {
                 try {
                     const { data } = await axios.get(link, {
-                        params: {
-                            fingerprint: `ig-${Date.now()}`,
-                            adblockerInstalled: 0,
-                            base64: 1,
-                            json: 1
-                        },
+                        params: { fingerprint: `ig-${Date.now()}`, adblockerInstalled: 0, base64: 1, json: 1 },
                         timeout: 10000
                     });
-                    
-                    if (data && data.to) {
-                        finalLinks.push(data.to);
-                    } else {
-                        finalLinks.push(link);
-                    }
+                    finalLinks.push(data?.to || link);
                 } catch {
                     finalLinks.push(link);
                 }
@@ -200,9 +169,9 @@ async function dlpanda(instagramUrl) {
                     type: url.includes('.mp4') ? 'video' : 'image'
                 }))
             };
-        } else {
-            throw new Error('No download links found');
         }
+        
+        throw new Error('No links found');
 
     } catch (error) {
         throw new Error(`DLPanda failed: ${error.message}`);
