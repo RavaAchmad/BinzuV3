@@ -1,5 +1,69 @@
 import search from 'yt-search';
 import fetch from 'node-fetch';
+import axios from 'axios';
+
+// ============================================================
+// YOUTUBE SCRAPER - EZCONV
+// ============================================================
+
+async function downloadYoutubeShort(videoUrl) {
+    try {
+        const cfApiUrl = 'https://api.nekolabs.web.id/tools/bypass/cf-turnstile';
+        const cfPayload = {
+            url: 'https://ezconv.cc',
+            siteKey: '0x4AAAAAAAi2NuZzwS99-7op'
+        };
+        
+        const { data: cfResponse } = await axios.post(cfApiUrl, cfPayload);
+        
+        if (!cfResponse.success || !cfResponse.result) {
+            return {
+                success: false,
+                error: 'No se pudo obtener el token de captcha'
+            };
+        }
+        
+        const captchaToken = cfResponse.result;
+        
+        const convertApiUrl = 'https://ds1.ezsrv.net/api/convert';
+        const convertPayload = {
+            url: videoUrl,
+            quality: '320',
+            trim: false,
+            startT: 0,
+            endT: 0,
+            captchaToken: captchaToken
+        };
+        
+        const { data: convertResponse } = await axios.post(convertApiUrl, convertPayload, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (convertResponse.status !== 'done') {
+            return {
+                success: false,
+                error: `La conversión falló. Estado: ${convertResponse.status}`
+            };
+        }
+        
+        return {
+            success: true,
+            data: {
+                title: convertResponse.title,
+                downloadUrl: convertResponse.url,
+                status: convertResponse.status
+            }
+        };
+        
+    } catch (error) {
+        return {
+            success: false,
+            error: error.response?.data ? error.response.data : error.message
+        };
+    }
+}
 
 const handler = async (m, { conn, text, usedPrefix }) => {
     if (!text) throw 'Enter Title / Link From YouTube!';
@@ -12,17 +76,32 @@ const handler = async (m, { conn, text, usedPrefix }) => {
             return conn.reply(m.chat, 'Video is longer than 1 hour!', m);
         } else {
             let audioUrl;
-            try {
-                const res = await fetch(`https://api.botcahx.eu.org/api/dowloader/yt?url=${convert.url}&apikey=${btc}`);
+            
+            // PRIMARY: EZCONV Scraper
+            console.log('[YT] Trying EZCONV scraper...');
+            const scraperResult = await downloadYoutubeShort(convert.url);
+            
+            if (scraperResult.success && scraperResult.data.downloadUrl) {
+                console.log('[YT] EZCONV scraper success');
+                audioUrl = {
+                    result: {
+                        mp3: scraperResult.data.downloadUrl
+                    }
+                };
+            } else {
+                // SECONDARY: Fallback API
+                console.log('[YT] Trying fallback API...');
                 try {
-                    audioUrl = await res.json();
+                    const res = await fetch(`https://api.botcahx.eu.org/api/dowloader/yt?url=${convert.url}&apikey=${btc}`);
+                    try {
+                        audioUrl = await res.json();
+                    } catch (e) {
+                        conn.reply('6281212035575@s.whatsapp.net', eror, m);
+                    }
                 } catch (e) {
-                    conn.reply(m.chat, eror, m)
+                    conn.reply('6281212035575@s.whatsapp.net', eror, m);
+                    return;
                 }
-                
-            } catch (e) {
-                conn.reply(m.chat, eror, m)
-                return;
             }
 
             let caption = '';

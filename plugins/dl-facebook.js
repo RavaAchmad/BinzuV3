@@ -1,10 +1,13 @@
 import fetch from 'node-fetch';
 import { promisify } from 'util';
 import { pipeline } from 'stream';
-import fs from 'fs';
 import path from 'path';
 import { tmpdir } from 'os';
 import { exec } from 'child_process';
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+import qs from 'qs';
+import fs from 'fs';
 
 const streamPipeline = promisify(pipeline);
 const execPromise = promisify(exec);
@@ -92,150 +95,60 @@ function selectBestVideoFromAPI(result) {
     return null;
 }
 
-// ============================================================
-// SECONDARY: SnapVid Raw Text (OPTIONAL, SKIP IF FAILED)
-// ============================================================
-
-async function fetchSnapVidRaw(fbUrl) {
-    const endpoint = 'https://snapvid.net/api/ajaxSearch';
-    
-    const headers = {
-        'Accept': '*/*',
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'Origin': 'https://snapvid.net',
-        'Referer': 'https://snapvid.net/en/facebook-downloader',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'X-Requested-With': 'XMLHttpRequest'
-    };
-    
-    const formData = new URLSearchParams({
-        'q': fbUrl,
-        'lang': 'en',
-        'v': 'facebook',
-        'cftoken': ''
-    });
-    
-    try {
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: headers,
-            body: formData.toString(),
-            timeout: 30000
-        });
-        
-        if (!response.ok) return { success: false };
-        
-        const json = await response.json();
-        const rawText = json.data || json.msg || json.html || '';
-        
-        if (!rawText) return { success: false };
-        
-        return {
-            success: true,
-            rawText: rawText
-        };
-        
-    } catch (error) {
-        console.error('[fetchSnapVidRaw] Error:', error.message);
-        return { success: false };
-    }
-}
-
-function extractSnapCdnUrls(rawText) {
-    // Match: https://dl.snapcdn.app/download?token=...
-    // OR: https://dl.snapcdn.app/get?token=...
-    const regex = /https:\/\/dl\.snapcdn\.app\/(?:get|download)\?token=[A-Za-z0-9\-\._]+/g;
-    const urls = [...new Set(rawText.match(regex) || [])];
-    
-    return urls;
-}
-
-function decodeJwtPayload(token) {
-    try {
-        const parts = token.split('.');
-        if (parts.length !== 3) return null;
-        
-        const payload = Buffer.from(parts[1], 'base64').toString('utf-8');
-        return JSON.parse(payload);
-    } catch (error) {
-        return null;
-    }
-}
-
-function parseSnapCdnUrls(urls) {
-    const parsed = urls.map(downloadUrl => {
-        const tokenMatch = downloadUrl.match(/token=([^&]+)/);
-        if (!tokenMatch) return null;
-        
-        const token = tokenMatch[1];
-        const payload = decodeJwtPayload(token);
-        
-        if (!payload) return null;
-        
-        // Extract quality dari filename
-        const filename = payload.filename || '';
-        const qualityMatch = filename.match(/_(\d{3,4}p)|(\d{3,4}p)/i);
-        const quality = qualityMatch ? qualityMatch[1] || qualityMatch[2] : 'Unknown';
-        
-        return {
-            downloadUrl: downloadUrl,
-            directVideo: payload.url || '',
-            quality: quality.toUpperCase(),
-            filename: filename,
-            exp: payload.exp || 0
-        };
-    }).filter(Boolean);
-    
-    // Sort by quality
-    const qualityPriority = { '1080P': 100, '720P': 80, '480P': 60, '360P': 40 };
-    parsed.sort((a, b) => {
-        const scoreA = qualityPriority[a.quality] || 0;
-        const scoreB = qualityPriority[b.quality] || 0;
-        return scoreB - scoreA;
-    });
-    
-    return parsed;
-}
 
 // ============================================================
 // DOWNLOAD
 // ============================================================
 
-async function downloadWithCurl(url, outputFile, onProgress) {
-    const curlCmd = [
-        'curl',
-        '-L',
-        '-#',
-        '--compressed',
-        '--max-time', '300',
-        '-H', `"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"`,
-        '-H', `"Referer: https://www.facebook.com/"`,
-        '-o', `"${outputFile}"`,
-        `"${url}"`
-    ].join(' ');
+async function downloadWithProgress(url, outputFile, conn, m, statusMsg, quality) {
+    let lastUpdate = 0;
     
-    return new Promise((resolve, reject) => {
-        const child = exec(curlCmd);
-        let lastProgress = 0;
-        
-        child.stderr.on('data', (data) => {
-            const output = data.toString();
-            const progressMatch = output.match(/(\d+\.\d+)%/);
-            if (progressMatch) {
-                const progress = parseFloat(progressMatch[1]);
-                if (progress - lastProgress >= 5) {
-                    lastProgress = progress;
-                    onProgress(progress);
-                }
+    try {
+        const response = await axios({
+            method: 'get',
+            url: url,
+            responseType: 'stream',
+            timeout: 300000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Referer': 'https://www.facebook.com/'
             }
         });
         
-        child.on('close', (code) => {
-            code === 0 ? resolve(true) : reject(new Error(`Curl exit ${code}`));
+        const totalLength = response.headers['content-length'];
+        let downloadedLength = 0;
+        
+        const writer = fs.createWriteStream(outputFile);
+        
+        response.data.on('data', async (chunk) => {
+            downloadedLength += chunk.length;
+            const progress = (downloadedLength / totalLength) * 100;
+            
+            // Update setiap 5%
+            if (progress - lastUpdate >= 5) {
+                lastUpdate = Math.floor(progress / 5) * 5;
+                const bar = createProgressBar(progress);
+                
+                try {
+                    await conn.sendMessage(m.chat, {
+                        text: `⏬ Downloading...\n\n${bar}\n${progress.toFixed(1)}%\n\n🎬 ${quality}`,
+                        edit: statusMsg.key
+                    });
+                } catch (e) {}
+            }
         });
         
-        child.on('error', (err) => reject(err));
-    });
+        response.data.pipe(writer);
+        
+        return new Promise((resolve, reject) => {
+            writer.on('finish', resolve);
+            writer.on('error', reject);
+            response.data.on('error', reject);
+        });
+        
+    } catch (error) {
+        throw new Error(`Download failed: ${error.message}`);
+    }
 }
 
 function createProgressBar(percentage) {
@@ -257,45 +170,32 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     
     try {
         // ============================================================
-        // PRIMARY: API ikyiizyy.my.id
+        // PRIMARY: FBDL (Scrape-based)
         // ============================================================
+        console.log('[Handler] Trying FBDL scraper (PRIMARY)...');
+        
         await conn.sendMessage(m.chat, {
-            text: '🔍 Mengambil dari API...',
+            text: '🔍 Memeriksa url valid atau tidak',
             edit: statusMsg.key
         });
         
-        const apiResult = await fetchFromAPI(args[0]);
+        const fbdlResult = await fbdl(args[0]);
         
-        if (apiResult.success) {
-            const videoData = selectBestVideoFromAPI(apiResult.data);
+        if (fbdlResult.success && fbdlResult.url) {
+            console.log('[PRIMARY] FBDL berhasil:', fbdlResult.quality);
             
-            if (videoData && videoData.url) {
-                console.log('[PRIMARY] API berhasil:', videoData.quality);
+            await conn.sendMessage(m.chat, {
+                text: `📹 Video ditemukan!\n\n📝 ${fbdlResult.title}\n🎬 ${fbdlResult.quality}\n⏬ Downloading...`,
+                edit: statusMsg.key
+            });
+            
+            // Download dengan progress tracking real-time
+            const tempFile = path.join(tmpdir(), `fb_${Date.now()}.mp4`);
+            
+            try {
+                await downloadWithProgress(fbdlResult.url, tempFile, conn, m, statusMsg, fbdlResult.quality);
                 
-                await conn.sendMessage(m.chat, {
-                    text: `📹 Video ditemukan!\n\n📝 ${videoData.title}\n⏱️ ${videoData.duration}\n🎬 ${videoData.quality}\n⏬ Downloading...`,
-                    edit: statusMsg.key
-                });
-                
-                // Download
-                const tempFile = path.join(tmpdir(), `fb_${Date.now()}.mp4`);
-                let lastProgress = 0;
-                
-                await downloadWithCurl(videoData.url, tempFile, async (progress) => {
-                    if (Math.floor(progress) - lastProgress >= 10) {
-                        lastProgress = Math.floor(progress);
-                        const bar = createProgressBar(progress);
-                        
-                        try {
-                            await conn.sendMessage(m.chat, {
-                                text: `⏬ Downloading...\n\n${bar}\n${progress.toFixed(1)}%\n\n🎬 ${videoData.quality}`,
-                                edit: statusMsg.key
-                            });
-                        } catch (e) {}
-                    }
-                });
-                
-                // Validate & Send
+                // Validate file
                 if (!fs.existsSync(tempFile)) {
                     throw new Error('Download failed');
                 }
@@ -316,9 +216,8 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
                 const caption = [
                     `*Facebook Downloader*`,
                     ``,
-                    `📝 ${videoData.title}`,
-                    `⏱️ ${videoData.duration}`,
-                    `🎬 ${videoData.quality}`,
+                    `📝 ${fbdlResult.title}`,
+                    `🎬 ${fbdlResult.quality}`,
                     `📦 ${fileSizeMB.toFixed(2)} MB`,
                     ``,
                     `✨ Success!`
@@ -332,67 +231,87 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
                 } catch (e) {}
                 
                 return; // SUCCESS, EXIT
+            } catch (downloadErr) {
+                console.error('[PRIMARY] Download error:', downloadErr.message);
+                try {
+                    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+                } catch (e) {}
+                // Fall through to secondary method
             }
         }
         
         // ============================================================
-        // SECONDARY: SnapVid (OPTIONAL)
+        // SECONDARY: API ikyiizyy.my.id
         // ============================================================
-        console.log('[SECONDARY] Trying SnapVid...');
+        console.log('[Handler] Trying API (SECONDARY)...');
         
         await conn.sendMessage(m.chat, {
-            text: '🔍 Mencoba SnapVid...',
+            text: '🔍 Mencoba API alternatif...',
             edit: statusMsg.key
         });
         
-        const snapResult = await fetchSnapVidRaw(args[0]);
+        const apiResult = await fetchFromAPI(args[0]);
         
-        if (snapResult.success) {
-            const snapUrls = extractSnapCdnUrls(snapResult.rawText);
+        if (apiResult.success) {
+            const videoData = selectBestVideoFromAPI(apiResult.data);
             
-            if (snapUrls.length > 0) {
-                const parsed = parseSnapCdnUrls(snapUrls);
+            if (videoData && videoData.url) {
+                console.log('[SECONDARY] API berhasil:', videoData.quality);
                 
-                if (parsed.length > 0) {
-                    const best = parsed[0];
+                await conn.sendMessage(m.chat, {
+                    text: `📹 Video ditemukan!\n\n📝 ${videoData.title}\n⏱️ ${videoData.duration}\n🎬 ${videoData.quality}\n⏬ Downloading...`,
+                    edit: statusMsg.key
+                });
+                
+                // Download dengan progress tracking real-time
+                const tempFile = path.join(tmpdir(), `fb_${Date.now()}.mp4`);
+                
+                try {
+                    await downloadWithProgress(videoData.url, tempFile, conn, m, statusMsg, videoData.quality);
                     
-                    console.log('[SECONDARY] SnapVid found:', best.quality);
-                    
-                    await conn.sendMessage(m.chat, {
-                        text: `📹 Video (SnapVid)\n\n🎬 ${best.quality}\n⏬ Downloading...`,
-                        edit: statusMsg.key
-                    });
-                    
-                    const tempFile = path.join(tmpdir(), `fb_${Date.now()}.mp4`);
-                    
-                    // Try direct video URL first, fallback to download wrapper
-                    const downloadUrl = best.directVideo || best.downloadUrl;
-                    
-                    await downloadWithCurl(downloadUrl, tempFile, async (progress) => {
-                        if (Math.floor(progress) % 10 === 0) {
-                            try {
-                                await conn.sendMessage(m.chat, {
-                                    text: `⏬ ${progress.toFixed(1)}%\n\n🎬 ${best.quality}`,
-                                    edit: statusMsg.key
-                                });
-                            } catch (e) {}
-                        }
-                    });
+                    // Validate file
+                    if (!fs.existsSync(tempFile)) {
+                        throw new Error('Download failed');
+                    }
                     
                     const stats = fs.statSync(tempFile);
                     const fileSizeMB = stats.size / (1024 * 1024);
                     
-                    if (fileSizeMB > 0.1 && fileSizeMB < 100) {
-                        await conn.sendFile(m.chat, tempFile, 'facebook_video.mp4', 
-                            `*Facebook Downloader*\n\n🎬 ${best.quality}\n📦 ${fileSizeMB.toFixed(2)} MB\n\n✨ Success!`, m);
-                        await conn.sendMessage(m.chat, { delete: statusMsg.key });
-                        
-                        try {
-                            fs.unlinkSync(tempFile);
-                        } catch (e) {}
-                        
-                        return; // SUCCESS
+                    if (fileSizeMB > 100) {
+                        fs.unlinkSync(tempFile);
+                        throw new Error(`Video too large (${fileSizeMB.toFixed(2)} MB)`);
                     }
+                    
+                    if (fileSizeMB < 0.1) {
+                        fs.unlinkSync(tempFile);
+                        throw new Error(`File corrupt (${fileSizeMB.toFixed(2)} MB)`);
+                    }
+                    
+                    const caption = [
+                        `*Facebook Downloader*`,
+                        ``,
+                        `📝 ${videoData.title}`,
+                        `⏱️ ${videoData.duration}`,
+                        `🎬 ${videoData.quality}`,
+                        `📦 ${fileSizeMB.toFixed(2)} MB`,
+                        ``,
+                        `✨ Success!`
+                    ].join('\n');
+                    
+                    await conn.sendFile(m.chat, tempFile, 'facebook_video.mp4', caption, m);
+                    await conn.sendMessage(m.chat, { delete: statusMsg.key });
+                    
+                    try {
+                        fs.unlinkSync(tempFile);
+                    } catch (e) {}
+                    
+                    return; // SUCCESS, EXIT
+                } catch (downloadErr) {
+                    console.error('[SECONDARY] Download error:', downloadErr.message);
+                    try {
+                        if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+                    } catch (e) {}
+                    throw new Error('Failed to download video');
                 }
             }
         }
@@ -400,7 +319,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         // ============================================================
         // TERTIARY: GIVE UP
         // ============================================================
-        throw new Error('All methods failed. Video might be private or unavailable.');
+        throw new Error('Semua metode gagal. Video mungkin private atau tidak tersedia.');
         
     } catch (error) {
         console.error('[Handler Error]', error);
@@ -410,7 +329,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         errorMessage += '\n💡 Kemungkinan:\n';
         errorMessage += '• Video private/terhapus\n';
         errorMessage += '• Link tidak valid\n';
-        errorMessage += '• API sedang maintenance';
+        errorMessage += '• Downloader sedang maintenance';
         
         try {
             await conn.sendMessage(m.chat, {
@@ -429,3 +348,159 @@ handler.tags = ['downloader'];
 handler.limit = true;
 
 export default handler;
+
+
+
+
+
+async function fbdl(videourl) {
+    const TARGET_URL = 'https://fdownloader.net/es';
+    try {
+        console.log('[FBDL] Fetching main page...');
+        const pageResponse = await axios.get(TARGET_URL, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+        });
+
+        const html = pageResponse.data;
+        const kExpMatch = html.match(/k_exp="(.*?)"/);
+        const kTokenMatch = html.match(/k_token="(.*?)"/);
+
+        const k_exp = kExpMatch ? kExpMatch[1] : null;
+        const k_token = kTokenMatch ? kTokenMatch[1] : null;
+
+        if (!k_exp || !k_token) {
+            console.error('[FBDL] Could not find tokens on the page.');
+            return { success: false, error: 'Token extraction failed' };
+        }
+
+        console.log('[FBDL] Performing search...');
+        const searchPayload = {
+            k_exp: k_exp,
+            k_token: k_token,
+            q: videourl,
+            lang: 'es',
+            web: 'fdownloader.net',
+            v: 'v2',
+            w: '',
+            cftoken: ''
+        };
+
+        const searchResponse = await axios.post('https://v3.fdownloader.net/api/ajaxSearch', qs.stringify(searchPayload), {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Origin': 'https://fdownloader.net',
+                'Referer': 'https://fdownloader.net/'
+            }
+        });
+
+        console.log('[FBDL] Search Status:', searchResponse.data.status);
+        
+        if (searchResponse.data.status === 'ok') {
+            const htmlData = searchResponse.data.data;
+            const $result = cheerio.load(htmlData);
+            
+            // Priority: 1080p render button
+            const renderButton = $result('button[onclick*="convertFile"]');
+            if (renderButton.length > 0) {
+                console.log('[FBDL] Found 1080p Render Button');
+                const videoUrl = renderButton.attr('data-videourl');
+                const videoCodec = renderButton.attr('data-videocodec');
+                const videoType = renderButton.attr('data-videotype');
+                const fquality = renderButton.attr('data-fquality');
+                
+                const audioUrl = $result('#audioUrl').val();
+                const audioType = $result('#audioType').val();
+                const v_id = $result('#FbId').val();
+
+                const cTokenMatch = htmlData.match(/c_token\s*=\s*"(.*?)"/);
+                const kExpMatchRes = htmlData.match(/k_exp\s*=\s*"(.*?)"/);
+                const kUrlConvertMatch = htmlData.match(/k_url_convert\s*=\s*"(.*?)"/);
+
+                const c_token = cTokenMatch ? cTokenMatch[1] : null;
+                const k_exp_res = kExpMatchRes ? kExpMatchRes[1] : null;
+                const k_url_convert = kUrlConvertMatch ? kUrlConvertMatch[1] : 'https://s3.vidcdn.app/api/json/convert';
+
+                if (videoUrl && audioUrl && c_token) {
+                    console.log('[FBDL] Initiating 1080p Conversion...');
+                    
+                    const convertPayload = {
+                        ftype: 'mp4',
+                        v_id: v_id,
+                        videoUrl: videoUrl,
+                        videoType: videoType,
+                        videoCodec: videoCodec,
+                        audioUrl: audioUrl,
+                        audioType: audioType,
+                        fquality: fquality,
+                        fname: 'FDownloader.net',
+                        exp: k_exp_res,
+                        token: c_token,
+                        cv: 'v2'
+                    };
+
+                    try {
+                        const convertResponse = await axios.post(k_url_convert, qs.stringify(convertPayload), {
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                'Origin': 'https://fdownloader.net',
+                                'Referer': 'https://fdownloader.net/'
+                            }
+                        });
+
+                        if (convertResponse.data && convertResponse.data.d) {
+                            console.log('[FBDL] 1080p download ready:', convertResponse.data.d);
+                            return {
+                                success: true,
+                                quality: '1080p',
+                                url: convertResponse.data.d,
+                                title: 'Facebook Video',
+                                duration: 'Unknown'
+                            };
+                        }
+                    } catch (convErr) {
+                        console.error('[FBDL] Conversion Error:', convErr.message);
+                    }
+                }
+            }
+
+            // Fallback: Direct download links
+            const downloadLinks = [];
+            $result('a.download-link-fb').each((i, el) => {
+                const quality = $result(el).closest('tr').find('.video-quality').text().trim();
+                const href = $result(el).attr('href');
+                if (href) {
+                    downloadLinks.push({ quality, url: href });
+                }
+            });
+
+            if (downloadLinks.length > 0) {
+                // Sort by quality: prioritize HD
+                const qualityScore = { '1080p': 100, '720p': 80, 'hd': 70, '480p': 50, '360p': 40, 'sd': 20 };
+                downloadLinks.sort((a, b) => {
+                    const scoreA = qualityScore[a.quality?.toLowerCase()] || 0;
+                    const scoreB = qualityScore[b.quality?.toLowerCase()] || 0;
+                    return scoreB - scoreA;
+                });
+
+                console.log('[FBDL] Found download links, best quality:', downloadLinks[0].quality);
+                return {
+                    success: true,
+                    quality: downloadLinks[0].quality,
+                    url: downloadLinks[0].url,
+                    title: 'Facebook Video',
+                    duration: 'Unknown'
+                };
+            }
+        }
+
+        return { success: false, error: 'No video found' };
+
+    } catch (error) {
+        console.error('[FBDL] Error:', error.message);
+        return { success: false, error: error.message };
+    }
+}

@@ -1,6 +1,4 @@
-let {
-	proto
-} = (await import('baileys')).default
+import { proto } from 'baileys'
 
 export async function all(m) {
 	let setting = global.db.data.settings[this.user.jid]
