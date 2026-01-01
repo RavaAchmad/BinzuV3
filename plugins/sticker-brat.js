@@ -84,8 +84,9 @@ export async function generateBratSticker(text) {
         
         const response = await axios.get(apiUrl, {
             headers: {
-                'accept': 'image/gif',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                'accept': 'image/png,image/gif,*/*',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Referer': 'https://api.ryzumi.vip/'
             },
             responseType: 'arraybuffer',
             timeout: 15000,
@@ -128,14 +129,15 @@ export async function generateBratAnimated(text) {
         
         const response = await axios.get(apiUrl, {
             headers: {
-                'accept': 'image/gif',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                'accept': 'image/png,image/gif,*/*',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Referer': 'https://api.ryzumi.vip/'
             },
             responseType: 'arraybuffer',
             timeout: 15000,
             httpAgent: proxyAgent,
             httpsAgent: proxyAgent,
-            proxy: false
+            proxy: true
         });
         
         if (!response.data) {
@@ -236,6 +238,7 @@ const utils = {
                 "content-type": "application/json",
                 "origin": "https://try.playwright.tech",
                 "referer": "https://try.playwright.tech/",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             },
             timeout: 30000,
             httpAgent: proxyAgent,
@@ -250,6 +253,10 @@ const utils = {
     
     const imageResponse = await axios.get(imageUrl, { 
         responseType: 'arraybuffer',
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        timeout: 15000,
         httpAgent: proxyAgent,
         httpsAgent: proxyAgent,
         proxy: false
