@@ -5,6 +5,8 @@
 • Author : Agas
 */
 
+import { generateIQC } from '../iqc/index.js';
+
 let handler = async (m, { conn, text }) => {
     if (!text) return m.reply('Example :\n.iqc lu hitam');
 
@@ -30,36 +32,31 @@ let handler = async (m, { conn, text }) => {
     const statusBarTime = new Intl.DateTimeFormat('id-ID', timeFormat).format(date);
 
     try {
-        const primaryUrl = `https://api.zenzxz.my.id/maker/fakechatiphone?text=${encodeURIComponent(text.trim())}&chatime=${encodeURIComponent(chatTime)}&statusbartime=${encodeURIComponent(statusBarTime)}`;
-        
-        const response = await fetch(primaryUrl);
-        if (!response.ok) throw new Error('Gagal mengambil gambar dari API');
-
-        await conn.sendMessage(m.chat, {
-            image: { url: primaryUrl }
-        }, { quoted: m });
-
-        await conn.sendMessage(m.chat, {
-            react: { text: '✅', key: m.key }
+        const result = await generateIQC(text.trim(), chatTime, {
+            baterai: [true, "100"],
+            operator: true,
+            timebar: true,
+            wifi: true
         });
-    } catch (e) {
-        console.error('Primary API gagal, coba fallback:', e);
-        try {
-            const fallbackUrl = `https://api.deline.my.id/maker/iqc?text=${encodeURIComponent(text.trim())}&chatTime=${encodeURIComponent(chatTime)}&statusBarTime=${encodeURIComponent(statusBarTime)}`;
 
+        if (result.success && result.image) {
             await conn.sendMessage(m.chat, {
-                image: { url: fallbackUrl }
+                image: result.image,
+                mimetype: result.mimeType
             }, { quoted: m });
 
             await conn.sendMessage(m.chat, {
                 react: { text: '✅', key: m.key }
             });
-        } catch (e) {
-            await conn.sendMessage(m.chat, {
-                react: { text: '❌', key: m.key }
-            });
-            throw e;
+        } else {
+            throw new Error('Gagal generate IQC');
         }
+    } catch (e) {
+        console.error('Error generating IQC:', e);
+        await conn.sendMessage(m.chat, {
+            react: { text: '❌', key: m.key }
+        });
+        throw e;
     }
 };
 

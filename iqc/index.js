@@ -1,0 +1,1 @@
+export { generateIQC } from "./iqc.js";
