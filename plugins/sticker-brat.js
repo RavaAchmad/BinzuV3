@@ -174,23 +174,22 @@ export async function generateBratAnimated(text) {
         
         if (response.status !== 200) {
             console.error('❌ API Error Status:', response.status);
-   
-    const imageResponse = await axios.get(imageUrl, { 
-        responseType: 'arraybuffer',
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        },
-        timeout: 15000,
-        httpAgent: proxyAgent,
-        httpsAgent: proxyAgent,
-        proxy: false
-    });
-    
-    return await sharp(imageResponse.data)
-        .resize(512, 512, {
-            fit: 'contain',
-            background: { r: 255, g: 255, b: 255, alpha: 1 }
-        })
-        .png()
-        .toBuffer();
+            throw new Error(`API returned status ${response.status}`);
+        }
+        
+        if (!response.data || response.data.length === 0) {
+            throw new Error('API returned empty data');
+        }
+
+        return Buffer.from(response.data);
+        
+    } catch (error) {
+        console.error('❌ Animated API Request Failed:');
+        console.error('Error Message:', error.message);
+        if (error.response) {
+            console.error('Response Status:', error.response.status);
+            console.error('Response Data:', error.response.data);
+        }
+        throw error;
+    }
 }
