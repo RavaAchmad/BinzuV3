@@ -1,4 +1,6 @@
 import { Sticker } from 'wa-sticker-formatter';
+import { generateBratSticker } from './brat-generator.js';
+import axios from 'axios';
 import sharp from 'sharp';
 
 var handler = async (m, { conn, text, command }) => {
@@ -10,15 +12,17 @@ var handler = async (m, { conn, text, command }) => {
         const maxTextLength = 151 - emojiText.length;
         let clippedText = text.substring(0, maxTextLength);
 
-        // Generate brat sticker locally
-        let imageBuffer = await generateBratSticker(clippedText, 512, 512);
+        m.reply('⏳ Generating brat sticker...');
+        
+        // Generate using API with auto fallback
+        let imageBuffer = await generateBratSticker(clippedText);
         
         let stiker = await createSticker(imageBuffer, false, '', '');
         await conn.sendFile(m.chat, stiker, '', '', m);
         
     } catch (e) {
         console.log(e);
-        m.reply('Gagal membuat stiker');
+        m.reply('❌ Gagal membuat stiker: ' + e.message);
     }
 }
 
@@ -40,86 +44,139 @@ async function createSticker(img, url, packName, authorName, quality) {
 }
 
 
+
 /**
- * Generate brat sticker with white background
- * @param {string} text - Text to display on sticker
- * @param {number} width - Image width (default: 512)
- * @param {number} height - Image height (default: 512)
+ * Generate brat sticker with auto fallback
+ * @param {string} text - Text to display
  * @returns {Promise<Buffer>} Image buffer
  */
-export async function generateBratSticker(text, width = 512, height = 512) {
+export async function generateBratSticker(text) {
+    // Try API first (faster)
     try {
-        // Text configuration
-        const fontSize = 48;
-        const lineHeight = 60;
-        const maxWidth = width - 80; // padding 40px each side
+        const apiUrl = `https://api.ryzumi.vip/api/image/brat/animated?text=${encodeURIComponent(text)}`;
         
-        // Word wrap function
-        const wrapText = (text, maxWidth) => {
-            const words = text.split(' ');
-            const lines = [];
-            let currentLine = '';
-            
-            for (const word of words) {
-                const testLine = currentLine ? `${currentLine} ${word}` : word;
-                // Approximate width calculation (rough estimate)
-                const estimatedWidth = testLine.length * (fontSize * 0.6);
-                
-                if (estimatedWidth <= maxWidth) {
-                    currentLine = testLine;
-                } else {
-                    if (currentLine) lines.push(currentLine);
-                    currentLine = word;
-                }
-            }
-            if (currentLine) lines.push(currentLine);
-            
-            return lines;
-        };
-        
-        const lines = wrapText(text.toLowerCase(), maxWidth);
-        const totalTextHeight = lines.length * lineHeight;
-        const startY = (height - totalTextHeight) / 2 + fontSize;
-        
-        // Create SVG text
-        let svgText = '';
-        lines.forEach((line, index) => {
-            const y = startY + (index * lineHeight);
-            svgText += `<text x="50%" y="${y}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${fontSize}" fill="#000000" style="filter: blur(0.5px);">${escapeXml(line)}</text>`;
+        const response = await axios.get(apiUrl, {
+            headers: {
+                'accept': 'image/gif',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            },
+            responseType: 'arraybuffer',
+            timeout: 10000
         });
         
-        // Create SVG
-        const svg = `
-        <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-            <rect width="100%" height="100%" fill="#FFFFFF"/>
-            ${svgText}
-        </svg>
-        `;
-        
-        // Convert SVG to PNG buffer using sharp
-        const buffer = await sharp(Buffer.from(svg))
+        const buffer = await sharp(response.data, { animated: false })
+            .resize(512, 512, {
+                fit: 'contain',
+                background: { r: 255, g: 255, b: 255, alpha: 1 }
+            })
             .png()
             .toBuffer();
         
         return buffer;
         
-    } catch (error) {
-        console.error('Error generating brat sticker:', error);
-        throw error;
+    } catch (apiError) {
+        console.log('API failed, trying scraper fallback...');
+        
+        // Fallback to scraper
+        try {
+            return await generateBratStickerScrape(text);
+        } catch (scrapeError) {
+            console.error('Both methods failed');
+            throw new Error('Failed to generate brat sticker');
+        }
     }
 }
 
-/**
- * Escape XML special characters
- */
-function escapeXml(text) {
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;');
-}
+export async function generateBratStickerScrape(text) {
+    const code = `
+const { chromium } = require('playwright');
+const config = {
+  viewport: { width: 1920, height: 1080 },
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+};
 
-// Example usage:
-// const buffer = await generateBratSticker('life is too short to argue just say KOCAK and move on');
+let browser, page;
+
+const utils = {
+  async initialize() {
+    if (!browser) {
+      browser = await chromium.launch({ headless: true });
+      const context = await browser.newContext({
+        viewport: config.viewport,
+        userAgent: config.userAgent
+      });
+      
+      await context.route('**/*', (route) => {
+        const url = route.request().url();
+        if (url.endsWith('.png') || url.endsWith('.jpg') || url.includes('google-analytics')) {
+          return route.abort();
+        }
+        route.continue();
+      });
+      
+      page = await context.newPage();
+      await page.goto('https://www.bratgenerator.com/', {
+        waitUntil: 'domcontentloaded',
+        timeout: 10000
+      });
+      
+      try {
+        await page.click('#onetrust-accept-btn-handler', { timeout: 2000 });
+      } catch {}
+      
+      await page.evaluate(() => setupTheme('white'));
+    }
+  },
+  
+  async generateBrat(text) {
+    await this.initialize();
+    await page.fill('#textInput', text);
+    const overlay = page.locator('#textOverlay');
+    return overlay.screenshot({
+      timeout: 3000,
+      path: "brat-" + Date.now() + ".png"
+    });
+  },
+  
+  async close() {
+    if (browser) await browser.close();
+  }
+};
+
+(async () => {
+  try {
+    await utils.initialize();
+    await utils.generateBrat(${JSON.stringify(text)});
+    await utils.close();
+  } catch (error) {
+    console.error(error);
+  }
+})();
+`;
+
+    const response = await axios.post(
+        "https://try.playwright.tech/service/control/run",
+        { language: "javascript", code },
+        {
+            headers: {
+                "content-type": "application/json",
+                "origin": "https://try.playwright.tech",
+                "referer": "https://try.playwright.tech/",
+            },
+            timeout: 30000
+        }
+    );
+
+    if (!response.data.success) throw new Error("Scraper failed");
+
+    const imageUrl = "https://try.playwright.tech" + response.data.files[0].publicURL;
+    const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+    
+    return await sharp(imageResponse.data)
+        .resize(512, 512, {
+            fit: 'contain',
+            background: { r: 255, g: 255, b: 255, alpha: 1 }
+        })
+        .png()
+        .toBuffer();
+}
