@@ -88,17 +88,26 @@ export async function generateBratSticker(text) {
     try {
         const response = await axios.get(apiUrl, {
             headers: {
-                'accept': 'image/png,image/gif,*/*',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
                 'Referer': 'https://api.ryzumi.vip/',
-                'Cache-Control': 'no-cache'
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'image',
+                'Sec-Fetch-Mode': 'no-cors',
+                'Sec-Fetch-Site': 'same-origin',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
             },
             responseType: 'arraybuffer',
             timeout: 15000,
             httpAgent: proxyAgent,
             httpsAgent: proxyAgent,
             proxy: false,
-            validateStatus: () => true // Accept all status codes
+            validateStatus: () => true
         });
         
         console.log('✓ Response Status:', response.status);
@@ -107,7 +116,11 @@ export async function generateBratSticker(text) {
         
         if (response.status !== 200) {
             console.error('❌ API Error Status:', response.status);
-            console.error('❌ Response Body:', response.data.toString());
+            if (response.status === 403) {
+                console.error('❌ Cloudflare Challenge detected - trying without proxy...');
+                return await generateBratStickerNoProxy(text);
+            }
+            console.error('❌ Response Body:', response.data.toString().slice(0, 500));
             throw new Error(`API returned status ${response.status}`);
         }
         
@@ -142,6 +155,51 @@ export async function generateBratSticker(text) {
 }
 
 /**
+ * Fallback: Try API without proxy (bypass Cloudflare)
+ */
+async function generateBratStickerNoProxy(text) {
+    const apiUrl = `https://api.ryzumi.vip/api/image/brat?text=${encodeURIComponent(text)}`;
+    
+    console.log('🔄 Trying API without proxy...');
+    
+    try {
+        const response = await axios.get(apiUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer': 'https://api.ryzumi.vip/'
+            },
+            responseType: 'arraybuffer',
+            timeout: 15000,
+            validateStatus: () => true
+        });
+        
+        console.log('✓ No-Proxy Response Status:', response.status);
+        
+        if (response.status !== 200) {
+            throw new Error(`API returned status ${response.status} even without proxy`);
+        }
+        
+        const buffer = await sharp(response.data, { animated: false })
+            .resize(512, 512, {
+                fit: 'contain',
+                background: { r: 255, g: 255, b: 255, alpha: 1 }
+            })
+            .png()
+            .toBuffer();
+        
+        console.log('✓ Image processed successfully (no proxy):', buffer.length, 'bytes');
+        return buffer;
+        
+    } catch (error) {
+        console.error('❌ No-Proxy API also failed:', error.message);
+        throw error;
+    }
+}
+
+/**
  * Generate animated brat GIF
  * @param {string} text - Text to display
  * @returns {Promise<Buffer>} Animated GIF buffer
@@ -156,10 +214,16 @@ export async function generateBratAnimated(text) {
     try {
         const response = await axios.get(apiUrl, {
             headers: {
-                'accept': 'image/png,image/gif,*/*',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
                 'Referer': 'https://api.ryzumi.vip/',
-                'Cache-Control': 'no-cache'
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Sec-Fetch-Dest': 'image',
+                'Sec-Fetch-Mode': 'no-cors',
+                'Sec-Fetch-Site': 'same-origin'
             },
             responseType: 'arraybuffer',
             timeout: 15000,
@@ -174,6 +238,10 @@ export async function generateBratAnimated(text) {
         
         if (response.status !== 200) {
             console.error('❌ API Error Status:', response.status);
+            if (response.status === 403) {
+                console.error('❌ Cloudflare Challenge detected - trying without proxy...');
+                return await generateBratAnimatedNoProxy(text);
+            }
             throw new Error(`API returned status ${response.status}`);
         }
         
@@ -188,8 +256,41 @@ export async function generateBratAnimated(text) {
         console.error('Error Message:', error.message);
         if (error.response) {
             console.error('Response Status:', error.response.status);
-            console.error('Response Data:', error.response.data);
         }
+        throw error;
+    }
+}
+
+/**
+ * Fallback: Try animated API without proxy
+ */
+async function generateBratAnimatedNoProxy(text) {
+    const apiUrl = `https://api.ryzumi.vip/api/image/brat/animated?text=${encodeURIComponent(text)}`;
+    
+    console.log('🔄 Trying animated API without proxy...');
+    
+    try {
+        const response = await axios.get(apiUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9'
+            },
+            responseType: 'arraybuffer',
+            timeout: 15000,
+            validateStatus: () => true
+        });
+        
+        console.log('✓ No-Proxy Response Status:', response.status);
+        
+        if (response.status !== 200) {
+            throw new Error(`API returned status ${response.status} even without proxy`);
+        }
+
+        return Buffer.from(response.data);
+        
+    } catch (error) {
+        console.error('❌ No-Proxy animated API also failed:', error.message);
         throw error;
     }
 }
