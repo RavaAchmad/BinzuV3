@@ -1,5 +1,4 @@
 import { Sticker } from 'wa-sticker-formatter';
-import { generateBratSticker } from './brat-generator.js';
 import axios from 'axios';
 import sharp from 'sharp';
 
