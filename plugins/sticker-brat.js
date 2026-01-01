@@ -67,7 +67,7 @@ const proxyAgent = new HttpsProxyAgent(proxyUrl);
 export async function generateBratSticker(text) {
     // Try API first (faster)
     try {
-        const apiUrl = `https://api.ryzumi.vip/api/image/brat/animated?text=${encodeURIComponent(text)}`;
+        const apiUrl = `https://api.ryzumi.vip/api/image/brat?text=${encodeURIComponent(text)}`;
         
         const response = await axios.get(apiUrl, {
             headers: {
