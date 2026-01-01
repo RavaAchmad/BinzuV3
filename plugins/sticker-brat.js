@@ -73,27 +73,47 @@ async function createSticker(img, url, packName, authorName, quality) {
 }
 
 /**
- * Generate brat sticker with auto fallback and proxy support
+ * Generate brat sticker with proxy support and detailed debugging
  * @param {string} text - Text to display
  * @returns {Promise<Buffer>} Image buffer
  */
 export async function generateBratSticker(text) {
-    // Try API first (faster)
+    const apiUrl = `https://api.ryzumi.vip/api/image/brat?text=${encodeURIComponent(text)}`;
+    
+    console.log('🔍 API Debug Info:');
+    console.log('URL:', apiUrl);
+    console.log('Proxy:', `${PROXY_CONFIG.host}:${PROXY_CONFIG.port}`);
+    console.log('Text:', text);
+    
     try {
-        const apiUrl = `https://api.ryzumi.vip/api/image/brat?text=${encodeURIComponent(text)}`;
-        
         const response = await axios.get(apiUrl, {
             headers: {
                 'accept': 'image/png,image/gif,*/*',
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Referer': 'https://api.ryzumi.vip/'
+                'Referer': 'https://api.ryzumi.vip/',
+                'Cache-Control': 'no-cache'
             },
             responseType: 'arraybuffer',
             timeout: 15000,
             httpAgent: proxyAgent,
             httpsAgent: proxyAgent,
-            proxy: false // Disable axios default proxy, use agent instead
+            proxy: false,
+            validateStatus: () => true // Accept all status codes
         });
+        
+        console.log('✓ Response Status:', response.status);
+        console.log('✓ Response Headers:', response.headers);
+        console.log('✓ Response Data Size:', response.data.length, 'bytes');
+        
+        if (response.status !== 200) {
+            console.error('❌ API Error Status:', response.status);
+            console.error('❌ Response Body:', response.data.toString());
+            throw new Error(`API returned status ${response.status}`);
+        }
+        
+        if (!response.data || response.data.length === 0) {
+            throw new Error('API returned empty data');
+        }
         
         const buffer = await sharp(response.data, { animated: false })
             .resize(512, 512, {
@@ -103,18 +123,21 @@ export async function generateBratSticker(text) {
             .png()
             .toBuffer();
         
+        console.log('✓ Image processed successfully:', buffer.length, 'bytes');
         return buffer;
         
-    } catch (apiError) {
-        console.log('API failed, trying fallback...', apiError.message);
-        
-        // Fallback to scraper
-        try {
-            return await generateBratStickerScrape(text);
-        } catch (scrapeError) {
-            console.error('Both methods failed:', scrapeError.message);
-            throw new Error('Failed to generate brat sticker');
+    } catch (error) {
+        console.error('❌ API Request Failed:');
+        console.error('Error Message:', error.message);
+        if (error.response) {
+            console.error('Response Status:', error.response.status);
+            console.error('Response Data:', error.response.data);
+            console.error('Response Headers:', error.response.headers);
         }
+        if (error.code) {
+            console.error('Error Code:', error.code);
+        }
+        throw error;
     }
 }
 
@@ -124,133 +147,34 @@ export async function generateBratSticker(text) {
  * @returns {Promise<Buffer>} Animated GIF buffer
  */
 export async function generateBratAnimated(text) {
+    const apiUrl = `https://api.ryzumi.vip/api/image/brat/animated?text=${encodeURIComponent(text)}`;
+    
+    console.log('🎬 Animated API Debug Info:');
+    console.log('URL:', apiUrl);
+    console.log('Text:', text);
+    
     try {
-        const apiUrl = `https://api.ryzumi.vip/api/image/brat/animated?text=${encodeURIComponent(text)}`;
-        
         const response = await axios.get(apiUrl, {
             headers: {
                 'accept': 'image/png,image/gif,*/*',
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Referer': 'https://api.ryzumi.vip/'
+                'Referer': 'https://api.ryzumi.vip/',
+                'Cache-Control': 'no-cache'
             },
             responseType: 'arraybuffer',
             timeout: 15000,
             httpAgent: proxyAgent,
             httpsAgent: proxyAgent,
-            proxy: true
+            proxy: false,
+            validateStatus: () => true
         });
         
-        if (!response.data) {
-            throw new Error('Failed to generate animated Brat GIF');
-        }
-
-        return Buffer.from(response.data);
+        console.log('✓ Response Status:', response.status);
+        console.log('✓ Response Data Size:', response.data.length, 'bytes');
         
-    } catch (apiError) {
-        console.error('Animated API failed:', apiError.message);
-        throw new Error('Failed to generate animated brat sticker');
-    }
-}
-
-/**
- * Scraper fallback with proxy
- */
-async function generateBratStickerScrape(text) {
-    const code = `
-const { chromium } = require('playwright');
-const config = {
-  viewport: { width: 1920, height: 1080 },
-  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-};
-
-let browser, page;
-
-const utils = {
-  async initialize() {
-    if (!browser) {
-      browser = await chromium.launch({ 
-        headless: true,
-        args: ['--proxy-server=${PROXY_CONFIG.host}:${PROXY_CONFIG.port}']
-      });
-      
-      const context = await browser.newContext({
-        viewport: config.viewport,
-        userAgent: config.userAgent,
-        httpCredentials: {
-          username: '${PROXY_CONFIG.auth.username}',
-          password: '${PROXY_CONFIG.auth.password}'
-        }
-      });
-      
-      await context.route('**/*', (route) => {
-        const url = route.request().url();
-        if (url.endsWith('.png') || url.endsWith('.jpg') || url.includes('google-analytics')) {
-          return route.abort();
-        }
-        route.continue();
-      });
-      
-      page = await context.newPage();
-      await page.goto('https://www.bratgenerator.com/', {
-        waitUntil: 'domcontentloaded',
-        timeout: 10000
-      });
-      
-      try {
-        await page.click('#onetrust-accept-btn-handler', { timeout: 2000 });
-      } catch {}
-      
-      await page.evaluate(() => setupTheme('white'));
-    }
-  },
-  
-  async generateBrat(text) {
-    await this.initialize();
-    await page.fill('#textInput', text);
-    const overlay = page.locator('#textOverlay');
-    return overlay.screenshot({
-      timeout: 3000,
-      path: "brat-" + Date.now() + ".png"
-    });
-  },
-  
-  async close() {
-    if (browser) await browser.close();
-  }
-};
-
-(async () => {
-  try {
-    await utils.initialize();
-    await utils.generateBrat(${JSON.stringify(text)});
-    await utils.close();
-  } catch (error) {
-    console.error(error);
-  }
-})();
-`;
-
-    const response = await axios.post(
-        "https://try.playwright.tech/service/control/run",
-        { language: "javascript", code },
-        {
-            headers: {
-                "content-type": "application/json",
-                "origin": "https://try.playwright.tech",
-                "referer": "https://try.playwright.tech/",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            },
-            timeout: 30000,
-            httpAgent: proxyAgent,
-            httpsAgent: proxyAgent,
-            proxy: false
-        }
-    );
-
-    if (!response.data.success) throw new Error("Scraper failed");
-
-    const imageUrl = "https://try.playwright.tech" + response.data.files[0].publicURL;
-    
+        if (response.status !== 200) {
+            console.error('❌ API Error Status:', response.status);
+   
     const imageResponse = await axios.get(imageUrl, { 
         responseType: 'arraybuffer',
         headers: {
