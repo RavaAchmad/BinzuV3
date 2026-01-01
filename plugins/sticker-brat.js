@@ -1,6 +1,7 @@
 import { Sticker } from 'wa-sticker-formatter';
 import axios from 'axios';
 import sharp from 'sharp';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 var handler = async (m, { conn, text, command }) => {
     if (!text) return m.reply('Masukan text');
@@ -44,8 +45,22 @@ async function createSticker(img, url, packName, authorName, quality) {
 
 
 
+// Proxy configuration
+const PROXY_CONFIG = {
+    host: '34.101.119.108',
+    port: 3128,
+    auth: {
+        username: 'xmaze',
+        password: 'xmpanel'
+    }
+};
+
+// Create proxy agent
+const proxyUrl = `http://${PROXY_CONFIG.auth.username}:${PROXY_CONFIG.auth.password}@${PROXY_CONFIG.host}:${PROXY_CONFIG.port}`;
+const proxyAgent = new HttpsProxyAgent(proxyUrl);
+
 /**
- * Generate brat sticker with auto fallback
+ * Generate brat sticker with auto fallback and proxy support
  * @param {string} text - Text to display
  * @returns {Promise<Buffer>} Image buffer
  */
@@ -60,7 +75,10 @@ export async function generateBratSticker(text) {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             },
             responseType: 'arraybuffer',
-            timeout: 10000
+            timeout: 15000,
+            httpAgent: proxyAgent,
+            httpsAgent: proxyAgent,
+            proxy: false // Disable axios default proxy, use agent instead
         });
         
         const buffer = await sharp(response.data, { animated: false })
@@ -74,19 +92,22 @@ export async function generateBratSticker(text) {
         return buffer;
         
     } catch (apiError) {
-        console.log('API failed, trying scraper fallback...');
+        console.log('API failed, trying scraper fallback...', apiError.message);
         
         // Fallback to scraper
         try {
             return await generateBratStickerScrape(text);
         } catch (scrapeError) {
-            console.error('Both methods failed');
+            console.error('Both methods failed:', scrapeError.message);
             throw new Error('Failed to generate brat sticker');
         }
     }
 }
 
-export async function generateBratStickerScrape(text) {
+/**
+ * Scraper fallback with proxy
+ */
+async function generateBratStickerScrape(text) {
     const code = `
 const { chromium } = require('playwright');
 const config = {
@@ -99,10 +120,18 @@ let browser, page;
 const utils = {
   async initialize() {
     if (!browser) {
-      browser = await chromium.launch({ headless: true });
+      browser = await chromium.launch({ 
+        headless: true,
+        args: ['--proxy-server=${PROXY_CONFIG.host}:${PROXY_CONFIG.port}']
+      });
+      
       const context = await browser.newContext({
         viewport: config.viewport,
-        userAgent: config.userAgent
+        userAgent: config.userAgent,
+        httpCredentials: {
+          username: '${PROXY_CONFIG.auth.username}',
+          password: '${PROXY_CONFIG.auth.password}'
+        }
       });
       
       await context.route('**/*', (route) => {
@@ -162,14 +191,23 @@ const utils = {
                 "origin": "https://try.playwright.tech",
                 "referer": "https://try.playwright.tech/",
             },
-            timeout: 30000
+            timeout: 30000,
+            httpAgent: proxyAgent,
+            httpsAgent: proxyAgent,
+            proxy: false
         }
     );
 
     if (!response.data.success) throw new Error("Scraper failed");
 
     const imageUrl = "https://try.playwright.tech" + response.data.files[0].publicURL;
-    const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+    
+    const imageResponse = await axios.get(imageUrl, { 
+        responseType: 'arraybuffer',
+        httpAgent: proxyAgent,
+        httpsAgent: proxyAgent,
+        proxy: false
+    });
     
     return await sharp(imageResponse.data)
         .resize(512, 512, {
