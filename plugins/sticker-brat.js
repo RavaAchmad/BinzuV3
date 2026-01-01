@@ -1,5 +1,4 @@
 import { Sticker } from 'wa-sticker-formatter';
-import { generateBratSticker } from './brat-generator.js'; // sesuaikan path
 import sharp from 'sharp';
 
 var handler = async (m, { conn, text, command }) => {
