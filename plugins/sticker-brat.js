@@ -1,6 +1,7 @@
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import axios from 'axios';
 import sharp from 'sharp';
+import { chromium } from 'playwright';
 
 var handler = async (m, { conn, text, command }) => {
     if (!text) return m.reply('Masukan text');
@@ -24,21 +25,38 @@ var handler = async (m, { conn, text, command }) => {
 
         // Process images
         for (let img of result.images) {
-            const imageResponse = await axios.get(img.image, {
-                responseType: 'arraybuffer',
-                timeout: 15000
-            });
+            let imageBuffer = img.buffer;
+            
+            // Process image if it came from buffer
+            if (imageBuffer) {
+                const buffer = await sharp(imageBuffer)
+                    .resize(512, 512, {
+                        fit: 'contain',
+                        background: { r: 255, g: 255, b: 255, alpha: 1 }
+                    })
+                    .png()
+                    .toBuffer();
 
-            const buffer = await sharp(imageResponse.data)
-                .resize(512, 512, {
-                    fit: 'contain',
-                    background: { r: 255, g: 255, b: 255, alpha: 1 }
-                })
-                .png()
-                .toBuffer();
+                let stiker = await createSticker(buffer, null, 'Brat Generator', 'XMCodes');
+                await conn.sendFile(m.chat, stiker, '', '', m);
+            } else if (img.image) {
+                // If image URL provided
+                const imageResponse = await axios.get(img.image, {
+                    responseType: 'arraybuffer',
+                    timeout: 15000
+                });
 
-            let stiker = await createSticker(buffer, null, 'Brat Generator', 'XMCodes');
-            await conn.sendFile(m.chat, stiker, '', '', m);
+                const buffer = await sharp(imageResponse.data)
+                    .resize(512, 512, {
+                        fit: 'contain',
+                        background: { r: 255, g: 255, b: 255, alpha: 1 }
+                    })
+                    .png()
+                    .toBuffer();
+
+                let stiker = await createSticker(buffer, null, 'Brat Generator', 'XMCodes');
+                await conn.sendFile(m.chat, stiker, '', '', m);
+            }
         }
         
         await conn.sendMessage(m.chat, {
@@ -72,130 +90,93 @@ async function createSticker(img, url, packName, authorName, quality) {
 }
 
 /**
- * Generate brat using playwright scraper
+ * Generate brat using local playwright
  */
 async function generateBrat(text) {
+    let browser, page;
+    const screenshotPath = `/tmp/brat-${Date.now()}.png`;
+    
     try {
         if (!text) return { success: false, errors: "missing text input!" };
         
-        const code = `
-const {
-  chromium
-} = require('playwright');
-
-const config = {
-  maxTextLength: 100,
-  viewport: {
-    width: 1920,
-    height: 1080
-  },
-  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-};
-
-let browser, page;
-
-const utils = {
-  async initialize() {
-    if (!browser) {
-      browser = await chromium.launch({
-        headless: true
-      });
-      const context = await browser.newContext({
-        viewport: config.viewport,
-        userAgent: config.userAgent
-      });
-
-      await context.route('**/*', (route) => {
-        const url = route.request().url();
-        if (url.endsWith('.png') || url.endsWith('.jpg') || url.includes('google-analytics')) {
-          return route.abort();
-        }
-        route.continue();
-      });
-
-      page = await context.newPage();
-      await page.goto('https://www.bratgenerator.com/', {
-        waitUntil: 'domcontentloaded',
-        timeout: 10000
-      });
-
-      try {
-        await page.click('#onetrust-accept-btn-handler', {
-          timeout: 2000
+        console.log('📸 Launching local playwright...');
+        
+        browser = await chromium.launch({
+            headless: true
         });
-      } catch {}
-
-      await page.evaluate(() => setupTheme('white'));
-    }
-  },
-
-  async generateBrat(text) {
-    await this.initialize();
-    await page.fill('#textInput', text);
-    const overlay = page.locator('#textOverlay');
-    return overlay.screenshot({
-      timeout: 3000,
-      path: "brat-" + Date.now() + ".png"
-    });
-  },
-
-  async close() {
-    if (browser) await browser.close();
-  }
-};
-
-(async () => {
-  try {
-    await utils.initialize();
-    const screenshot = await utils.generateBrat("${text}");
-    console.log(screenshot);
-    await utils.close();
-  } catch (error) {
-    console.error(error);
-  }
-})();
-`;
-
-        console.log('📸 Generating brat sticker using playwright...');
         
-        const response = await axios.post(
-            "https://try.playwright.tech/service/control/run",
-            {
-                language: "javascript",
-                code: code
+        const context = await browser.newContext({
+            viewport: {
+                width: 1920,
+                height: 1080
             },
-            {
-                headers: {
-                    "content-type": "application/json",
-                    "origin": "https://try.playwright.tech",
-                    "referer": "https://try.playwright.tech/",
-                },
-                timeout: 30000
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        });
+
+        // Block unnecessary resources
+        await context.route('**/*', (route) => {
+            const url = route.request().url();
+            if (url.endsWith('.png') || url.endsWith('.jpg') || url.includes('google-analytics') || url.includes('analytics.js')) {
+                return route.abort();
             }
-        );
+            route.continue();
+        });
 
-        const data = response.data;
+        page = await context.newPage();
         
-        console.log('✓ Response status:', response.status);
-        console.log('✓ Success:', data.success);
-        
-        if (!data.success) {
-            console.error('❌ Failed to generate brat');
-            return { success: false, errors: "failed generate brat" };
-        }
+        console.log('✓ Opening bratgenerator.com...');
+        await page.goto('https://www.bratgenerator.com/', {
+            waitUntil: 'domcontentloaded',
+            timeout: 10000
+        });
 
-        console.log('✓ Generated files:', data.files.length);
+        // Accept cookies
+        try {
+            await page.click('#onetrust-accept-btn-handler', {
+                timeout: 2000
+            });
+            console.log('✓ Cookies accepted');
+        } catch {}
+
+        // Setup theme
+        await page.evaluate(() => setupTheme('white'));
+        console.log('✓ Theme set to white');
+
+        // Fill text and generate
+        console.log('✓ Filling text:', text);
+        await page.fill('#textInput', text);
         
+        await page.waitForTimeout(1000); // Wait for render
+        
+        const overlay = page.locator('#textOverlay');
+        console.log('✓ Taking screenshot...');
+        
+        await overlay.screenshot({
+            path: screenshotPath,
+            timeout: 3000
+        });
+
+        console.log('✓ Screenshot saved to:', screenshotPath);
+
+        // Read the file
+        const fs = await import('fs');
+        const imageBuffer = fs.readFileSync(screenshotPath);
+
+        await browser.close();
+        
+        console.log('✓ Image buffer size:', imageBuffer.length, 'bytes');
+
         return {
             success: true,
-            images: data.files.map(d => ({
-                filename: d.fileName,
-                image: "https://try.playwright.tech" + d.publicURL
-            }))
+            images: [{
+                filename: `brat-${Date.now()}.png`,
+                buffer: imageBuffer
+            }]
         };
 
     } catch (error) {
-        console.error('❌ Scraper error:', error.message);
+        console.error('❌ Playwright error:', error.message);
+        if (browser) await browser.close();
         return {
             success: false,
             errors: error.message || error

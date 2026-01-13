@@ -3,6 +3,7 @@ import axios from 'axios';
 import cheerio from 'cheerio';
 import moment from 'moment-timezone';
 import FormData from "form-data";
+import { scrapeSnapTik } from '../lib/scrape.js';
 
 let handler = async (m, { conn, args, usedPrefix, text, command }) => {
     var delay = time => new Promise(res => setTimeout(res, time))
@@ -111,6 +112,23 @@ if (videoUrl) {
   } catch (e) {
     console.log(`Eror kak : ${e.message}`)
             try {
+                // Fallback ke scrapeSnapTik
+                try {
+                    console.log('Mencoba scrapeSnapTik...');
+                    const snapTikResult = await scrapeSnapTik(text);
+                    if (snapTikResult?.video) {
+                        let capt = `乂 *T I K T O K* (SnapTik)\n\n`;
+                        capt += `◦ *Title* : ${snapTikResult.title || 'No Title'}\n\n`;
+                        await conn.sendFile(m.chat, snapTikResult.video, null, capt, m);
+                        if (snapTikResult.audio) {
+                            await conn.sendMessage(m.chat, { audio: { url: snapTikResult.audio }, mimetype: 'audio/mpeg' }, { quoted: m });
+                        }
+                        return;
+                    }
+                } catch (snapTikErr) {
+                    console.log(`SnapTik error: ${snapTikErr.message}`);
+                }
+
                 const response = await axios.get(`https://api.botcahx.eu.org/api/dowloader/tiktok?url=${text}&apikey=${btc}`);
                 const res = await response.data.result;
                 if (res) {
