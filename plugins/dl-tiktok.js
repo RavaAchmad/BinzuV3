@@ -167,47 +167,61 @@ function formatK(num) {
 }
 
 async function tiktokV1(query) {
-  const encodedParams = new URLSearchParams()
-  encodedParams.set('url', query)
-  encodedParams.set('hd', '1')
+  try {
+    const encodedParams = new URLSearchParams()
+    encodedParams.set('url', query)
+    encodedParams.set('hd', '1')
 
-  const { data } = await axios.post('https://tikwm.com/api/', encodedParams, {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      Cookie: 'current_language=en',
-      'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36'
-    }
-  })
+    const { data } = await axios.post('https://tikwm.com/api/', encodedParams, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Origin': 'https://tikwm.com',
+        'Referer': 'https://tikwm.com/'
+      },
+      timeout: 10000
+    })
 
-  return data
+    return data
+  } catch (error) {
+    console.log(`tiktokV1 error: ${error.message}`);
+    return { data: null };
+  }
 }
 
 async function tiktokV2(query) {
-  const form = new FormData()
-  form.append('q', query)
+  try {
+    const form = new FormData()
+    form.append('q', query)
 
-  const { data } = await axios.post('https://savetik.co/api/ajaxSearch', form, {
-    headers: {
-      ...form.getHeaders(),
-      'Accept': '*/*',
-      'Origin': 'https://savetik.co',
-      'Referer': 'https://savetik.co/en2',
-      'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36',
-      'X-Requested-With': 'XMLHttpRequest'
-    }
-  })
+    const { data } = await axios.post('https://savetik.co/api/ajaxSearch', form, {
+      headers: {
+        ...form.getHeaders(),
+        'Accept': '*/*',
+        'Origin': 'https://savetik.co',
+        'Referer': 'https://savetik.co/en2',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      timeout: 10000
+    })
 
-  const rawHtml = data.data
-  const $ = cheerio.load(rawHtml)
-  const title = $('.thumbnail .content h3').text().trim()
-  const thumbnail = $('.thumbnail .image-tik img').attr('src')
-  const video_url = $('video#vid').attr('data-src')
+    const rawHtml = data.data
+    const $ = cheerio.load(rawHtml)
+    const title = $('.thumbnail .content h3').text().trim()
+    const thumbnail = $('.thumbnail .image-tik img').attr('src')
+    const video_url = $('video#vid').attr('data-src')
 
-  const slide_images = []
-  $('.photo-list .download-box li').each((_, el) => {
-    const imgSrc = $(el).find('.download-items__thumb img').attr('src')
-    if (imgSrc) slide_images.push(imgSrc)
-  })
+    const slide_images = []
+    $('.photo-list .download-box li').each((_, el) => {
+      const imgSrc = $(el).find('.download-items__thumb img').attr('src')
+      if (imgSrc) slide_images.push(imgSrc)
+    })
 
-  return { title, thumbnail, video_url, slide_images }
+    return { title, thumbnail, video_url, slide_images }
+  } catch (error) {
+    console.log(`tiktokV2 error: ${error.message}`);
+    return { title: '', thumbnail: '', video_url: '', slide_images: [] };
+  }
 }
