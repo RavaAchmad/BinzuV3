@@ -12,26 +12,32 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     const hasVideoFlag = args.some(arg => arg === '--video');
     const query = args.filter(arg => arg !== '--video').join(' ');
     
-    let result;
+    let results;
     
-    // Get Pinterest content
-    result = await scrapePinterest(query);
+    // Get Pinterest content (returns array)
+    results = await scrapePinterest(query);
 
-    if (!result) {
+    if (!results || results.length === 0) {
       return m.reply('❌ Tidak ditemukan konten Pinterest. Coba keyword lain.');
     }
 
+    // Filter by type based on flag
+    let filtered = results;
+    if (hasVideoFlag) {
+      filtered = results.filter(r => r.type === 'video');
+      if (filtered.length === 0) {
+        return m.reply('❌ Tidak ditemukan video. Coba keyword lain atau hapus flag --video untuk mencari gambar.');
+      }
+    } else {
+      filtered = results.filter(r => r.type === 'image');
+      if (filtered.length === 0) {
+        return m.reply('❌ Tidak ditemukan gambar. Coba gunakan flag --video untuk mencari video.');
+      }
+    }
+
+    // Pick random result
+    const result = filtered[Math.floor(Math.random() * filtered.length)];
     const { type, title, url, likes, comments, link } = result;
-    
-    // If --video flag is set, only send videos
-    if (hasVideoFlag && type !== 'video') {
-      return m.reply('❌ Konten ini bukan video. Gunakan command tanpa flag --video untuk mengambil gambar.');
-    }
-    
-    // If no --video flag, prioritize image (skip video)
-    if (!hasVideoFlag && type === 'video') {
-      return m.reply('❌ Hasil pencarian berupa video. Gunakan flag --video untuk mengambil video: ' + usedPrefix + command + ' ' + query + ' --video');
-    }
     
     let caption = `*✨ Pinterest ${type.toUpperCase()} ✨*\n\n`;
     caption += `*📌 Judul:* ${title || '-'}\n`;
