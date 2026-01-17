@@ -127,44 +127,7 @@ if (videoUrl) {
                     }
                 } catch (snapTikErr) {
                     console.log(`SnapTik error: ${snapTikErr.message}`);
-                }
-
-                const response = await axios.get(`https://api.botcahx.eu.org/api/dowloader/tiktok?url=${text}&apikey=${btc}`);
-                const res = await response.data.result;
-                if (res) {
-                    var { video, title, title_audio, audio } = res;
-
-                    const videoUrl = Array.isArray(video) ? video[0] : video;
-                    let isVideo = false;
-
-                    try {
-                        const contentCheck = await axios.head(videoUrl);
-                        const contentType = contentCheck.headers['content-type'];
-                        isVideo = contentType && (contentType.includes('video/') || contentType.includes('application/octet-stream'));
-                    } catch (verifyError) {
-                        console.log('Content verification failed:', verifyError);
-                    }
-
-                    let capt = `乂 *T I K T O K*\n\n`;
-                    capt += `◦ *Title* : ${title || 'No Title'}\n`;
-                    capt += `◦ *Audio* : ${title_audio || 'No Audio Title'}\n\n`;
-
-                    if (isVideo) {
-                        await conn.sendFile(m.chat, videoUrl, null, capt, m);
-                    } else {
-                        if (Array.isArray(video)) {
-                            await conn.sendFile(m.chat, video[0], null, capt, m);
-                            for (let i = 1; i < video.length; i++) {
-                                await conn.sendFile(m.chat, video[i], null, '', m);
-                            }
-                        } else {
-                            await conn.sendFile(m.chat, video, null, capt, m);
-                        }
-                    }
-
-                    if (audio && audio[0]) {
-                        conn.sendMessage(m.chat, { audio: { url: audio[0] }, mimetype: 'audio/mpeg' }, { quoted: m });
-                    }
+                    m.reply('❌ Error: Failed to process TikTok download');
                 }
             } catch (e) {
                 console.log(e);
