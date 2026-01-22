@@ -3,8 +3,48 @@ import fetch from 'node-fetch';
 import axios from 'axios';
 
 // ============================================================
-// YOUTUBE SCRAPER - EZCONV
+// YOUTUBE SCRAPER - YTMP3 & EZCONV
 // ============================================================
+
+const ytmp3Download = async (bitrate, format, url) => {
+  try {
+    const headers = {
+      'accept': 'application/json',
+      'accept-language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+      'content-type': 'application/json',
+      'origin': 'https://ytmp3.gg',
+      'priority': 'u=1, i',
+      'referer': 'https://ytmp3.gg/',
+      'sec-ch-ua': '"Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
+      'sec-ch-ua-mobile': '?1',
+      'sec-ch-ua-platform': '"Android"',
+      'sec-fetch-dest': 'empty',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-site': 'cross-site',
+      'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36'
+    };
+
+    const { data: v } = await axios.post('https://hub.y2mp3.co/', {
+      audioBitrate: bitrate,
+      audioFormat: format, 
+      brandName: "ytmp3.gg",
+      downloadMode: "audio",
+      url: url
+    }, { headers });
+
+    return {
+      success: true,
+      title: v?.filename,
+      url: v?.url,
+      size: v?.size || null
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e.message
+    };
+  }
+};
 
 async function downloadYoutubeShort(videoUrl) {
     try {
@@ -77,30 +117,45 @@ const handler = async (m, { conn, text, usedPrefix }) => {
         } else {
             let audioUrl;
             
-            // PRIMARY: EZCONV Scraper
-            console.log('[YT] Trying EZCONV scraper...');
-            const scraperResult = await downloadYoutubeShort(convert.url);
+            // PRIMARY: YTMP3 Scraper
+            console.log('[YT-PLAY] Trying YTMP3 scraper...');
+            const ytmp3Result = await ytmp3Download('128', 'mp3', convert.url);
             
-            if (scraperResult.success && scraperResult.data.downloadUrl) {
-                console.log('[YT] EZCONV scraper success');
+            if (ytmp3Result.success && ytmp3Result.url) {
+                console.log('[YT-PLAY] YTMP3 scraper success');
                 audioUrl = {
                     result: {
-                        mp3: scraperResult.data.downloadUrl
+                        mp3: ytmp3Result.url,
+                        title: ytmp3Result.title
                     }
                 };
             } else {
-                // SECONDARY: Fallback API
-                console.log('[YT] Trying fallback API...');
-                try {
-                    const res = await fetch(`https://api.botcahx.eu.org/api/dowloader/yt?url=${convert.url}&apikey=${btc}`);
+                // SECONDARY: EZCONV Scraper
+                console.log('[YT-PLAY] Trying EZCONV scraper...');
+                const scraperResult = await downloadYoutubeShort(convert.url);
+                
+                if (scraperResult.success && scraperResult.data.downloadUrl) {
+                    console.log('[YT-PLAY] EZCONV scraper success');
+                    audioUrl = {
+                        result: {
+                            mp3: scraperResult.data.downloadUrl,
+                            title: scraperResult.data.title
+                        }
+                    };
+                } else {
+                    // TERTIARY: Fallback API
+                    console.log('[YT-PLAY] Trying fallback API...');
                     try {
-                        audioUrl = await res.json();
+                        const res = await fetch(`https://api.botcahx.eu.org/api/dowloader/yt?url=${convert.url}&apikey=${btc}`);
+                        try {
+                            audioUrl = await res.json();
+                        } catch (e) {
+                            conn.reply('6281212035575@s.whatsapp.net', eror, m);
+                        }
                     } catch (e) {
                         conn.reply('6281212035575@s.whatsapp.net', eror, m);
+                        return;
                     }
-                } catch (e) {
-                    conn.reply('6281212035575@s.whatsapp.net', eror, m);
-                    return;
                 }
             }
 

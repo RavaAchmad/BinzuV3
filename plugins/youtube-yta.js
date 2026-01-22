@@ -2,8 +2,48 @@ import fetch from 'node-fetch';
 import axios from 'axios';
 
 // ============================================================
-// YOUTUBE SCRAPER - EZCONV
+// YOUTUBE SCRAPER - YTMP3 & EZCONV
 // ============================================================
+
+const ytmp3Download = async (bitrate, format, url) => {
+  try {
+    const headers = {
+      'accept': 'application/json',
+      'accept-language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+      'content-type': 'application/json',
+      'origin': 'https://ytmp3.gg',
+      'priority': 'u=1, i',
+      'referer': 'https://ytmp3.gg/',
+      'sec-ch-ua': '"Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
+      'sec-ch-ua-mobile': '?1',
+      'sec-ch-ua-platform': '"Android"',
+      'sec-fetch-dest': 'empty',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-site': 'cross-site',
+      'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36'
+    };
+
+    const { data: v } = await axios.post('https://hub.y2mp3.co/', {
+      audioBitrate: bitrate,
+      audioFormat: format, 
+      brandName: "ytmp3.gg",
+      downloadMode: "audio",
+      url: url
+    }, { headers });
+
+    return {
+      success: true,
+      title: v?.filename,
+      url: v?.url,
+      size: v?.size || null
+    };
+  } catch (e) {
+    return {
+      success: false,
+      error: e.message
+    };
+  }
+};
 
 async function downloadYoutubeShort(videoUrl) {
     try {
@@ -64,41 +104,64 @@ async function downloadYoutubeShort(videoUrl) {
     }
 }
 
-let handler = async (m, { conn, text, usedPrefix, command }) => {
-  if (!text) throw `*Example:* ${usedPrefix + command} https://www.youtube.com/watch?v=Z28dtg_QmFw`;
+let handler = async (m, { conn, text, usedPrefix, command, args }) => {
+  if (!text) throw `*Example:* ${usedPrefix + command} https://www.youtube.com/watch?v=Z28dtg_QmFw [format] [bitrate]\n\n*Format:* mp3 (default), m4a\n*Bitrate:* 128, 192, 320 (default 128)`;
   m.reply(wait)
   try {
+    const urlMatch = text.match(/https?:\/\/\S+/);
+    const url = urlMatch ? urlMatch[0] : text;
+    const format = args[1] || 'mp3';
+    const bitrate = args[2] || '128';
+    
     let result;
     
-    // PRIMARY: EZCONV Scraper
-    console.log('[YTA] Trying EZCONV scraper...');
-    const scraperResult = await downloadYoutubeShort(text);
+    // PRIMARY: YTMP3 Scraper
+    console.log('[YTA] Trying YTMP3 scraper...');
+    const scraperResult = await ytmp3Download(bitrate, format, url);
     
-    if (scraperResult.success && scraperResult.data.downloadUrl) {
-      console.log('[YTA] EZCONV scraper success');
+    if (scraperResult.success && scraperResult.url) {
+      console.log('[YTA] YTMP3 scraper success');
       result = {
         status: true,
         result: {
-          mp3: scraperResult.data.downloadUrl
+          mp3: scraperResult.url,
+          title: scraperResult.title,
+          size: scraperResult.size
         }
       };
     } else {
-      // SECONDARY: Fallback API
-      console.log('[YTA] Trying fallback API...');
-      const response = await fetch(`https://api.botcahx.eu.org/api/dowloader/yt?url=${encodeURIComponent(text)}&apikey=${btc}`);
-      result = await response.json();
+      // SECONDARY: EZCONV Scraper
+      console.log('[YTA] Trying EZCONV scraper...');
+      const ezconvResult = await downloadYoutubeShort(url);
+      
+      if (ezconvResult.success && ezconvResult.data.downloadUrl) {
+        console.log('[YTA] EZCONV scraper success');
+        result = {
+          status: true,
+          result: {
+            mp3: ezconvResult.data.downloadUrl,
+            title: ezconvResult.data.title
+          }
+        };
+      } else {
+        // TERTIARY: Fallback API
+        console.log('[YTA] Trying fallback API...');
+        const response = await fetch(`https://api.botcahx.eu.org/api/dowloader/yt?url=${encodeURIComponent(url)}&apikey=${btc}`);
+        result = await response.json();
+      }
     }
 
     if (result.status && result.result && result.result.mp3) {
       await conn.sendMessage(m.chat, { 
         audio: { url: result.result.mp3 }, 
-        mimetype: 'audio/mpeg' 
+        mimetype: 'audio/mpeg',
+        fileName: result.result.title || 'audio.mp3'
       }, { quoted: m });
     } else {
       throw 'Error: Unable to fetch audio';
     }
   } catch (error) {
-    throw eror
+    throw error;
   }
 };
 
