@@ -9,7 +9,7 @@ import os from 'os'
 import axios from 'axios' 
 import fs from 'fs'
 import { toAudio } from '../lib/converter.js'
-
+let cachedThumbnail = null
 let tags = {
   // 🧭 CORE / WAJIB (Tier 1)
   'main': 'Main Menu',
@@ -235,6 +235,16 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
     
     let xm4ze = await( await fetch(xmenus)).json()
     let thumb = xm4ze[Math.floor(Math.random() * xm4ze.length)]
+        if (!cachedThumbnail) {
+      try {
+        cachedThumbnail = await fetch(global.thum ? thum : thumb)
+          .then(res => res.buffer())
+      } catch {
+        cachedThumbnail = await fetch('https://g.top4top.io/p_353640c0q1.png')
+          .then(res => res.buffer())
+      }
+    }
+
     let fkon = { key: { fromMe: false, participant: `0@s.whatsapp.net`, ...(m.chat ? { remoteJid: '0@s.whatsapp.net' } : {}) }, message: { contactMessage: { displayName: `${conn.getName(conn.user.jid)}`, vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;a,;;;\nFN:${conn.getName(conn.user.jid)}\nitem1.TEL;waid=${m.sender.split('@')[0]}:${m.sender.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`}}}
 
 if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
@@ -253,7 +263,7 @@ if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
           title: global.info.namebot + ` © ` + year, 
           body: '', 
           // thumbnailUrl: global.thum ? thum : thumb, 
-          thumbnailUrl: 'https://g.top4top.io/p_353640c0q1.png',
+          thumbnailUrl: cachedThumbnail,
           mediaType: 1, 
           sourceUrl: gcbot,
           renderLargerThumbnail: true 
