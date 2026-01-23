@@ -167,7 +167,7 @@ Quality Hosting at XMPanels! Click this button to buy and get a special price. S
 
 </div>
 
----
+---"baileys": "^6.7.21",
 
 ## 👥 **Contributors**
 
