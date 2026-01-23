@@ -81,8 +81,8 @@ export default handler;
 async function createSticker(img, url, packName, authorName, quality) {
     let stickerMetadata = {
         type: 'full',
-        pack: packName || 'Brat Generator',
-        author: authorName || 'XMCodes',
+        pack: packName || 'Binzu V3',
+        author: authorName || '6289508296379',
         quality: quality || 80
     };
     return (new Sticker(img ? img : url, stickerMetadata)).toBuffer();
