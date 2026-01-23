@@ -253,7 +253,7 @@ if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
           title: global.info.namebot + ` © ` + year, 
           body: '', 
           // thumbnailUrl: global.thum ? thum : thumb, 
-          thumbnail: 'https://g.top4top.io/p_353640c0q1.png',
+          thumbnailUrl: 'https://g.top4top.io/p_353640c0q1.png',
           mediaType: 1, 
           sourceUrl: gcbot,
           renderLargerThumbnail: true 
