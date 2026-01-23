@@ -250,7 +250,8 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
 if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
   if (!db.data.settings[conn.user.jid].thumbnail) {
     conn.sendMessage(m.chat, {
-      text: textToSend,
+      text: textToSend, 
+      jpegThumbnail: cachedThumbnail,
       contextInfo: {
         mentionedJid: [m.sender],
         forwardedNewsletterMessageInfo: {
@@ -262,8 +263,7 @@ if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
           showAdAttribution: false, 
           title: global.info.namebot + ` © ` + year, 
           body: '', 
-          // thumbnailUrl: global.thum ? thum : thumb, 
-          jpegThumbnail: cachedThumbnail,
+          // thumbnailUrl: global.thum ? thum : thumb,
           mediaType: 1, 
           sourceUrl: gcbot,
           renderLargerThumbnail: true 
