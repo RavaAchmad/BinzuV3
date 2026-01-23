@@ -235,7 +235,7 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
     
     let xm4ze = await( await fetch(xmenus)).json()
     let thumb = xm4ze[Math.floor(Math.random() * xm4ze.length)]
-        if (!cachedThumbnail) {
+    if (!cachedThumbnail) {
       try {
         cachedThumbnail = await fetch(global.thum ? thum : thumb)
           .then(res => res.buffer())
@@ -263,7 +263,7 @@ if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
           title: global.info.namebot + ` © ` + year, 
           body: '', 
           // thumbnailUrl: global.thum ? thum : thumb, 
-          thumbnailUrl: cachedThumbnail,
+          jpegThumbnail: cachedThumbnail,
           mediaType: 1, 
           sourceUrl: gcbot,
           renderLargerThumbnail: true 
