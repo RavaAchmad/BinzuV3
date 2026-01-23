@@ -52,7 +52,7 @@
         "https-proxy-agent": "^7.0.6",
         "human-readable": "^0.2.1",
         "javascript-obfuscator": "^4.1.0",
-        "jimp": "^1.6.0",
+        "jimp": "^0.16.1",
         "jsdom": "^26.1.0",
         "lodash": "^4.17.21",
         "lowdb": "^3.0.0",
