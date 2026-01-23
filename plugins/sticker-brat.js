@@ -1,7 +1,6 @@
 import { Sticker, StickerTypes } from 'wa-sticker-formatter';
 import axios from 'axios';
 import sharp from 'sharp';
-import { chromium } from 'playwright';
 
 var handler = async (m, { conn, text, command }) => {
     if (!text) return m.reply('Masukan text');
@@ -90,93 +89,43 @@ async function createSticker(img, url, packName, authorName, quality) {
 }
 
 /**
- * Generate brat using local playwright
+ * Generate brat using Sawit API
  */
 async function generateBrat(text) {
-    let browser, page;
-    const screenshotPath = `/tmp/brat-${Date.now()}.png`;
-    
     try {
         if (!text) return { success: false, errors: "missing text input!" };
         
-        console.log('📸 Launching local playwright...');
+        console.log('📡 Calling Sawit API...');
         
-        browser = await chromium.launch({
-            headless: true
-        });
-        
-        const context = await browser.newContext({
-            viewport: {
-                width: 1920,
-                height: 1080
-            },
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        const response = await axios.get('https://api.sawit.biz.id/api/maker/brat', {
+            params: { text },
+            timeout: 15000
         });
 
-        // Block unnecessary resources
-        await context.route('**/*', (route) => {
-            const url = route.request().url();
-            if (url.endsWith('.png') || url.endsWith('.jpg') || url.includes('google-analytics') || url.includes('analytics.js')) {
-                return route.abort();
-            }
-            route.continue();
+        if (!response.data.status || !response.data.result?.url) {
+            throw new Error('Invalid API response');
+        }
+
+        console.log('✓ Got image URL from API:', response.data.result.url);
+
+        // Download image
+        const imageResponse = await axios.get(response.data.result.url, {
+            responseType: 'arraybuffer',
+            timeout: 15000
         });
 
-        page = await context.newPage();
-        
-        console.log('✓ Opening bratgenerator.com...');
-        await page.goto('https://www.bratgenerator.com/', {
-            waitUntil: 'domcontentloaded',
-            timeout: 10000
-        });
-
-        // Accept cookies
-        try {
-            await page.click('#onetrust-accept-btn-handler', {
-                timeout: 2000
-            });
-            console.log('✓ Cookies accepted');
-        } catch {}
-
-        // Setup theme
-        await page.evaluate(() => setupTheme('white'));
-        console.log('✓ Theme set to white');
-
-        // Fill text and generate
-        console.log('✓ Filling text:', text);
-        await page.fill('#textInput', text);
-        
-        await page.waitForTimeout(1000); // Wait for render
-        
-        const overlay = page.locator('#textOverlay');
-        console.log('✓ Taking screenshot...');
-        
-        await overlay.screenshot({
-            path: screenshotPath,
-            timeout: 3000
-        });
-
-        console.log('✓ Screenshot saved to:', screenshotPath);
-
-        // Read the file
-        const fs = await import('fs');
-        const imageBuffer = fs.readFileSync(screenshotPath);
-
-        await browser.close();
-        
-        console.log('✓ Image buffer size:', imageBuffer.length, 'bytes');
+        console.log('✓ Image downloaded, size:', imageResponse.data.length, 'bytes');
 
         return {
             success: true,
             images: [{
                 filename: `brat-${Date.now()}.png`,
-                buffer: imageBuffer
+                buffer: imageResponse.data
             }]
         };
 
     } catch (error) {
-        console.error('❌ Playwright error:', error.message);
-        if (browser) await browser.close();
+        console.error('❌ API error:', error.message);
         return {
             success: false,
             errors: error.message || error
