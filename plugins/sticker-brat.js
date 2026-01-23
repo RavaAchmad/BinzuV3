@@ -73,7 +73,6 @@ var handler = async (m, { conn, text, command }) => {
 
 handler.command = handler.help = ['brat', 'bratvid', 'bratanimated'];
 handler.tags = ['sticker'];
-handler.limit = true;
 handler.register = true;
 
 export default handler;
