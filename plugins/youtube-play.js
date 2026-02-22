@@ -70,7 +70,8 @@ const handler = async (m, { conn, text, usedPrefix }) => {
         }, { quoted: m });
 
     } catch (e) {
-        conn.reply(m.chat, eror, m);
+        console.error('Error in YouTube Play handler:', e);
+        await m.reply('An error occurred while processing your request. Please try again later.', m);
     }
 };
 
