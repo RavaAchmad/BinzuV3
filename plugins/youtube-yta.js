@@ -146,8 +146,28 @@ let handler = async (m, { conn, text, usedPrefix, command, args }) => {
       } else {
         // TERTIARY: Fallback API
         console.log('[YTA] Trying fallback API...');
-        const response = await fetch(`https://api.botcahx.eu.org/api/dowloader/yt?url=${encodeURIComponent(url)}&apikey=${btc}`);
-        result = await response.json();
+        const response = await fetch(`https://chocomilk.amira.us.kg/v1/download/aio?url=${encodeURIComponent(url)}`);
+        const res = await response.json();
+        
+        if (!res.success || !res.data?.medias?.length) throw 'Gagal mengambil audio dari API amira';
+
+        // Ambil audio terbaik (prioritas medium quality m4a)
+        const audios = res.data.medias.filter(m => m.type === 'audio');
+        const best = audios.find(a => a.audioQuality === 'AUDIO_QUALITY_MEDIUM' && a.extension === 'm4a')
+                  || audios.find(a => a.audioQuality === 'AUDIO_QUALITY_MEDIUM')
+                  || audios[0];
+
+        if (!best?.url) throw 'Audio stream tidak ditemukan';
+        
+        console.log('[YTA] Fallback API success');
+        result = {
+          status: true,
+          result: {
+            mp3: best.url,
+            title: res.data.title || 'audio.mp3',
+            size: best.size || null
+          }
+        };
       }
     }
 
@@ -158,7 +178,7 @@ let handler = async (m, { conn, text, usedPrefix, command, args }) => {
         fileName: result.result.title || 'audio.mp3'
       }, { quoted: m });
     } else {
-      throw 'Error: Unable to fetch audio';
+      throw console.log('Error: Unable to fetch audio');
     }
   } catch (error) {
     throw error;
