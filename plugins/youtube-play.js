@@ -32,7 +32,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
                   || audios[0];
 
         if (!best?.url) throw 'Audio stream tidak ditemukan';
-
+        console.log('Audio stream found:', best.url);
         let caption = '';
         caption += `∘ Title : ${res.data.title || convert.title}\n`;
         caption += `∘ Ext : Search\n`;
