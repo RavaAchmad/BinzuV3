@@ -172,6 +172,11 @@ let handler = async (m, { conn, text, usedPrefix, command, args }) => {
     }
 
     if (result.status && result.result && result.result.mp3) {
+      if (!jid || typeof jid !== 'string') {
+          console.error('❌ sendMessage dipanggil dengan jid invalid:', jid)
+          return null
+      }
+      jid = jid.includes('@') ? jid : jid + '@s.whatsapp.net'      
       await conn.sendMessage(m.chat, { 
         audio: { url: result.result.mp3 }, 
         mimetype: 'audio/mpeg',
