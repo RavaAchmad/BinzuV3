@@ -33,6 +33,7 @@ import {
   handlePairing,
   messageTemplates
 } from "./lib/connection.js";
+import { startCryptoTicker } from './plugins/crypto-ticker.js';
 
 const app = express();
 app.use(express.json());
@@ -202,7 +203,12 @@ global.reloadHandler = async function reloadHandler(restartConn) {
   conn.participantsUpdate = handlerModule.participantsUpdate.bind(global.conn);
   conn.groupsUpdate = handlerModule.groupsUpdate.bind(global.conn);
   conn.onDelete = handlerModule.deleteUpdate.bind(global.conn);
-  conn.connectionUpdate = (update) => connectionUpdate(update, conn);
+  conn.connectionUpdate = (update) => {
+    connectionUpdate(update, conn);
+    if (update.connection === 'open') {
+      startCryptoTicker(conn);
+    }
+  };
   conn.credsUpdate = saveCredentials.bind(global.conn);
 
   conn.ev.on("messages.upsert", conn.handler);

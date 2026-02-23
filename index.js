@@ -53,10 +53,6 @@ const sleep = (ms) => {
   return new Promise(resolve => setTimeout(resolve, ms));
 };
 
-import { startCryptoTicker } from './plugins/crypto-ticker.js'
-
-// Lalu di dalam handler connection.update, saat connection === 'open':
-startCryptoTicker(conn)
 
 console.clear();
 await sleep(300);
