@@ -33,6 +33,8 @@ const handler = async (m, { conn, text, usedPrefix }) => {
 
         if (!best?.url) throw 'Audio stream tidak ditemukan';
          const bufferResult = await fetchAudioAsBuffer(best.url);
+        
+        if (!bufferResult.success) throw bufferResult.error;
 
         console.log('Audio stream found:', best.url);
         let caption = '';
@@ -66,7 +68,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
         }, {});
 
         await conn.sendMessage(m.chat, {
-            audio: { url: bufferResult },
+            audio: bufferResult.buffer,
             mimetype: 'audio/mpeg',
             fileName: res.data.title || convert.title
         }, { quoted: m });

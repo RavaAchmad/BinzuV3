@@ -83,29 +83,125 @@ async function downloadYoutubeShort(videoUrl) {
 }
 
 // ============================================================
+// HELPER: Fetch audio via browser automation (Puppeteer)
+// Untuk URL yang ketat (googlevideo.com) yang perlu spoof device
+// ============================================================
+async function fetchAudioViaBrowser(audioUrl) {
+  try {
+    // Cek apakah puppeteer tersedia
+    let puppeteer;
+    try {
+      puppeteer = (await import('puppeteer')).default;
+    } catch {
+      console.warn('[YTA] Puppeteer not installed, skipping browser automation');
+      return null;
+    }
+
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    });
+
+    try {
+      const page = await browser.newPage();
+      
+      // Spoof device sebagai mobile + set referer
+      await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1');
+      await page.setViewport({ width: 390, height: 844 });
+      await page.setExtraHTTPHeaders({
+        'Referer': 'https://www.youtube.com/',
+        'Origin': 'https://www.youtube.com'
+      });
+
+      // Fetch via page
+      const response = await page.goto(audioUrl, { waitUntil: 'networkidle2', timeout: 120000 });
+      
+      if (!response.ok()) {
+        throw new Error(`HTTP ${response.status()}`);
+      }
+
+      // Ambil buffer dari response
+      const buffer = await response.buffer();
+      await page.close();
+
+      return {
+        success: true,
+        buffer: buffer,
+        contentType: 'audio/mpeg'
+      };
+    } finally {
+      await browser.close();
+    }
+  } catch (e) {
+    console.error('[YTA] fetchAudioViaBrowser error:', e.message);
+    return null;
+  }
+}
+
+// ============================================================
 // HELPER: Fetch audio as buffer
 // Wajib untuk googlevideo.com — URL-nya signed & expire,
 // kalau langsung kasih ke baileys via { url: ... } → 403
 // Solusi: download dulu ke buffer, baru kirim ke sendMessage
 // ============================================================
-async function fetchAudioAsBuffer(audioUrl) {
+async function fetchAudioAsBuffer(audioUrl, retryCount = 0) {
   try {
     const isGooglevideo = audioUrl.includes('googlevideo.com');
 
+    // Headers yang lebih lengkap & realistis untuk bypass Google Video restrictions
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+      'Accept': '*/*',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Connection': 'keep-alive',
+      'Sec-Fetch-Dest': 'audio',
+      'Sec-Fetch-Mode': 'cors',
+      'Sec-Fetch-Site': 'cross-site',
+      'Cache-Control': 'max-age=0'
+    };
+
+    // Header khusus biar googlevideo ga reject
+    if (isGooglevideo) {
+      headers['Referer'] = 'https://www.youtube.com/';
+      headers['Origin'] = 'https://www.youtube.com';
+      headers['Sec-Ch-Ua-Mobile'] = '?1';
+      headers['Sec-Ch-Ua-Platform'] = '"iOS"';
+    }
+
     const response = await axios.get(audioUrl, {
       responseType: 'arraybuffer',
-      timeout: 90000,
+      timeout: 120000,
       maxContentLength: 150 * 1024 * 1024, // max 150MB
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36',
-        // Header khusus biar googlevideo ga reject
-        ...(isGooglevideo && {
-          'Referer': 'https://www.youtube.com/',
-          'Origin': 'https://www.youtube.com',
-          'Range': 'bytes=0-'
-        })
-      }
+      maxRedirects: 5,
+      validateStatus: (status) => status < 500,
+      headers: headers
     });
+
+    // Handle 403 Forbidden dengan retry + browser automation
+    if (response.status === 403) {
+      if (retryCount < 1) {
+        console.warn(`[YTA] 403 Forbidden, retrying with different headers (${retryCount + 1}/2)...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return fetchAudioAsBuffer(audioUrl, retryCount + 1);
+      } else if (isGooglevideo) {
+        // Last attempt: coba via browser automation
+        console.warn('[YTA] Still 403, trying browser automation as last resort...');
+        const browserResult = await fetchAudioViaBrowser(audioUrl);
+        if (browserResult?.success) {
+          return browserResult;
+        }
+      }
+      throw new Error('HTTP 403: Access denied by Google Video');
+    }
+
+    if (response.status !== 200) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText || 'Failed to fetch'}`);
+    }
+
+    if (!response.data || response.data.length === 0) {
+      throw new Error('Response data is empty');
+    }
 
     return {
       success: true,
