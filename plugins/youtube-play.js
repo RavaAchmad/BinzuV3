@@ -32,6 +32,8 @@ const handler = async (m, { conn, text, usedPrefix }) => {
                   || audios[0];
 
         if (!best?.url) throw 'Audio stream tidak ditemukan';
+         const bufferResult = await fetchAudioAsBuffer(best.url);
+
         console.log('Audio stream found:', best.url);
         let caption = '';
         caption += `∘ Title : ${res.data.title || convert.title}\n`;
@@ -64,7 +66,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
         }, {});
 
         await conn.sendMessage(m.chat, {
-            audio: { url: best.url },
+            audio: { url: bufferResult },
             mimetype: 'audio/mpeg',
             fileName: res.data.title || convert.title
         }, { quoted: m });
@@ -82,3 +84,34 @@ handler.limit = true;
 handler.premium = false;
 
 export default handler;
+
+
+async function fetchAudioAsBuffer(audioUrl) {
+  try {
+    const isGooglevideo = audioUrl.includes('googlevideo.com');
+
+    const response = await axios.get(audioUrl, {
+      responseType: 'arraybuffer',
+      timeout: 90000,
+      maxContentLength: 150 * 1024 * 1024, // max 150MB
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36',
+        // Header khusus biar googlevideo ga reject
+        ...(isGooglevideo && {
+          'Referer': 'https://www.youtube.com/',
+          'Origin': 'https://www.youtube.com',
+          'Range': 'bytes=0-'
+        })
+      }
+    });
+
+    return {
+      success: true,
+      buffer: Buffer.from(response.data),
+      contentType: response.headers['content-type'] || 'audio/mpeg'
+    };
+  } catch (e) {
+    console.error('[YTA] fetchAudioAsBuffer error:', e.message);
+    return { success: false, error: e.message };
+  }
+}
