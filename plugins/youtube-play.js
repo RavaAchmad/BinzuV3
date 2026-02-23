@@ -73,7 +73,6 @@ const handler = async (m, { conn, text, usedPrefix }) => {
 
     } catch (e) {
         console.error('Error in YouTube Play handler:', e);
-        await m.reply('An error occurred while processing your request. Please try again later.', m);
     }
 };
 
