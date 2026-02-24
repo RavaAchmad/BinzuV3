@@ -10,42 +10,53 @@
 //     if (connection === 'open') startCryptoTicker(conn)
 //   })
 //
-// PERBEDAAN DARI VERSI GRUP:
-// - Broadcast dikirim ke 1 CHANNEL (newsletter) saja
-// - User yang mau notif tinggal FOLLOW channel → zero spam
-// - Bot harus admin/owner channel tersebut
-// - Set channel via: .crypto-notif set <jid>
+// FIX: Pakai global.__cryptoTicker bukan module-level variable
+// biar tahan hot-reload. Kalau module di-reload, interval lama
+// di-clear dulu sebelum buat yang baru → tidak numpuk.
 // ============================================================
 import { updatePrices, COINS, getPrice, getPriceChange, getMiniChart, formatNum, initCryptoEngine } from '../lib/crypto-engine.js'
 
-let tickerStarted = false
-
 export function startCryptoTicker(conn) {
-    if (tickerStarted) return
-    tickerStarted = true
-    console.log('[CRYPTO] Ticker started ✅')
+    // Pakai global biar tahan hot-reload plugin
+    // Kalau sudah ada interval sebelumnya → clear dulu
+    if (global.__cryptoTicker) {
+        clearInterval(global.__cryptoTicker.priceInterval)
+        clearInterval(global.__cryptoTicker.broadcastInterval)
+        console.log('[CRYPTO] Ticker lama di-clear, restart...')
+    }
+
+    global.__cryptoTicker = {}
 
     // Update harga setiap 5 menit
-    setInterval(async () => {
+    global.__cryptoTicker.priceInterval = setInterval(async () => {
         try {
-            if (global.db?.data?.crypto) {
-                updatePrices()
-                console.log('[CRYPTO] Prices updated at', new Date().toLocaleTimeString('id-ID'))
-                await checkAlerts(conn)
-            }
+            if (!global.db?.data?.crypto) return
+            updatePrices()
+            console.log('[CRYPTO] Prices updated', new Date().toLocaleTimeString('id-ID'))
+            await checkAlerts(conn)
         } catch (e) {
             console.error('[CRYPTO] Price update error:', e.message)
         }
     }, 5 * 60 * 1000)
 
     // Broadcast ke newsletter setiap 30 menit
-    setInterval(async () => {
-        try {
-            await broadcastToNewsletter(conn)
-        } catch (e) {
-            console.error('[CRYPTO] Broadcast error:', e.message)
-        }
-    }, 30 * 60 * 1000)
+    // Pakai setTimeout berantai (bukan setInterval) biar
+    // tidak overlap kalau broadcast-nya lama/lambat
+    const scheduleBroadcast = () => {
+        global.__cryptoTicker.broadcastInterval = setTimeout(async () => {
+            try {
+                await broadcastToNewsletter(conn)
+            } catch (e) {
+                console.error('[CRYPTO] Broadcast error:', e.message)
+            } finally {
+                // Jadwalkan broadcast berikutnya setelah yang ini selesai
+                scheduleBroadcast()
+            }
+        }, 30 * 60 * 1000)
+    }
+    scheduleBroadcast()
+
+    console.log('[CRYPTO] Ticker started ✅')
 }
 
 // Ambil newsletter JID dari settings DB
@@ -57,18 +68,20 @@ function getNewsletterJid(conn) {
 // Broadcast update harga ke newsletter
 async function broadcastToNewsletter(conn) {
     const newsletterJid = getNewsletterJid(conn)
-    if (!newsletterJid) {
-        // Belum diset owner, skip diam-diam
-        return
-    }
+    if (!newsletterJid) return
 
     try {
         initCryptoEngine()
         const message = buildMarketMessage()
         await conn.sendMessage(newsletterJid, { text: message })
-        console.log(`[CRYPTO] Broadcast ke newsletter ${newsletterJid} ✅`)
+        console.log(`[CRYPTO] Broadcast ke newsletter ✅`)
     } catch (e) {
-        console.error(`[CRYPTO] Gagal broadcast ke newsletter:`, e.message)
+        // Kalau 429 / rate limit → log tapi jangan crash
+        if (e?.data === 429 || e?.message?.includes('rate')) {
+            console.warn('[CRYPTO] Rate limited oleh WA, skip broadcast ini.')
+        } else {
+            console.error('[CRYPTO] Gagal broadcast:', e.message)
+        }
     }
 }
 
@@ -105,7 +118,11 @@ ${alertLines.trim()}
         await conn.sendMessage(newsletterJid, { text: alertMsg })
         console.log(`[CRYPTO] Alert dikirim ke newsletter ✅`)
     } catch (e) {
-        console.error(`[CRYPTO] Gagal kirim alert:`, e.message)
+        if (e?.data === 429 || e?.message?.includes('rate')) {
+            console.warn('[CRYPTO] Rate limited, skip alert ini.')
+        } else {
+            console.error('[CRYPTO] Gagal kirim alert:', e.message)
+        }
     }
 }
 
@@ -141,7 +158,7 @@ ${rows.trim()}
 `.trim()
 }
 
-// Dummy handler biar ga error saat di-load sebagai plugin
+// Dummy handler biar tidak error saat di-load sebagai plugin biasa
 let handler = async () => {}
 handler.help = []
 handler.tags = []
