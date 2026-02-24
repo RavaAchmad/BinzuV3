@@ -474,11 +474,8 @@ export async function handler(chatUpdate) {
 				if (!isNumber(user.unreglast)) user.unreglast = 0
 				if (!isNumber(user.upgrader)) user.upgrader = 0
 				if (!isNumber(user.vodka)) user.vodka = 0
-				if (!isNumber(user.wallet)) user.wallet = 0
-				if (!isNumber(user.cryptoWallet)) user.cryptoWallet = 0
-				if (!isNumber(user.cryptoTotalDeposit)) user.cryptoTotalDeposit = 0
 				if (!isNumber(user.cryptoTotalPnl)) user.cryptoTotalPnl = 0
-				if (!isNumber(user.cryptoLastWithdraw)) user.cryptoLastWithdraw = 0
+				if (!isNumber(user.cryptoLastSell)) user.cryptoLastSell = 0
 				if (typeof user.cryptoPortfolio !== 'object' || Array.isArray(user.cryptoPortfolio)) user.cryptoPortfolio = {}
 				if (typeof user.cryptoBuyPrice !== 'object' || Array.isArray(user.cryptoBuyPrice)) user.cryptoBuyPrice = {}
 				if (!isNumber(user.warn)) user.warn = 0
@@ -500,7 +497,7 @@ export async function handler(chatUpdate) {
 					afk: -1,
 					afkReason: "",
 					age: -1,
-					agility: 16,
+					agility: 1,
 					topup: 0,
 					anakanjing: 0,
 					anakcentaur: 0,
@@ -880,11 +877,8 @@ export async function handler(chatUpdate) {
 					unreglast: 0,
 					upgrader: 0,
 					vodka: 0,
-					wallet: 0,
-					cryptoWallet: 0,
-					cryptoTotalDeposit: 0,
 					cryptoTotalPnl: 0,
-					cryptoLastWithdraw: 0,
+					cryptoLastSell: 0,
 					cryptoPortfolio: {},
 					cryptoBuyPrice: {},
 					warn: 0,

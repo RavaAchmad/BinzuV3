@@ -1,21 +1,48 @@
 // ============================================================
-// CRYPTO SELL - Jual koin kembali ke wallet
+// CRYPTO SELL - Jual koin langsung ke user.money
 // File: plugins/crypto-sell.js
+//
+// PROTEKSI EKONOMI RPG (dipindah dari withdraw):
+// ✦ Pajak jual 15% (hangus) — cegah money printer
+// ✦ Cooldown 8 jam per sell — cegah spam flip
 // ============================================================
 import { initCryptoEngine, COINS, getPrice, isValidCoin, formatNum } from '../lib/crypto-engine.js'
+
+const TAX_RATE   = 0.15
+const COOLDOWN_MS = 8 * 60 * 60 * 1000  // 8 jam
 
 let handler = async (m, { conn, usedPrefix, args }) => {
     let user = global.db.data.users[m.sender]
 
-    if (!user.cryptoWallet) user.cryptoWallet = 0
     if (!user.cryptoPortfolio) user.cryptoPortfolio = {}
     if (!user.cryptoBuyPrice) user.cryptoBuyPrice = {}
+    if (!user.cryptoLastSell) user.cryptoLastSell = 0
     initCryptoEngine()
 
-    if (!args[0] || !args[1]) throw `❌ *Format salah!*\nGunakan: *${usedPrefix}crypto-sell <koin> <jumlah/all>*\n\n_Contoh: ${usedPrefix}crypto-sell BTC 0.5_\n_Jual semua: ${usedPrefix}crypto-sell BTC all_\n\nKoin tersedia: *${Object.keys(COINS).join(', ')}*`
+    if (!args[0] || !args[1]) throw `❌ *Format salah!*
+Gunakan: *${usedPrefix}crypto-sell <koin> <jumlah/all>*
+
+_Contoh: ${usedPrefix}crypto-sell BTC 0.5_
+_Jual semua: ${usedPrefix}crypto-sell BTC all_
+
+⚠️ _Penjualan dikenakan pajak *15%*_
+⏳ _Cooldown *8 jam* per penjualan_`
+
+    // Cek cooldown
+    const now = Date.now()
+    const sisaCooldown = COOLDOWN_MS - (now - user.cryptoLastSell)
+    if (sisaCooldown > 0) {
+        const jam   = Math.floor(sisaCooldown / (60 * 60 * 1000))
+        const menit = Math.floor((sisaCooldown % (60 * 60 * 1000)) / (60 * 1000))
+        throw `⏳ *Cooldown jual belum habis!*
+
+Kamu bisa jual lagi dalam:
+⏱ *${jam} jam ${menit} menit*
+
+_Penjualan dibatasi 1x per 8 jam._`
+    }
 
     const symbol = args[0].toUpperCase()
-
     if (!isValidCoin(symbol)) throw `❌ *Koin "${symbol}" tidak ditemukan!*\nKoin tersedia: *${Object.keys(COINS).join(', ')}*`
 
     const owned = user.cryptoPortfolio[symbol] || 0
@@ -31,27 +58,29 @@ let handler = async (m, { conn, usedPrefix, args }) => {
     if (!sellAmount || sellAmount <= 0) throw `❌ *Jumlah tidak valid!*`
     if (sellAmount > owned) throw `❌ *Kamu hanya punya ${owned} ${symbol}!*`
 
-    const price = getPrice(symbol)
-    const coin = COINS[symbol]
-    const revenue = Math.floor(sellAmount * price)
+    const price      = getPrice(symbol)
+    const coin       = COINS[symbol]
+    const gross      = Math.floor(sellAmount * price)
+    const tax        = Math.floor(gross * TAX_RATE)
+    const diterima   = gross - tax
 
-    // Hitung profit/loss
+    // Hitung P&L
     const avgBuyPrice = user.cryptoBuyPrice[symbol] || price
-    const costBasis = Math.floor(sellAmount * avgBuyPrice)
-    const pnl = revenue - costBasis
-    const pnlPct = ((revenue - costBasis) / costBasis * 100).toFixed(2)
-    const pnlEmoji = pnl >= 0 ? '🟢' : '🔴'
-    const pnlSign = pnl >= 0 ? '+' : ''
+    const costBasis   = Math.floor(sellAmount * avgBuyPrice)
+    const pnl         = diterima - costBasis   // pakai nilai setelah pajak
+    const pnlPct      = costBasis > 0 ? ((pnl / costBasis) * 100).toFixed(2) : '0.00'
+    const pnlEmoji    = pnl >= 0 ? '🟢' : '🔴'
+    const pnlSign     = pnl >= 0 ? '+' : ''
 
-    // Update portfolio
+    // Update data
     user.cryptoPortfolio[symbol] = parseFloat((owned - sellAmount).toFixed(8))
     if (user.cryptoPortfolio[symbol] <= 0.00000001) {
         delete user.cryptoPortfolio[symbol]
         delete user.cryptoBuyPrice[symbol]
     }
-    user.cryptoWallet += revenue
+    user.money = (user.money || 0) + diterima
+    user.cryptoLastSell = now
 
-    // Tambahkan ke total profit tracking
     if (!user.cryptoTotalPnl) user.cryptoTotalPnl = 0
     user.cryptoTotalPnl += pnl
 
@@ -62,22 +91,22 @@ let handler = async (m, { conn, usedPrefix, args }) => {
 
 ${coin.emoji} *${symbol}* (${coin.name})
 
-✅ Kamu menjual *${sellAmount} ${symbol}*
-💲 Harga jual    : ${formatNum(price)} / koin
-💰 Total diterima: ${revenue.toLocaleString('id')}
+✅ Terjual         : *${sellAmount} ${symbol}*
+💲 Harga jual      : ${formatNum(price)} / koin
+💰 Hasil kotor     : ${gross.toLocaleString('id')}
+🏦 Pajak 15%       : -${tax.toLocaleString('id')}
+✅ Diterima        : *${diterima.toLocaleString('id')}*
 
 ━━━━━━━━━━━━━━━━━━━━━━
 📊 *Analisis Trading*
    Harga beli avg  : ${formatNum(avgBuyPrice)}
    Modal           : ${costBasis.toLocaleString('id')}
-   Hasil           : ${revenue.toLocaleString('id')}
-   ${pnlEmoji} P&L: ${pnlSign}${pnl.toLocaleString('id')} (${pnlSign}${pnlPct}%)
+   ${pnlEmoji} P&L (after tax): ${pnlSign}${pnl.toLocaleString('id')} (${pnlSign}${pnlPct}%)
 ━━━━━━━━━━━━━━━━━━━━━━
-💼 Wallet sekarang : ${user.cryptoWallet.toLocaleString('id')}
-📦 Sisa ${symbol}      : ${user.cryptoPortfolio[symbol] || 0}
+💰 Saldo Money    : ${user.money.toLocaleString('id')}
+📦 Sisa ${symbol.padEnd(5)}    : ${user.cryptoPortfolio[symbol] || 0}
 ━━━━━━━━━━━━━━━━━━━━━━
-
-💡 *${usedPrefix}crypto-portofolio* — Cek semua aset kamu
+⏳ Jual berikutnya: *8 jam lagi*
 `.trim(), m)
 }
 
@@ -85,4 +114,4 @@ handler.help = ['crypto-sell']
 handler.tags = ['game', 'rpg']
 handler.command = /^crypto[-_]sell$/i
 
-export default handler
+export default handler  
