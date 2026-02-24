@@ -1,24 +1,29 @@
 export async function before(m, { conn }) {
-    let sender = global.db.data.users[m.sender]
+    if (m.isBaileys) return true
+
+    // Resolve sender: LID → PN (Baileys 7.x fix)
+    const senderJid = await resolvePN(conn, m.sender)
+
+    // Fallback: coba resolved JID dulu, kalau ga ada coba raw m.sender
+    let sender = global.db.data.users[senderJid]
+               || global.db.data.users[m.sender]
     if (!sender) return true
 
     // ── CEK APAKAH PENGIRIM SENDIRI SEDANG AFK ──────────────
-    if (sender.afk > -1) {
+    if (sender.afk && sender.afk > 0) {
         const nama = sender.afkName
             || (sender.registered && sender.name)
-            || (await conn.getName(m.sender))
+            || (await conn.getName(senderJid))
             || m.pushName
-            || m.sender.split('@')[0]
+            || senderJid.split('@')[0]
 
-        const durasi = clockString(new Date - sender.afk)
+        const durasi = clockString(Date.now() - sender.afk)
 
-        m.reply(`
-╭─「 ✅ *KEMBALI DARI AFK* 」
+        m.reply(`╭─「 ✅ *KEMBALI DARI AFK* 」
 │ *${nama}* telah kembali!
 │ *Selama:* ${durasi}
 │ ${sender.afkReason ? `*Alasan AFK:* ${sender.afkReason}` : '_Tanpa alasan_'}
-╰──────────────────
-`.trim())
+╰──────────────────`.trim())
 
         sender.afk = -1
         sender.afkReason = ''
@@ -26,40 +31,54 @@ export async function before(m, { conn }) {
     }
 
     // ── CEK MENTION / QUOTED KE USER YANG AFK ───────────────
-    const jids = [...new Set([
+    const rawJids = [...new Set([
         ...(m.mentionedJid || []),
-        ...(m.quoted ? [m.quoted.sender] : [])
+        ...(m.quoted?.sender ? [m.quoted.sender] : [])
     ])]
 
-    for (let jid of jids) {
-        let target = global.db.data.users[jid]
-        if (!target) continue
-        if (!target.afk || target.afk < 0) continue
+    for (let rawJid of rawJids) {
+        const resolvedJid = await resolvePN(conn, rawJid)
 
-        // Ambil nama target yang AFK
+        // Fallback lookup: coba resolved dulu, kalau ga ada coba raw
+        let target = global.db.data.users[resolvedJid]
+                   || global.db.data.users[rawJid]
+        if (!target || !target.afk || target.afk < 0) continue
+
         const namaTarget = target.afkName
             || (target.registered && target.name)
-            || (await conn.getName(jid))
-            || jid.split('@')[0]
+            || (await conn.getName(resolvedJid))
+            || resolvedJid.split('@')[0]
 
-        const durasi = clockString(new Date - target.afk)
+        const durasi = clockString(Date.now() - target.afk)
 
-        m.reply(`
-╭─「 💤 *SEDANG AFK* 」
+        m.reply(`╭─「 💤 *SEDANG AFK* 」
 │ *${namaTarget}* sedang tidak ada
-│ *Alasan:* ${target.afkReason ? target.afkReason : '_tanpa alasan_'}
+│ *Alasan:* ${target.afkReason || '_tanpa alasan_'}
 │ *Sudah AFK selama:* ${durasi}
-╰──────────────────
-`.trim())
+╰──────────────────`.trim())
     }
 
     return true
 }
 
+// Helper resolve LID ke PN supaya lookup DB ga miss
+async function resolvePN(conn, jid) {
+    if (!jid) return null
+    if (jid.includes('@lid') && conn.signalRepository?.lidMapping) {
+        try {
+            const pn = await conn.signalRepository.lidMapping.getPNForLID(jid)
+            return pn || jid
+        } catch {
+            return jid
+        }
+    }
+    return jid
+}
+
 function clockString(ms) {
-    if (isNaN(ms)) return '--:--:--'
-    let h = Math.floor(ms / 3600000)
-    let m = Math.floor(ms / 60000) % 60
-    let s = Math.floor(ms / 1000) % 60
+    if (!ms || isNaN(ms)) return '00:00:00'
+    const h = Math.floor(ms / 3600000)
+    const m = Math.floor(ms / 60000) % 60
+    const s = Math.floor(ms / 1000) % 60
     return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':')
 }

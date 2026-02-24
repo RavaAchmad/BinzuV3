@@ -148,7 +148,7 @@ function buildMarketMessage() {
 
     return `
 ╔══════════════════════╗
-║  📊 *UPDATE HARGA CRYPTO* ║
+║  📊 *UPDATE HARGA CRYPTO*       ║
 ╚══════════════════════╝
 🕐 ${now} WIB
 ━━━━━━━━━━━━━━━━━━━━━━
