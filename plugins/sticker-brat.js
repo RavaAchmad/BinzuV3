@@ -29,10 +29,6 @@ var handler = async (m, { conn, text, command }) => {
             // Process image if it came from buffer
             if (imageBuffer) {
                 const buffer = await sharp(imageBuffer)
-                    .resize(512, 512, {
-                        fit: 'contain',
-                        background: { r: 255, g: 255, b: 255, alpha: 1 }
-                    })
                     .png()
                     .toBuffer();
 
@@ -131,3 +127,5 @@ async function generateBrat(text) {
         };
     }
 }
+
+
