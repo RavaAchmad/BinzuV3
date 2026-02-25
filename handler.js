@@ -1423,13 +1423,39 @@ export async function participantsUpdate({
 		case 'remove':
 			if (chat.welcome) {
 				let groupMetadata = await this.groupMetadata(id) || (conn.chats[id] || {}).metadata
-				// Fetch welcome/leave thumbnails once before the loop
+				// Fetch welcome/leave thumbnails once before the loop with error handling
 				let masukbre = "https://i.ibb.co.com/ByDRDWM/Proyek-Baru-11-B52-C91-D.png"
 				let wel = global.welcome ? global.welcome : masukbre
 				let keluarbos = "https://i.ibb.co.com/Xyzc9Wr/Proyek-Baru-11-418-EB56.png"
 				let lea = global.leave ? global.leave : keluarbos
-				const welThumbnail = await this.getFile(wel, true)
-				const leaThumbnail = await this.getFile(lea, true)
+				
+				let welThumbnail = { data: Buffer.alloc(0) };
+				try {
+					welThumbnail = await this.getFile(wel, true)
+				} catch (welErr) {
+					console.log('Welcome thumbnail fetch failed:', welErr.message)
+					if (global.thum) {
+						try {
+							welThumbnail = await this.getFile(global.thum, true)
+						} catch (e) {
+							welThumbnail = { data: Buffer.alloc(0) }
+						}
+					}
+				}
+				
+				let leaThumbnail = { data: Buffer.alloc(0) };
+				try {
+					leaThumbnail = await this.getFile(lea, true)
+				} catch (leaErr) {
+					console.log('Leave thumbnail fetch failed:', leaErr.message)
+					if (global.thum) {
+						try {
+							leaThumbnail = await this.getFile(global.thum, true)
+						} catch (e) {
+							leaThumbnail = { data: Buffer.alloc(0) }
+						}
+					}
+				}
 				for (let user of participants) {
 					let pp = fs.readFileSync('./src/avatar_contact.png')
 					try {

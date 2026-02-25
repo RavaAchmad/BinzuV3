@@ -18,7 +18,21 @@ let handler = async (m, {
 		let _p = usedPrefix
 		const urls = ''
 		const logo = 'https://static.vecteezy.com/system/resources/previews/002/214/642/non_2x/web-designer-and-programmer-free-vector.jpg'
-		const { data: logoBuff } = await conn.getFile(logo, true)
+		let logoBuff = Buffer.alloc(0);
+		try {
+			const { data } = await conn.getFile(logo, true)
+			logoBuff = data;
+		} catch (logoErr) {
+			console.log('Logo fetch failed, using fallback:', logoErr.message);
+			if (global.thum) {
+				try {
+					const { data } = await conn.getFile(global.thum, true);
+					logoBuff = data;
+				} catch (e) {
+					logoBuff = Buffer.alloc(0);
+				}
+			}
+		}
 		const linkgc = `https://chat.whatsapp.com/H2fDSaqtd5B92LU5C71PoE`.trim()
 		const domain = panel.domain
 		const apikey = panel.apikey

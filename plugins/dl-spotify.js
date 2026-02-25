@@ -19,8 +19,22 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         type
       } = jsons.result.data.artist;
       let captionvid = ` ∘ Title: ${title}\n∘ Id: ${id}\n∘ Duration: ${duration}\n∘ Type: ${type}`;
-      // Fetch thumbnail as buffer
-      const { data: thumbBuffer } = await conn.getFile(thumbnail, true);
+      // Fetch thumbnail as buffer with error handling
+      let thumbBuffer = Buffer.alloc(0);
+      try {
+        const { data } = await conn.getFile(thumbnail, true);
+        thumbBuffer = data;
+      } catch (thumbErr) {
+        console.log('Spotify thumbnail fetch failed:', thumbErr.message);
+        if (global.thum) {
+          try {
+            const { data } = await conn.getFile(global.thum, true);
+            thumbBuffer = data;
+          } catch (e) {
+            thumbBuffer = Buffer.alloc(0);
+          }
+        }
+      }
       let pesan = await conn.sendMessage(m.chat, {
         text: captionvid,
         contextInfo: {

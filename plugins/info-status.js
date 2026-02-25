@@ -76,6 +76,23 @@ var txt = `
 \`Ping\`
 \`\`\`Ping : ${Math.round(neww - old)} ms\`\`\`
 `
+// Fetch thumbnail with fallback on error
+let statusThumb = Buffer.alloc(0);
+try {
+  const { data } = await conn.getFile('https://pomf2.lain.la/f/he42in5n.jpg', true);
+  statusThumb = data;
+} catch (thumbErr) {
+  console.log('Status thumbnail fetch failed, using fallback:', thumbErr.message);
+  // Use a fallback solid color buffer or global theme thumbnail
+  if (global.thum) {
+    try {
+      const { data } = await conn.getFile(global.thum, true);
+      statusThumb = data;
+    } catch (e) {
+      statusThumb = Buffer.alloc(0);
+    }
+  }
+}
 conn.relayMessage(m.chat, {
       extendedTextMessage: {
         text: txt, 
@@ -85,7 +102,7 @@ conn.relayMessage(m.chat, {
             mediaType: 1,
             previewType: 0,
             renderLargerThumbnail: true,
-            thumbnail: await (async () => { const { data } = await conn.getFile('https://pomf2.lain.la/f/he42in5n.jpg', true); return data; })(),
+            thumbnail: statusThumb,
             sourceUrl: ''
           }
         },

@@ -57,7 +57,22 @@ const handler = async (m, { text, conn, usedPrefix, command }) => {
 
     teks += `*Preview:* ${json.result.image}\n`;
 
-    const { data: deviceThumbnail } = await conn.getFile(json.result.image, true);
+    let deviceThumbnail = Buffer.alloc(0);
+    try {
+      const { data } = await conn.getFile(json.result.image, true);
+      deviceThumbnail = data;
+    } catch (thumbErr) {
+      console.log('Device thumbnail fetch failed:', thumbErr.message);
+      // Use fallback if fetch fails
+      if (global.thum) {
+        try {
+          const { data } = await conn.getFile(global.thum, true);
+          deviceThumbnail = data;
+        } catch (e) {
+          deviceThumbnail = Buffer.alloc(0);
+        }
+      }
+    }
     await conn.relayMessage(m.chat, {
       extendedTextMessage: {
         text: teks,

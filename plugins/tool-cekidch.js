@@ -47,7 +47,24 @@ ${desc}
                             mediaType: 1,
                             previewType: 0,
                             renderLargerThumbnail: true,
-                            thumbnail: await (async () => { const { data } = await conn.getFile(metadata.pictureUrl || global.thum, true); return data; })(),
+                            thumbnail: await (async () => { 
+                                let thumbData = Buffer.alloc(0);
+                                try {
+                                    const { data } = await conn.getFile(metadata.pictureUrl || global.thum, true);
+                                    thumbData = data;
+                                } catch (e) {
+                                    console.log('Channel thumbnail error:', e.message);
+                                    if (global.thum) {
+                                        try {
+                                            const { data } = await conn.getFile(global.thum, true);
+                                            thumbData = data;
+                                        } catch (err) {
+                                            thumbData = Buffer.alloc(0);
+                                        }
+                                    }
+                                }
+                                return thumbData;
+                            })(),
                             sourceUrl: `https://whatsapp.com/channel/${metadata.invite}`
                         }
                     }
