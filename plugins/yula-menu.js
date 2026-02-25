@@ -238,10 +238,10 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
     if (!cachedThumbnail) {
       try {
         cachedThumbnail = await fetch(global.thum ? thum : thumb)
-          .then(res => res.buffer())
+          .then(res => Buffer.from(res.arrayBuffer()))
       } catch {
         cachedThumbnail = await fetch('https://g.top4top.io/p_353640c0q1.png')
-          .then(res => res.buffer())
+          .then(res => Buffer.from(res.arrayBuffer()))
       }
     }
 
@@ -249,29 +249,26 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
 
 if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
   if (!db.data.settings[conn.user.jid].thumbnail) {
-    conn.sendMessage(m.chat, {
-      text: textToSend, 
-      jpegThumbnail: cachedThumbnail,
-      contextInfo: {
-        mentionedJid: [m.sender],
-        forwardedNewsletterMessageInfo: {
-          newsletterJid: global.info.channel,
-          serverMessageId: null,
-          newsletterName: global.info.namechannel,
-        },
-        externalAdReply: { 
-          showAdAttribution: false, 
-          title: global.info.namebot + ` © ` + year, 
-          body: '', 
-          // thumbnailUrl: global.thum ? thum : thumb,
-          mediaType: 1, 
-          sourceUrl: gcbot,
-          renderLargerThumbnail: true 
-        }
-      },
-    }, {
-      quoted: m
-    });
+        conn.sendMessage(m.chat, {
+            text: textToSend,
+            contextInfo: {
+                mentionedJid: [m.sender],
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: global.info.channel,
+                    serverMessageId: null,
+                    newsletterName: global.info.namechannel,
+                },
+                externalAdReply: {
+                    showAdAttribution: false,
+                    title: global.info.namebot + ` © ` + year,
+                    body: '',
+                    mediaType: 1,
+                    sourceUrl: gcbot,
+                    renderLargerThumbnail: true,
+                    thumbnail: cachedThumbnail, // ← pindah ke sini, harus Buffer jpeg
+                }
+            },
+        }, { quoted: m });
   } else {
       conn.sendMessage(m.chat, { text: textToSend, contextInfo: { mentionedJid: [m.sender] }}, { quoted: m });
   }
