@@ -57,6 +57,7 @@ const handler = async (m, { text, conn, usedPrefix, command }) => {
 
     teks += `*Preview:* ${json.result.image}\n`;
 
+    const { data: deviceThumbnail } = await conn.getFile(json.result.image, true);
     await conn.relayMessage(m.chat, {
       extendedTextMessage: {
         text: teks,
@@ -66,7 +67,7 @@ const handler = async (m, { text, conn, usedPrefix, command }) => {
             mediaType: 1,
             previewType: 0,
             renderLargerThumbnail: true,
-            thumbnailUrl: json.result.image,
+            thumbnail: deviceThumbnail,
             sourceUrl: json.result.image 
           }
         },

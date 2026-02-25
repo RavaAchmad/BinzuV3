@@ -19,13 +19,15 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         type
       } = jsons.result.data.artist;
       let captionvid = ` ∘ Title: ${title}\n∘ Id: ${id}\n∘ Duration: ${duration}\n∘ Type: ${type}`;
+      // Fetch thumbnail as buffer
+      const { data: thumbBuffer } = await conn.getFile(thumbnail, true);
       let pesan = await conn.sendMessage(m.chat, {
         text: captionvid,
         contextInfo: {
           externalAdReply: {
             title: "Spotify Downloader",
             body: "",
-            thumbnailUrl: thumbnail,
+            thumbnail: thumbBuffer,
             sourceUrl: args[0],
             mediaType: 1,
             showAdAttribution: true,
@@ -42,7 +44,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
           externalAdReply: {
             title: title,
             body: "",
-            thumbnailUrl: thumbnail,
+            thumbnail: thumbBuffer,
             sourceUrl: args[0],
             mediaType: 1,
             showAdAttribution: true,
@@ -79,7 +81,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
               previewType: 0,
               showAdAttribution: true,
               renderLargerThumbnail: true,
-              thumbnailUrl: 'https://www.scdn.co/i/_global/open-graph-default.png',
+              thumbnail: await (async () => { const { data } = await conn.getFile('https://www.scdn.co/i/_global/open-graph-default.png', true); return data; })(),
               sourceUrl: ''
             }
           },

@@ -50,6 +50,10 @@ const handler = async (m, { conn, text, usedPrefix }) => {
         caption += `∘ Description : ${convert.description}\n`;
         caption += `∘ Thumbnail : ${res.data.thumbnail || convert.image}`;
 
+        // Fetch thumbnail as buffer
+        const thumbnailUrl = res.data.thumbnail || convert.image;
+        const { data: thumbnailBuffer } = await conn.getFile(thumbnailUrl, true);
+
         await conn.relayMessage(m.chat, {
             extendedTextMessage: {
                 text: caption,
@@ -59,7 +63,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
                         mediaType: 1,
                         previewType: 0,
                         renderLargerThumbnail: true,
-                        thumbnailUrl: res.data.thumbnail || convert.image,
+                        thumbnail: thumbnailBuffer,
                         sourceUrl: convert.url
                     }
                 },

@@ -7,11 +7,11 @@ let handler = async (m, { conn, usedPrefix, command }) => {
 https://chat.whatsapp.com/FJRtTzRKxP8A2wT6fcCW3s`
 		await conn.sendMessage(m.chat, {
                 text: maximus,
-                contextInfo: {
+                contexInfo: {
                     externalAdReply: {
                         title: "YuLa | Online Bot",
                         body: "",
-                        thumbnailUrl: "https://telegra.ph/file/7a20200e053f8906d375f.jpg",
+                        thumbnail: await (async () => { const { data } = await conn.getFile("https://telegra.ph/file/7a20200e053f8906d375f.jpg", true); return data; })(),
                         sourceUrl: "https://chat.whatsapp.com/FJRtTzRKxP8A2wT6fcCW3s",
                         mediaType: 1,
                         showAdAttribution: true,

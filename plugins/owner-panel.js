@@ -18,6 +18,7 @@ let handler = async (m, {
 		let _p = usedPrefix
 		const urls = ''
 		const logo = 'https://static.vecteezy.com/system/resources/previews/002/214/642/non_2x/web-designer-and-programmer-free-vector.jpg'
+		const { data: logoBuff } = await conn.getFile(logo, true)
 		const linkgc = `https://chat.whatsapp.com/H2fDSaqtd5B92LU5C71PoE`.trim()
 		const domain = panel.domain
 		const apikey = panel.apikey
@@ -100,7 +101,7 @@ CREATED AT: ${user.created_at}
 								mediaType: 1,
 								previewType: 0,
 								renderLargerThumbnail: true,
-								thumbnailUrl: logo,
+								thumbnail: logoBuff,
 								sourceUrl: urls
 							}
 						},
@@ -193,7 +194,7 @@ Jika sudah memasang auto backup. Kamu bisa hubungi admin Maximus untuk mendapatk
 								mediaType: 1,
 								previewType: 0,
 								renderLargerThumbnail: true,
-								thumbnailUrl: logo,
+								thumbnail: logoBuff,
 								sourceUrl: urls
 							}
 						},
@@ -233,7 +234,7 @@ CREATED AT: ${u.created_at}\`\`\``
 								mediaType: 1,
 								previewType: 0,
 								renderLargerThumbnail: true,
-								thumbnailUrl: logo,
+								thumbnail: logoBuff,
 								sourceUrl: urls
 							}
 						},
@@ -330,7 +331,7 @@ CREATED AT: ${server.created_at}`,
 								mediaType: 1,
 								previewType: 0,
 								renderLargerThumbnail: true,
-								thumbnailUrl: logo,
+								thumbnail: logoBuff,
 								sourceUrl: urls
 							}
 						},
@@ -396,7 +397,7 @@ CREATED AT: ${server.created_at}`,
 								mediaType: 1,
 								previewType: 0,
 								renderLargerThumbnail: true,
-								thumbnailUrl: logo,
+								thumbnail: logoBuff,
 								sourceUrl: urls
 							}
 						},
@@ -456,7 +457,7 @@ CREATED AT: ${s.created_at}\`\`\``
 									mediaType: 1,
 									previewType: 0,
 									renderLargerThumbnail: true,
-									thumbnailUrl: logo,
+									thumbnail: logoBuff,
 									sourceUrl: urls
 								}
 							},
@@ -594,7 +595,7 @@ UPDATED AT: ${server.updated_at}`,
 								mediaType: 1,
 								previewType: 0,
 								renderLargerThumbnail: true,
-								thumbnailUrl: logo,
+								thumbnail: logoBuff,
 								sourceUrl: urls
 							}
 						},
@@ -655,7 +656,7 @@ DESCRIPTION: ${server.description}`,
 								mediaType: 1,
 								previewType: 0,
 								renderLargerThumbnail: true,
-								thumbnailUrl: logo,
+								thumbnail: logoBuff,
 								sourceUrl: urls
 							}
 						},
@@ -748,7 +749,7 @@ Backupan script kamu sudah saya kirim melalui private chat.`,
 								mediaType: 1,
 								previewType: 0,
 								renderLargerThumbnail: true,
-								thumbnailUrl: logo,
+								thumbnail: logoBuff,
 								sourceUrl: urls
 							}
 						},

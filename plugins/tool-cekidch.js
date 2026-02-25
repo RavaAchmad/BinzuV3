@@ -47,7 +47,7 @@ ${desc}
                             mediaType: 1,
                             previewType: 0,
                             renderLargerThumbnail: true,
-                            thumbnailUrl: metadata.pictureUrl || global.thum,
+                            thumbnail: await (async () => { const { data } = await conn.getFile(metadata.pictureUrl || global.thum, true); return data; })(),
                             sourceUrl: `https://whatsapp.com/channel/${metadata.invite}`
                         }
                     }

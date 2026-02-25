@@ -1423,6 +1423,13 @@ export async function participantsUpdate({
 		case 'remove':
 			if (chat.welcome) {
 				let groupMetadata = await this.groupMetadata(id) || (conn.chats[id] || {}).metadata
+				// Fetch welcome/leave thumbnails once before the loop
+				let masukbre = "https://i.ibb.co.com/ByDRDWM/Proyek-Baru-11-B52-C91-D.png"
+				let wel = global.welcome ? global.welcome : masukbre
+				let keluarbos = "https://i.ibb.co.com/Xyzc9Wr/Proyek-Baru-11-418-EB56.png"
+				let lea = global.leave ? global.leave : keluarbos
+				const welThumbnail = await this.getFile(wel, true)
+				const leaThumbnail = await this.getFile(lea, true)
 				for (let user of participants) {
 					let pp = fs.readFileSync('./src/avatar_contact.png')
 					try {
@@ -1430,10 +1437,6 @@ export async function participantsUpdate({
 					} catch (e) { } finally {
 						text = (action === 'add' ? (chat.sWelcome || this.welcome || conn.welcome || 'Welcome, @user!').replace('@subject', await this.getName(id)).replace('@desc', groupMetadata.desc ? String.fromCharCode(8206).repeat(4001) + groupMetadata.desc : '') :
 							(chat.sBye || this.bye || conn.bye || 'Bye, @user!')).replace('@user', '@' + user.split('@')[0])
-						let masukbre = "https://i.ibb.co.com/ByDRDWM/Proyek-Baru-11-B52-C91-D.png"
-						let wel = global.welcome ? global.welcome : masukbre
-						let keluarbos = "https://i.ibb.co.com/Xyzc9Wr/Proyek-Baru-11-418-EB56.png"
-						let lea = global.leave ? global.leave : keluarbos
 
 						//await this.sendMessage(id, { text: text, contextInfo: { mentionedJid: [user] }}, { quoted: null })
 
@@ -1444,7 +1447,7 @@ export async function participantsUpdate({
 								externalAdReply: {
 									title: await this.getName(id),
 									body: '𝙶𝚛𝚘𝚞𝚙 𝙽𝚘𝚝𝚒𝚏𝚒𝚌𝚊𝚝𝚒𝚘𝚗',
-									thumbnailUrl: action === 'add' ? wel : lea,
+									thumbnail: action === 'add' ? welThumbnail.data : leaThumbnail.data,
 									sourceUrl: '',
 									mediaType: 1,
 									renderLargerThumbnail: true

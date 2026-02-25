@@ -85,7 +85,7 @@ conn.relayMessage(m.chat, {
             mediaType: 1,
             previewType: 0,
             renderLargerThumbnail: true,
-            thumbnailUrl: 'https://pomf2.lain.la/f/he42in5n.jpg',
+            thumbnail: await (async () => { const { data } = await conn.getFile('https://pomf2.lain.la/f/he42in5n.jpg', true); return data; })(),
             sourceUrl: ''
           }
         },
