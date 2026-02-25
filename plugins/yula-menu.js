@@ -237,11 +237,13 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
     let thumb = xm4ze[Math.floor(Math.random() * xm4ze.length)]
     if (!cachedThumbnail) {
       try {
-        cachedThumbnail = await fetch(global.thum ? thum : thumb)
-          .then(res => Buffer.from(res.arrayBuffer()))
+        cachedThumbnail = await fetch(global.thum ? global.thum : thumb)
+          .then(res => res.arrayBuffer())
+          .then(ab => Buffer.from(ab))
       } catch {
         cachedThumbnail = await fetch('https://g.top4top.io/p_353640c0q1.png')
-          .then(res => Buffer.from(res.arrayBuffer()))
+          .then(res => res.arrayBuffer())
+          .then(ab => Buffer.from(ab))
       }
     }
 
