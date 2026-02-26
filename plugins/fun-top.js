@@ -1,36 +1,67 @@
-let handler = async (m, { groupMetadata, command, usedPrefix, text }) => {
-    if (!text) throw `Contoh:
-    ${usedPrefix + command} pengcoli`
-    let user = db.data.users
-    let ps = groupMetadata.participants.map(v => v.id)
-    let a = ps.getRandom()
-    let b = ps.getRandom()
-    let c = ps.getRandom()
-    let d = ps.getRandom()
-    let e = ps.getRandom()
-    let f = ps.getRandom()
-    let g = ps.getRandom()
-    let h = ps.getRandom()
-    let i = ps.getRandom()
-    let j = ps.getRandom()
-    let k = Math.floor(Math.random() * 70);
-    let x = `${pickRandom(['😨', '😅', '😂', '😳', '😎', '🥵', '😱', '🐦', '🙄', '🐤', '🗿', '🐦', '🤨', '🥴', '😐', '👆', '😔', '👀', '👎'])}`
-    let l = Math.floor(Math.random() * x.length);
-    let top = `*${x} Top 10 ${text} ${x}*
+let handler = async (m, { conn, groupMetadata, command, usedPrefix, text }) => {
+    if (!text) throw `Contoh:\n${usedPrefix + command} pengcoli`
 
-*1. ${user?.[a]?.registered ? user[a].name: conn.getName(a)}*
-*2. ${user?.[b]?.registered ? user[b].name: conn.getName(b)}*
-*3. ${user?.[c]?.registered ? user[c].name: conn.getName(c)}*
-*4. ${user?.[d]?.registered ? user[d].name: conn.getName(d)}*
-*5. ${user?.[e]?.registered ? user[e].name: conn.getName(e)}*
-*6. ${user?.[f]?.registered ? user[f].name: conn.getName(f)}*
-*7. ${user?.[g]?.registered ? user[g].name: conn.getName(g)}*
-*8. ${user?.[h]?.registered ? user[h].name: conn.getName(h)}*
-*9. ${user?.[i]?.registered ? user[i].name: conn.getName(i)}*
-*10. ${user?.[j]?.registered ? user[j].name: conn.getName(j)}*
-`.trim()
-    m.reply(top)
+    const user = db.data.users
+
+    const ps = groupMetadata.participants.map(v => {
+        if (v.phoneNumber) {
+            const pn = v.phoneNumber.includes('@') ? v.phoneNumber : v.phoneNumber + '@s.whatsapp.net'
+            return pn
+        }
+        // Kalau id sudah PN, return langsung
+        if (v.id?.endsWith('@s.whatsapp.net')) return v.id
+        // Coba resolve LID via storeLid cache
+        const resolved = conn.getJid?.(v.id)
+        return (resolved && !resolved.includes('@lid')) ? resolved : v.id
+    }).filter(Boolean)
+
+    if (ps.length < 10) throw `Anggota grup kurang dari 10 orang!`
+
+    // Pilih 10 unik biar ga ada nama muncul 2x
+    const picked = []
+    const pool = [...ps]
+    while (picked.length < 10 && pool.length > 0) {
+        const idx = Math.floor(Math.random() * pool.length)
+        picked.push(pool.splice(idx, 1)[0])
+    }
+
+    // Resolve nama — await karena getName bisa return Promise
+    const getName = async (jid) => {
+        // Cek DB dulu
+        const u = user?.[jid]
+        if (u?.registered && u?.name) return u.name
+        // Fallback ke conn.getName (await karena bisa Promise)
+        try {
+            const name = await conn.getName(jid)
+            if (name && name !== jid) return name
+        } catch (_) {}
+        // Terakhir: tag nomor mentah
+        return '@' + jid.split('@')[0]
+    }
+
+    const names = await Promise.all(picked.map(getName))
+
+    const emoji = pickRandom(['😨', '😅', '😂', '😳', '😎', '🥵', '😱', '🐦', '🙄', '🐤', '🗿', '🤨', '🥴', '😐', '👆', '😔', '👀', '👎'])
+
+    const top = `*${emoji} Top 10 ${text} ${emoji}*
+
+*1.* ${names[0]}
+*2.* ${names[1]}
+*3.* ${names[2]}
+*4.* ${names[3]}
+*5.* ${names[4]}
+*6.* ${names[5]}
+*7.* ${names[6]}
+*8.* ${names[7]}
+*9.* ${names[8]}
+*10.* ${names[9]}`.trim()
+
+    await conn.sendMessage(m.chat, {
+        text: top,
+        mentions: picked
+    }, { quoted: m })
 }
+
 handler.help = ['top']
 handler.tags = ['fun']
 handler.command = /^top$/i
