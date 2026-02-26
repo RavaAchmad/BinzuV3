@@ -54,7 +54,7 @@ global.ig = 'https://instagram.com/ravaja_'
 global.gcbot = 'https://chat.whatsapp.com/KPqLnY91cX2BGWaZVcXX2D'
 global.wait = '*Starting Processing . . .*'
 global.eror = '*Failed to process . . .*\n\nLapor Owner dengan menulis \`.lapor\`\nReport Owner by writing \`.report\`'
-global.qris = 'https://h.uguu.se/GmwwoeNX.jpg'
+global.qris = 'https://ibb.co.com/tpTLWJLv'
 global.pricelist = '*Limit kamu habis.*\nKamu bisa order akses premium dengan menulis `.sewa`\nAtau menambah limit gratis dengan perintah `.freelimit`'
 global.thumvid = 'https://media.tenor.com/aYg-_ZOHKNMAAAPo/ganyu.mp4'
 // 'https://github.com/XM4ZE/DATABASE/raw/refs/heads/master/wallpaper/mommy.mp4' // Allmenu Video thumbnail
