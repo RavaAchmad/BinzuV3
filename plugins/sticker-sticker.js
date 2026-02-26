@@ -1,3 +1,5 @@
+import { toStickerImage } from '../lib/converter.js'
+
 let handler = async (m, { conn, command, usedPrefix }) => {
 	if (m.quoted?.viewOnce) return;
 	let sendSticker = async (media, isImage = true) => {
@@ -14,7 +16,19 @@ let handler = async (m, { conn, command, usedPrefix }) => {
 			isAnimated: true
 		};
 		
-		const smedia = isImage ? await conn.sendStickerImage(m.chat, media, m, optionsimg) : await conn.sendStickerVideo(m.chat, media, m, optionsvid);
+		try {
+			if (isImage) {
+				// Resize image to optimal sticker size (512x512)
+				const resizedMedia = await toStickerImage(media, 'png');
+				await conn.sendStickerImage(m.chat, resizedMedia.data, m, optionsimg);
+				await resizedMedia.delete();
+			} else {
+				// Video dibiarkan original, tanpa resize
+				await conn.sendStickerVideo(m.chat, media, m, optionsvid);
+			}
+		} catch (error) {
+			throw new Error(`Gagal membuat stiker: ${error.message}`);
+		}
 	};
 	let q = m.quoted ? m.quoted : m;
 	let mime = (q.msg || q).mimetype || "";

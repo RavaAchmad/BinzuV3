@@ -57,6 +57,22 @@ const handler = async (m, { text, conn, usedPrefix, command }) => {
 
     teks += `*Preview:* ${json.result.image}\n`;
 
+    let deviceThumbnail = Buffer.alloc(0);
+    try {
+      const { data } = await conn.getFile(json.result.image, true);
+      deviceThumbnail = data;
+    } catch (thumbErr) {
+      console.log('Device thumbnail fetch failed:', thumbErr.message);
+      // Use fallback if fetch fails
+      if (global.thum) {
+        try {
+          const { data } = await conn.getFile(global.thum, true);
+          deviceThumbnail = data;
+        } catch (e) {
+          deviceThumbnail = Buffer.alloc(0);
+        }
+      }
+    }
     await conn.relayMessage(m.chat, {
       extendedTextMessage: {
         text: teks,
@@ -66,7 +82,7 @@ const handler = async (m, { text, conn, usedPrefix, command }) => {
             mediaType: 1,
             previewType: 0,
             renderLargerThumbnail: true,
-            thumbnailUrl: json.result.image,
+            thumbnail: deviceThumbnail,
             sourceUrl: json.result.image 
           }
         },

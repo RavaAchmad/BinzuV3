@@ -17,6 +17,21 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
             capt += `◦ *Posts* : ${posts}\n`;
             capt += `◦ *URL* : ${profile_url}\n`;
             
+            let profileThumb = Buffer.alloc(0);
+            try {
+              const { data } = await conn.getFile(profile_picture, true);
+              profileThumb = data;
+            } catch (thumbErr) {
+              console.log('SnackVideo thumbnail fetch failed:', thumbErr.message);
+              if (global.thum) {
+                try {
+                  const { data } = await conn.getFile(global.thum, true);
+                  profileThumb = data;
+                } catch (e) {
+                  profileThumb = Buffer.alloc(0);
+                }
+              }
+            }
             return conn.relayMessage(m.chat, {
                 extendedTextMessage: {
                     text: capt, 
@@ -26,7 +41,7 @@ let handler = async (m, { conn, text, usedPrefix, command }) => {
                             mediaType: 1,
                             previewType: 0,
                             renderLargerThumbnail: true,
-                            thumbnailUrl: profile_picture,
+                            thumbnail: profileThumb,
                             sourceUrl: profile_url
                         }
                     }, mentions: [m.sender]

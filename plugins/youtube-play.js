@@ -50,6 +50,24 @@ const handler = async (m, { conn, text, usedPrefix }) => {
         caption += `∘ Description : ${convert.description}\n`;
         caption += `∘ Thumbnail : ${res.data.thumbnail || convert.image}`;
 
+        // Fetch thumbnail as buffer with error handling
+        const thumbnailUrl = res.data.thumbnail || convert.image;
+        let thumbnailBuffer = Buffer.alloc(0);
+        try {
+          const { data } = await conn.getFile(thumbnailUrl, true);
+          thumbnailBuffer = data;
+        } catch (thumbErr) {
+          console.log('YouTube thumbnail fetch failed:', thumbErr.message);
+          if (global.thum) {
+            try {
+              const { data } = await conn.getFile(global.thum, true);
+              thumbnailBuffer = data;
+            } catch (e) {
+              thumbnailBuffer = Buffer.alloc(0);
+            }
+          }
+        }
+
         await conn.relayMessage(m.chat, {
             extendedTextMessage: {
                 text: caption,
@@ -59,7 +77,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
                         mediaType: 1,
                         previewType: 0,
                         renderLargerThumbnail: true,
-                        thumbnailUrl: res.data.thumbnail || convert.image,
+                        thumbnail: thumbnailBuffer,
                         sourceUrl: convert.url
                     }
                 },

@@ -19,13 +19,29 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         type
       } = jsons.result.data.artist;
       let captionvid = ` ∘ Title: ${title}\n∘ Id: ${id}\n∘ Duration: ${duration}\n∘ Type: ${type}`;
+      // Fetch thumbnail as buffer with error handling
+      let thumbBuffer = Buffer.alloc(0);
+      try {
+        const { data } = await conn.getFile(thumbnail, true);
+        thumbBuffer = data;
+      } catch (thumbErr) {
+        console.log('Spotify thumbnail fetch failed:', thumbErr.message);
+        if (global.thum) {
+          try {
+            const { data } = await conn.getFile(global.thum, true);
+            thumbBuffer = data;
+          } catch (e) {
+            thumbBuffer = Buffer.alloc(0);
+          }
+        }
+      }
       let pesan = await conn.sendMessage(m.chat, {
         text: captionvid,
         contextInfo: {
           externalAdReply: {
             title: "Spotify Downloader",
             body: "",
-            thumbnailUrl: thumbnail,
+            thumbnail: thumbBuffer,
             sourceUrl: args[0],
             mediaType: 1,
             showAdAttribution: true,
@@ -42,7 +58,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
           externalAdReply: {
             title: title,
             body: "",
-            thumbnailUrl: thumbnail,
+            thumbnail: thumbBuffer,
             sourceUrl: args[0],
             mediaType: 1,
             showAdAttribution: true,
@@ -79,7 +95,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
               previewType: 0,
               showAdAttribution: true,
               renderLargerThumbnail: true,
-              thumbnailUrl: 'https://www.scdn.co/i/_global/open-graph-default.png',
+              thumbnail: await (async () => { const { data } = await conn.getFile('https://www.scdn.co/i/_global/open-graph-default.png', true); return data; })(),
               sourceUrl: ''
             }
           },

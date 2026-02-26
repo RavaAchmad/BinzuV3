@@ -4,17 +4,17 @@ export async function before(m, { conn }) {
     // Resolve sender: LID → PN (Baileys 7.x fix)
     const senderJid = await resolvePN(conn, m.sender)
 
-    // Fallback: coba resolved JID dulu, kalau ga ada coba raw m.sender
+    // Fallback lookup DB
     let sender = global.db.data.users[senderJid]
                || global.db.data.users[m.sender]
     if (!sender) return true
 
     // ── CEK APAKAH PENGIRIM SENDIRI SEDANG AFK ──────────────
     if (sender.afk && sender.afk > 0) {
-        const nama = sender.afkName
-            || (sender.registered && sender.name)
-            || (await conn.getName(senderJid))
-            || m.pushName
+        // Prioritas: pushName > afkName (tersimpan saat set AFK) > getName > nomor
+        const nama = m.pushName
+            || sender.afkName
+            || await safeGetName(conn, senderJid)
             || senderJid.split('@')[0]
 
         const durasi = clockString(Date.now() - sender.afk)
@@ -39,14 +39,13 @@ export async function before(m, { conn }) {
     for (let rawJid of rawJids) {
         const resolvedJid = await resolvePN(conn, rawJid)
 
-        // Fallback lookup: coba resolved dulu, kalau ga ada coba raw
         let target = global.db.data.users[resolvedJid]
                    || global.db.data.users[rawJid]
         if (!target || !target.afk || target.afk < 0) continue
 
+        // Untuk target yang di-mention: pakai afkName dulu, fallback ke getName
         const namaTarget = target.afkName
-            || (target.registered && target.name)
-            || (await conn.getName(resolvedJid))
+            || await safeGetName(conn, resolvedJid)
             || resolvedJid.split('@')[0]
 
         const durasi = clockString(Date.now() - target.afk)
@@ -61,7 +60,19 @@ export async function before(m, { conn }) {
     return true
 }
 
-// Helper resolve LID ke PN supaya lookup DB ga miss
+// Wrapper getName yang aman — ga akan pernah return [Object Promise]
+async function safeGetName(conn, jid) {
+    try {
+        const result = await conn.getName(jid)
+        // Double await buat jaga-jaga kalau getName return Promise di dalam Promise
+        const name = result instanceof Promise ? await result : result
+        return (name && name !== jid) ? name : null
+    } catch {
+        return null
+    }
+}
+
+// Helper: resolve LID → PN JID (Baileys 7.x)
 async function resolvePN(conn, jid) {
     if (!jid) return null
     if (jid.includes('@lid') && conn.signalRepository?.lidMapping) {

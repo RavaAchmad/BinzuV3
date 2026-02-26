@@ -8,6 +8,13 @@ let handler = async (m, { conn }) => {
     let user = global.db.data.users[m.sender]
     let chat = global.db.data.chats[m.chat]
 
+    const senderJid = await resolvePN(conn, m.sender)
+
+    const nama = m.pushName
+            || await safeGetName(conn, senderJid)
+            || senderJid.split('@')[0]   
+            
+            
     if (!(m.isGroup && !chat.isBanned) || user.level >= MAX_LEVEL) {
         m.reply(`
 🏆 *LEVEL MAXIMUM REACHED!* 🏆
@@ -42,7 +49,7 @@ ${user.level === MAX_LEVEL ?
 '🌟 *MAXIMUM LEVEL ACHIEVED!* 🌟\nYou are now among the elite!' : 
 'Note: _Interact more with bot to level up faster_'}
 
-${wish()} ${conn.getName(m.sender)}!
+${wish()} ${nama}!
 `.trim()
 
         try {
@@ -79,4 +86,17 @@ function wish() {
     if (time >= 18) wishloc = 'Selamat Malam'
     if (time >= 23) wishloc = 'Selamat Malam'
     return wishloc
+}
+
+async function resolvePN(conn, jid) {
+    if (!jid) return null
+    if (jid.includes('@lid') && conn.signalRepository?.lidMapping) {
+        try {
+            const pn = await conn.signalRepository.lidMapping.getPNForLID(jid)
+            return pn || jid
+        } catch {
+            return jid
+        }
+    }
+    return jid
 }

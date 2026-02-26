@@ -14,6 +14,22 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 *• Size:* \`${filesizeH}\`
 
 #${wm}`.trim()
+    // Fetch thumbnail as buffer with error handling
+    let thumbData = Buffer.alloc(0);
+    try {
+      const { data } = await conn.getFile('https://telegra.ph/file/a6acf193edac1f64d7e1a.jpg', true);
+      thumbData = data;
+    } catch (thumbErr) {
+      console.log('MediaFire thumbnail fetch failed:', thumbErr.message);
+      if (global.thum) {
+        try {
+          const { data } = await conn.getFile(global.thum, true);
+          thumbData = data;
+        } catch (e) {
+          thumbData = Buffer.alloc(0);
+        }
+      }
+    }
     conn.sendMessage(m.chat, {
             text: caption,
             contextInfo: {
@@ -27,7 +43,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
                    externalAdReply: {
                    title: `${filename} SEDANG DI KIRIM`,
                    body: ``,
-                   thumbnailUrl: 'https://telegra.ph/file/a6acf193edac1f64d7e1a.jpg',
+                   thumbnail: thumbData,
                    sourceUrl: args[0],
                    mediaType: 1,
                    renderLargerThumbnail: true
