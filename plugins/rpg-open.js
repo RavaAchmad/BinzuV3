@@ -243,7 +243,7 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
             animatedText += `Progress: [${('█'.repeat(Math.floor((openedCount / count) * 10)) + '░'.repeat(10 - Math.floor((openedCount / count) * 10)))}] ${openedCount}/${count}\n\n`
             animatedText += `📦 *Items Revealed:*\n`
             animatedText += revealedItems.map((item, idx) => `${idx + 1}. ${item}`).join('\n')
-            animatedText += `\n\n⏳ Opening... (${Math.round((count - openedCount) * 0.4)}ms left)`
+            animatedText += `\n\n⏳ Opening...`
 
             // Update status message
             await conn.sendMessage(m.chat, {
