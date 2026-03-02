@@ -1,6 +1,9 @@
 import fetch from "node-fetch"
 import crateSystem from "../lib/crate-system.js"
 
+// keep track of pending crate-opening confirmations keyed by warning message id
+const pendingConfirms = {}
+
 const tfinventory = {
   others: {
     money: true,
@@ -97,9 +100,28 @@ let handler = async (m, { command, args, usedPrefix, conn }) => {
     
     const listCrate = Object.fromEntries(Object.entries(rewards).filter(([v]) => v && v in user))
     
+    // parse parameters (may be replaced by stored values when reply-confirm is used)
     let type = (args[0] || '').toLowerCase()
     let count = Math.floor(isNumber(args[1]) ? Math.max(parseInt(args[1]), 1) : 1) * 1
-    
+
+    // check for stored context in case user replied to the warning message
+    let isReplyConfirm = false
+    if (m.quoted && m.quoted.key && pendingConfirms[m.quoted.key.id]) {
+        const entry = pendingConfirms[m.quoted.key.id]
+        if (entry.user === m.sender && /confirm/i.test(m.text)) {
+            isReplyConfirm = true
+            // restore original parameters
+            type = entry.type
+            count = entry.count
+            // clear the pending entry once used
+            delete pendingConfirms[m.quoted.key.id]
+        }
+    }
+
+    // confirmation helpers (command arg or reply to warning)
+    const confirmArg = args[2]?.toLowerCase()
+    const repliedConfirm = isReplyConfirm
+
     // Show info if no type provided
     if (!type) {
         const luck = crateSystem.playerLuck[m.sender]
@@ -143,13 +165,13 @@ ${usedPrefix}open legendary 1
         })
     }
 
-    // ⚠️ WARNING: Jika count > 10
-    if (count > 10) {
+    // ⚠️ WARNING: Jika count > 10 dan belum dikonfirmasi
+    const isConfirmed = confirmArg === 'confirm' || repliedConfirm
+    if (count > 10 && !isConfirmed) {
         let warningMsg = `
 ⚠️ *PERHATIAN!*
 
 Anda ingin membuka ${count}x ${global.rpg.emoticon(type)} ${type} crate
-Ini akan memakan waktu ~${(count * 400 / 1000).toFixed(1)} detik
 
 *⚡ PEMBERITAHUAN:*
 • Jangan close chat atau restart bot sampai selesai
@@ -158,13 +180,15 @@ Ini akan memakan waktu ~${(count * 400 / 1000).toFixed(1)} detik
 Apakah Anda yakin? 
 
 *Ketik:* ${usedPrefix}open ${type} ${count} confirm
+*atau* balas pesan ini dengan "confirm"
 `.trim()
-        return m.reply(warningMsg)
+        const sent = await m.reply(warningMsg)
+        if (sent && sent.key && sent.key.id) {
+            pendingConfirms[sent.key.id] = { user: m.sender, type, count }
+        }
+        return
     }
 
-    // Check for confirmation if needed
-    const confirmArg = args[2]?.toLowerCase()
-    
     if (!(type in listCrate)) {
         return m.reply(`❌ Crate *${type}* tidak ditemukan! Available: ${Object.keys(listCrate).join(', ')}`)
     }
@@ -311,7 +335,8 @@ ${crateSystem.playerPity[m.sender][type] === 0 && guaranteedRewards.length > 0 ?
 }
 handler.help = ['open'].map(v => v + ' [crate] [count]')
 handler.tags = ['rpg']
-handler.command = /^(open|buka|gacha)$/i
+// allow running when user replies with just "confirm" to a warning, or normal open/gacha commands
+handler.command = /^((open|buka|gacha)( .*)?|confirm)$/i
 handler.register = true
 handler.group = true
 handler.rpg = true
