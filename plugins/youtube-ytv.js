@@ -1,72 +1,15 @@
-// Menggunakan ESM (ECMAScript Modules) untuk import
-import axios from 'axios';
-import { unlinkSync, existsSync } from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import ytdlWrapper from '../lib/ytdl-core-wrapper.js';
+import fs from 'fs';
 
-// Helper buat dapetin __dirname di ESM
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-/**
- * Fungsi download video dari YouTube dengan scraper ytmp3
- * Fokus ke 720p, fallback ke 360p
- */
-const ytmp4Download = async (bitrate, format, url) => {
-  try {
-    const headers = {
-      'accept': 'application/json',
-      'accept-language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-      'content-type': 'application/json',
-      'origin': 'https://ytmp3.gg',
-      'priority': 'u=1, i',
-      'referer': 'https://ytmp3.gg/',
-      'sec-ch-ua': '"Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
-      'sec-ch-ua-mobile': '?1',
-      'sec-ch-ua-platform': '"Android"',
-      'sec-fetch-dest': 'empty',
-      'sec-fetch-mode': 'cors',
-      'sec-fetch-site': 'cross-site',
-      'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Mobile Safari/537.36'
-    };
-
-    const { data: v } = await axios.post('https://hub.y2mp3.co/', {
-      audioBitrate: bitrate,
-      audioFormat: format, 
-      brandName: "ytmp3.gg",
-      downloadMode: "video",
-      url: url
-    }, { headers });
-
-    return {
-      success: true,
-      title: v?.filename,
-      url: v?.url,
-      size: v?.size || null
-    };
-  } catch (e) {
-    return {
-      success: false,
-      error: e.message
-    };
-  }
-};
-
-// Fungsi helper buat format ukuran file biar gampang dibaca
-const formatBytes = (bytes) => {
-  if (!bytes || bytes === 0) return "0 Bytes";
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return `${parseFloat((bytes / Math.pow(1024, i)).toFixed(2))} ${sizes[i]}`;
-};
 
 // Handler utama buat ngerespon perintah dari user
-let handler = async (m, { conn, text }) => {
+const handler = async (m, { conn, text, args, usedPrefix, command }) => {
   if (!text) {
-    return m.reply(`*Cara pakenya gini, cuy:*\n.ytmp4 <url youtube>\n\n*Contoh:*\n.ytmp4 https://youtu.be/dQw4w9WgXcQ\n\nFokus download 720p, kalo gak ada fallback ke 360p.`);
+    return m.reply(`*Cara pakenya gini, cuy:*\n${usedPrefix}${command} <url youtube> [720/360]\n\n*Contoh:*\n${usedPrefix}${command} https://youtu.be/dQw4w9WgXcQ 720\n\nDefault 720p, fallback ke 360p kalau gak ada.`);
   }
 
   const url = text.split(" ")[0];
+  const quality = args[0] || '720';
 
   // Validasi URL YouTube
   if (!/youtube\.com|youtu\.be/.test(url)) {
@@ -76,38 +19,45 @@ let handler = async (m, { conn, text }) => {
   try {
     m.reply("⏳ *Sabar ya, lagi di-download video... Bentar lagi beres kok!*");
 
-    // PRIMARY: Coba download 720p
-    console.log('[YTV] Trying download 720p...');
-    let result = await ytmp4Download('720', 'mp4', url);
-    
-    // SECONDARY: Fallback ke 360p kalo 720p gagal
-    if (!result.success || !result.url) {
-      console.log('[YTV] 720p failed, trying 360p fallback...');
-      result = await ytmp4Download('360', 'mp4', url);
+    console.log('[YTV] Starting download:', { query: url, quality });
+
+    // Download video
+    let result;
+    try {
+      result = await ytdlWrapper.getVideoFile(url, quality);
+    } catch (e) {
+      // Fallback ke 360p kalau 720p gagal
+      if (quality === '720') {
+        console.log('[YTV] Quality 720 failed, trying 360p fallback...');
+        result = await ytdlWrapper.getVideoFile(url, '360');
+      } else {
+        throw e;
+      }
     }
 
-    if (!result.success || !result.url) {
-      throw new Error('Gagal download video dari kedua resolusi');
-    }
+    const { filePath, title } = result;
 
-    const { title, url: downloadUrl, size } = result;
-    
+    console.log('[YTV] Download success:', filePath);
+
     const caption = `
 ✅ *DOWNLOAD VIDEO BERES!*
 
 🎬 *Judul:* ${title}
-📦 *Ukuran:* ${size || 'N/A'}
 📺 *Format:* MP4
+📥 *Quality:* ${quality}p
 `.trim();
 
     await conn.sendMessage(m.chat, {
-      video: { url: downloadUrl },
+      video: fs.readFileSync(filePath),
       mimetype: 'video/mp4',
       caption: caption
     }, { quoted: m });
 
+    // Cleanup after send
+    setTimeout(() => ytdlWrapper.cleanup(filePath), 5000);
+
   } catch (err) {
-    console.error(err);
+    console.error('[YTV] Error:', err.message);
     m.reply(`❌ *Yah, gagal download cuy.*\n\n*Error:* ${err.message}`);
   }
 };
