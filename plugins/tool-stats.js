@@ -121,7 +121,6 @@ ${toolData.description}
         })
     }
 }
-}
 
 handler.help = ['toolstats'].map(v => v + ' [tool_name]')
 handler.tags = ['rpg']
