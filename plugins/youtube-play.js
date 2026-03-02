@@ -1,10 +1,8 @@
-import ytdlWrapper from '../lib/ytdl-core-wrapper.js';
-import search from 'yt-search';
+import ytdlpWrapper from '../lib/yt-dlp-wrapper.js';
 import fs from 'fs';
 
 // ============================================================
-// YOUTUBE DOWNLOADER - YTDL-CORE
-// ============================================================
+// YOUTUBE DOWNLOADER - YTDLP// ============================================================
 
 const handler = async (m, { conn, text, usedPrefix }) => {
   if (!text) throw 'Enter Title / Link From YouTube!';
@@ -14,13 +12,13 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     console.log('[PLAY] Query:', text);
 
     // Get video info (search + metadata)
-    const videoInfo = await ytdlWrapper.getVideoInfo(text);
+    const videoInfo = await ytdlpWrapper.getVideoInfo(text);
     const { title, videoId, duration, author, description, thumbnail, views, url } = videoInfo;
 
     console.log('[PLAY] Video found:', videoId);
 
     // Download audio
-    const result = await ytdlWrapper.getAudioFile(text, '128');
+    const result = await ytdlpWrapper.getAudioFile(text, '128');
     const { filePath } = result;
 
     console.log('[PLAY] Download success:', filePath);
@@ -79,7 +77,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     }, { quoted: m });
 
     // Cleanup after send
-    setTimeout(() => ytdlWrapper.cleanup(filePath), 5000);
+    setTimeout(() => ytdlpWrapper.cleanup(filePath), 5000);
 
   } catch (e) {
     console.error('[PLAY] Error:', e.message);

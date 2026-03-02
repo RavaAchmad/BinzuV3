@@ -1,4 +1,4 @@
-import ytdlWrapper from '../lib/ytdl-core-wrapper.js';
+import ytdlpWrapper from '../lib/yt-dlp-wrapper.js';
 import fs from 'fs';
 
 
@@ -18,7 +18,7 @@ const handler = async (m, { conn, text, usedPrefix, command, args }) => {
     console.log('[YTA] Starting download:', { query: text, bitrate });
 
     // Download audio
-    const result = await ytdlWrapper.getAudioFile(text, bitrate);
+    const result = await ytdlpWrapper.getAudioFile(text, bitrate);
     const { filePath, title } = result;
 
     console.log('[YTA] Download success:', filePath);
@@ -33,7 +33,7 @@ const handler = async (m, { conn, text, usedPrefix, command, args }) => {
     }, { quoted: m });
 
     // Cleanup after send
-    setTimeout(() => ytdlWrapper.cleanup(filePath), 5000);
+    setTimeout(() => ytdlpWrapper.cleanup(filePath), 5000);
 
   } catch (error) {
     console.error('[YTA] Error:', error.message);

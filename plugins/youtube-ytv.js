@@ -1,4 +1,4 @@
-import ytdlWrapper from '../lib/ytdl-core-wrapper.js';
+import ytdlpWrapper from '../lib/yt-dlp-wrapper.js';
 import fs from 'fs';
 
 
@@ -8,28 +8,25 @@ const handler = async (m, { conn, text, args, usedPrefix, command }) => {
     return m.reply(`*Cara pakenya gini, cuy:*\n${usedPrefix}${command} <url youtube> [720/360]\n\n*Contoh:*\n${usedPrefix}${command} https://youtu.be/dQw4w9WgXcQ 720\n\nDefault 720p, fallback ke 360p kalau gak ada.`);
   }
 
-  const url = text.split(" ")[0];
+  const query = text.split(" ")[0];
   const quality = args[0] || '720';
 
-  // Validasi URL YouTube
-  if (!/youtube\.com|youtu\.be/.test(url)) {
-    return m.reply("❌ *URL YouTube-nya gak valid, nih. Coba copy-paste lagi.*");
-  }
+  // the wrapper will handle URLs or search queries via yt-search
 
   try {
     m.reply("⏳ *Sabar ya, lagi di-download video... Bentar lagi beres kok!*");
 
-    console.log('[YTV] Starting download:', { query: url, quality });
+    console.log('[YTV] Starting download:', { query, quality });
 
-    // Download video
+    // Download video (wrapper accepts query or URL)
     let result;
     try {
-      result = await ytdlWrapper.getVideoFile(url, quality);
+      result = await ytdlpWrapper.getVideoFile(query, quality);
     } catch (e) {
       // Fallback ke 360p kalau 720p gagal
       if (quality === '720') {
         console.log('[YTV] Quality 720 failed, trying 360p fallback...');
-        result = await ytdlWrapper.getVideoFile(url, '360');
+        result = await ytdlpWrapper.getVideoFile(query, '360');
       } else {
         throw e;
       }
@@ -54,7 +51,7 @@ const handler = async (m, { conn, text, args, usedPrefix, command }) => {
     }, { quoted: m });
 
     // Cleanup after send
-    setTimeout(() => ytdlWrapper.cleanup(filePath), 5000);
+    setTimeout(() => ytdlpWrapper.cleanup(filePath), 5000);
 
   } catch (err) {
     console.error('[YTV] Error:', err.message);
