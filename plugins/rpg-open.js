@@ -98,7 +98,7 @@ let handler = async (m, { command, args, usedPrefix, conn }) => {
     const listCrate = Object.fromEntries(Object.entries(rewards).filter(([v]) => v && v in user))
     
     let type = (args[0] || '').toLowerCase()
-    let count = Math.floor(isNumber(args[1]) ? Math.min(Math.max(parseInt(args[1]), 1), 10) : 1) * 1
+    let count = Math.floor(isNumber(args[1]) ? Math.max(parseInt(args[1]), 1) : 1) * 1
     
     // Show info if no type provided
     if (!type) {
@@ -125,6 +125,7 @@ ${usedPrefix}open legendary 1
 ⮕ Luck multiplier increases with consecutive opens (Max 2.5x)
 ⮕ First open of day gives +50% bonus!
 ⮕ Pity counter guarantees rare items every X opens
+⚠️ *Max 10 opens per sekali! Lebih dari itu perlu warning*
 `.trim()
         return await conn.reply(m.chat, info, m, {
             contextInfo: {
@@ -141,6 +142,28 @@ ${usedPrefix}open legendary 1
             }
         })
     }
+
+    // ⚠️ WARNING: Jika count > 10
+    if (count > 10) {
+        let warningMsg = `
+⚠️ *PERHATIAN!*
+
+Anda ingin membuka ${count}x ${global.rpg.emoticon(type)} ${type} crate
+Ini akan memakan waktu ~${(count * 400 / 1000).toFixed(1)} detik
+
+*⚡ PEMBERITAHUAN:*
+• Jangan close chat atau restart bot sampai selesai
+• Crate akan langsung dikurangi dari inventory
+
+Apakah Anda yakin? 
+
+*Ketik:* ${usedPrefix}open ${type} ${count} confirm
+`.trim()
+        return m.reply(warningMsg)
+    }
+
+    // Check for confirmation if needed
+    const confirmArg = args[2]?.toLowerCase()
     
     if (!(type in listCrate)) {
         return m.reply(`❌ Crate *${type}* tidak ditemukan! Available: ${Object.keys(listCrate).join(', ')}`)
@@ -148,98 +171,143 @@ ${usedPrefix}open legendary 1
     
     if (user[type] < count) {
         return m.reply(`
-❌ Crate *${global.rpg.emoticon(type)} ${type}* not enough!
+❌ Crate *${global.rpg.emoticon(type)} ${type}* tidak cukup!
 You have: ${user[type]} | Need: ${count}
 Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
 `.trim())
     }
-    
-    // Deduct crates
+
+    // Deduct crates first
     user[type] -= count
     
-    // Update luck system
-    const luck = crateSystem.updateLuck(m.sender)
-    const dailyBonus = crateSystem.getDailyBonus(m.sender)
-    
-    let totalReward = {}
-    let guaranteedRewards = []
-    let bonusMessage = ''
-    
-    // Process each crate opening
-    for (let i = 0; i < count; i++) {
-        // Check for guaranteed reward
-        const guaranteed = crateSystem.checkPityGuarantee(m.sender, type)
-        if (guaranteed) {
-            guaranteedRewards.push(guaranteed)
-            if (guaranteed.type === 'crate_drop') {
-                user[guaranteed.item] = (user[guaranteed.item] || 0) + guaranteed.amount
-                totalReward[guaranteed.item] = (totalReward[guaranteed.item] || 0) + guaranteed.amount
-            } else if (guaranteed.type === 'mix') {
-                for (const [item, amount] of Object.entries(guaranteed.items)) {
-                    if (item in user) {
-                        user[item] = (user[item] || 0) + amount
-                        totalReward[item] = (totalReward[item] || 0) + amount
+    // Create status message
+    let statusMsg = await conn.sendMessage(m.chat, {
+        text: `⏳ ${global.rpg.emoticon(type)} Membuka ${count}x ${type} crate...\n\n🔄 Silahkan tunggu...`
+    }, { quoted: m })
+
+    try {
+        // Update luck system
+        const luck = crateSystem.updateLuck(m.sender)
+        const dailyBonus = crateSystem.getDailyBonus(m.sender)
+        
+        let totalReward = {}
+        let guaranteedRewards = []
+        let openedCount = 0
+        let revealedItems = []
+        
+        // Process each crate opening WITH ANIMATION
+        for (let i = 0; i < count; i++) {
+            // Wait 400ms before revealing next item
+            await new Promise(resolve => setTimeout(resolve, 400))
+            
+            openedCount++
+            let currentReveals = []
+
+            // Check for guaranteed reward
+            const guaranteed = crateSystem.checkPityGuarantee(m.sender, type)
+            if (guaranteed) {
+                guaranteedRewards.push(guaranteed)
+                if (guaranteed.type === 'crate_drop') {
+                    user[guaranteed.item] = (user[guaranteed.item] || 0) + guaranteed.amount
+                    totalReward[guaranteed.item] = (totalReward[guaranteed.item] || 0) + guaranteed.amount
+                    currentReveals.push(`🎁 ${guaranteed.amount}x ${guaranteed.item}`)
+                } else if (guaranteed.type === 'mix') {
+                    for (const [item, amount] of Object.entries(guaranteed.items)) {
+                        if (item in user) {
+                            user[item] = (user[item] || 0) + amount
+                            totalReward[item] = (totalReward[item] || 0) + amount
+                            currentReveals.push(`🎁 ${amount}x ${item}`)
+                        }
+                    }
+                }
+            } else {
+                // Regular crate rewards with multipliers
+                for (let [reward, value] of Object.entries(rewards[type])) {
+                    if (reward in user && Array.isArray(value)) {
+                        const baseAmount = value.getRandom()
+                        if (baseAmount > 0) {
+                            const finalAmount = crateSystem.calculateReward(baseAmount, m.sender)
+                            user[reward] = (user[reward] || 0) + finalAmount
+                            totalReward[reward] = (totalReward[reward] || 0) + finalAmount
+                            currentReveals.push(`✨ ${finalAmount}x ${global.rpg.emoticon(reward)} ${reward}`)
+                        }
                     }
                 }
             }
-            continue
+
+            // Add to revealed items
+            revealedItems.push(...currentReveals)
+
+            // Build animated update message
+            let animatedText = `🎁 *Opening ${count}x ${type} Crate*\n`
+            animatedText += `Progress: [${('█'.repeat(Math.floor((openedCount / count) * 10)) + '░'.repeat(10 - Math.floor((openedCount / count) * 10)))}] ${openedCount}/${count}\n\n`
+            animatedText += `📦 *Items Revealed:*\n`
+            animatedText += revealedItems.map((item, idx) => `${idx + 1}. ${item}`).join('\n')
+            animatedText += `\n\n⏳ Opening... (${Math.round((count - openedCount) * 0.4)}ms left)`
+
+            // Update status message
+            await conn.sendMessage(m.chat, {
+                text: animatedText,
+                edit: statusMsg.key
+            })
         }
+
+        // Build final reward display
+        let rewardText = Object.keys(totalReward)
+            .filter(v => v && totalReward[v] && !/hai/i.test(v))
+            .map(reward => `💎 *${global.rpg.emoticon(reward)} ${reward}:* ${totalReward[reward]}`)
+            .join('\n')
         
-        // Regular crate rewards with multipliers
-        for (let [reward, value] of Object.entries(rewards[type])) {
-            if (reward in user && Array.isArray(value)) {
-                const baseAmount = value.getRandom()
-                if (baseAmount > 0) {
-                    const finalAmount = crateSystem.calculateReward(baseAmount, m.sender)
-                    user[reward] = (user[reward] || 0) + finalAmount
-                    totalReward[reward] = (totalReward[reward] || 0) + finalAmount
-                }
-            }
+        // Add daily bonus if applicable
+        let bonusMessage = ''
+        if (dailyBonus && dailyBonus.type === 'daily') {
+            bonusMessage = `\n✨ ${dailyBonus.message} ✨`
         }
-    }
 
-    // Build reward display
-    let rewardText = Object.keys(totalReward)
-        .filter(v => v && totalReward[v] && !/hai/i.test(v))
-        .map(reward => `💎 *${global.rpg.emoticon(reward)} ${reward}:* ${totalReward[reward]}`)
-        .join('\n')
-    
-    // Add daily bonus if applicable
-    if (dailyBonus && dailyBonus.type === 'daily') {
-        bonusMessage = `\n✨ ${dailyBonus.message} ✨`
-    }
+        // Add guaranteed rewards notification
+        if (guaranteedRewards.length > 0) {
+            rewardText += '\n\n🎁 *GUARANTEED REWARDS:*\n' + 
+                guaranteedRewards.map((r, idx) => {
+                    if (r.type === 'crate_drop') {
+                        return `${idx + 1}. 📦 ${r.amount}x ${r.item}`
+                    } else {
+                        return `${idx + 1}. ✨ Special mix!`
+                    }
+                }).join('\n')
+        }
 
-    // Add guaranteed rewards notification
-    if (guaranteedRewards.length > 0) {
-        rewardText += '\n\n🎁 *GUARANTEED REWARDS:*\n' + 
-            guaranteedRewards.map((r, idx) => {
-                if (r.type === 'crate_drop') {
-                    return `${idx + 1}. 📦 ${r.amount}x ${r.item}`
-                } else {
-                    return `${idx + 1}. ✨ Special mix!`
-                }
-            }).join('\n')
-    }
+        // Final result
+        let result = `
+✅ *Selesai! ${count}x ${type} Crate Terbuka*
+🎊 ${crateSystem.getOpeningAnimation(count)}
 
-    // Main response
-    let result = `
-${global.rpg.emoticon(type)} *Opening ${count}x ${type} Crate*
-${crateSystem.getOpeningAnimation(count)}
-
-━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 *HASIL OPENING:*
 ${rewardText}
-━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${bonusMessage}
 
 🍀 *Luck Info:*
 ├─ Streak: ${luck.streak}/50 (Multiplier: x${luck.multiplier.toFixed(2)})
-├─ Total Opened: ${luck.totalOpens}
+├─ Total Opened Today: ${luck.totalOpens}
 └─ Pity (${type}): ${crateSystem.playerPity[m.sender][type]}/${crateSystem.playerPity[m.sender].guaranteeThresholds[type]}
 
-${crateSystem.playerPity[m.sender][type] === 0 && guaranteedRewards.length > 0 ? '⚡ Pity Reset!' : ''}
+${crateSystem.playerPity[m.sender][type] === 0 && guaranteedRewards.length > 0 ? '⚡ Pity Counter Reset!' : ''}
 `.trim()
 
-    await m.reply(result)
+        // Final update with complete results
+        await conn.sendMessage(m.chat, {
+            text: result,
+            edit: statusMsg.key
+        })
+
+    } catch (error) {
+        console.error('Error in open crate:', error)
+        await conn.sendMessage(m.chat, {
+            text: '❌ Terjadi error saat membuka crate. Crate sudah dikurangi dari inventory.',
+            edit: statusMsg.key
+        })
+    }
 }
 handler.help = ['open'].map(v => v + ' [crate] [count]')
 handler.tags = ['rpg']
