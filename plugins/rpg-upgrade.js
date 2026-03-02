@@ -105,7 +105,7 @@ untuk memilikinya ketik *${usedPrefix}craft armor*`
                     return m.reply(lmao)
                 }
                 if (armor > 9) return m.reply(`*${rpg.emoticon('armor')}Armor* kamu sudah level max!!`)
-                let _diamond = armor * 5
+                let _diamond = armor * 2
                 let ____wood = armor * 150
                 let ____money = armor * 1000000
                 if (diamond < _diamond || wood < ____wood || money < ____money) return m.reply(`
@@ -126,7 +126,7 @@ untuk memilikinya ketik *${usedPrefix}craft atm*`
                     return m.reply(lmao)
                 }
                 if (atm > 999) return m.reply(`*${rpg.emoticon('atm')}Atm* kamu sudah level max!!`)
-                let __diamond = atm * 3
+                let __diamond = atm * 1
                 let _emerald = atm * 5
                 let _____money = atm * 10000
                 if (diamond < __diamond || emerald < _emerald || money < _____money) return m.reply(`

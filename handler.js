@@ -888,7 +888,24 @@ export async function handler(chatUpdate) {
 					wolfexp: 0,
 					wolflastfeed: 0,
 					wood: 0,
-					wortel: 0
+					wortel: 0,
+					// NEW RPG FEATURES
+					dungeonWins: 0,
+					dungeonRuns: 0,
+					bossKills: 0,
+					dungeonRank: 'BEGINNER',
+					achievements: {
+						unlocked: [],
+						totalPoints: 0,
+						lastCheck: 0
+					},
+					dailyMissions: {
+						completedToday: [],
+						inProgress: [],
+						lastReset: Date.now()
+					},
+					itemsCrafted: 0,
+					legendaryFound: 0
 				}
 			let chat = global.db.data.chats[m.chat]
 			if (typeof chat !== 'object')

@@ -89,20 +89,20 @@ contoh *${usedPrefix}${command} pickaxe*
             break
           case 'armor':
           if (user.armor > 0) return m.reply('Kamu sudah memilik ini')
-            if(user.iron < 30 || user.emerald < 1 || user.diamond < 5) return m.reply(`Barang tidak cukup!\nUntuk membuat armor. Kamu memerlukan :${user.iron < 30 ? `\n${30 - user.iron} Iron ⛓️` : ''}${user.emerald < 1 ? `\n${1 - user.emerald} Emerald ❇️` : ''}${user.diamond < 5 ? `\n${5 - user.diamond} Diamond 💎` : ''}`)
+            if(user.iron < 30 || user.emerald < 1 || user.diamond < 2) return m.reply(`Barang tidak cukup!\nUntuk membuat armor. Kamu memerlukan :${user.iron < 30 ? `\n${30 - user.iron} Iron ⛓️` : ''}${user.emerald < 1 ? `\n${1 - user.emerald} Emerald ❇️` : ''}${user.diamond < 2 ? `\n${2 - user.diamond} Diamond 💎` : ''}`)
             user.emerald -= 1
             user.iron -= 30
-            user.diamond -= 5
+            user.diamond -= 2
             user.armor += 1
             user.armordurability = 50
             m.reply("Sukses membuat 1 Armor 🥼")
             break
             case 'atm':
           if (user.atm > 0) return m.reply('Kamu sudah memilik ini')
-            if(user.emerald < 3 || user.money < 10000 || user.diamond < 6) return m.reply(`Barang tidak cukup!\nUntuk membuat atm. Kamu memerlukan :${user.money < 10000 ? `\n${10000 - user.money} Money 💹` : ''}${user.emerald < 3 ? `\n${3 - user.emerald} Emerald ❇️` : ''}${user.diamond < 6 ? `\n${6 - user.diamond} Diamond 💎` : ''}`)
+            if(user.emerald < 3 || user.money < 10000 || user.diamond < 3) return m.reply(`Barang tidak cukup!\nUntuk membuat atm. Kamu memerlukan :${user.money < 10000 ? `\n${10000 - user.money} Money 💹` : ''}${user.emerald < 3 ? `\n${3 - user.emerald} Emerald ❇️` : ''}${user.diamond < 3 ? `\n${3 - user.diamond} Diamond 💎` : ''}`)
             user.emerald -= 3
             user.money -= 10000
-            user.diamond -= 6
+            user.diamond -= 3
             user.atm += 1
             user.fullatm = 500000000
             m.reply("Sukses membuat 1 Atm 💳")

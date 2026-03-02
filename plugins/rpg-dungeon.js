@@ -46,7 +46,7 @@ let handler = async(m, { conn, usedPrefix, command, text }) => {
             room.price.money += (Math.floor(Math.random() * 10000)) * 1
             room.price.exp += (Math.floor(Math.random() * 5001)) * 1
             room.price.iron += (pickRandom([0, 1, 0, 0, 1, 1, 0, 0])) * 1
-            room.game.diamond += (pickRandom([0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0])) * 1
+            room.game.diamond += (pickRandom([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])) * 1
             room.game.trash += (Math.floor(Math.random() * 1001)) * 1
             room.price.string += (Math.floor(Math.random() * 5)) * 1
             room.price.wood += (Math.floor(Math.random() * 10)) * 1
