@@ -6,23 +6,45 @@ let handler = async (m, { conn, args }) => {
     const user = global.db.data.users[m.sender]
     const db = global.db.data
 
-    leaderboardManager.initLeaderboard(db)
+    // Create status message for animation
+    let statusMsg = await conn.sendMessage(m.chat, { text: '⏳ Loading profile data...' }, { quoted: m })
 
-    const rank = getDungeonRank(user.level)
-    achievementSystem.initAchievements(user)
+    try {
+        leaderboardManager.initLeaderboard(db)
 
-    const globalRank = {
-        level: (Object.entries(db.users).sort((a, b) => b[1].level - a[1].level).map(e => e[0]).indexOf(m.sender) + 1),
-        exp: (Object.entries(db.users).sort((a, b) => b[1].exp - a[1].exp).map(e => e[0]).indexOf(m.sender) + 1),
-        money: (Object.entries(db.users).sort((a, b) => b[1].money - a[1].money).map(e => e[0]).indexOf(m.sender) + 1)
-    }
+        // Stage 1: Fetching
+        await conn.sendMessage(m.chat, {
+            text: '⏳ Fetching achievements & dungeon ranks...',
+            edit: statusMsg.key
+        })
 
-    const dailyRank = leaderboardManager.getPlayerRank(db, m.sender, 'daily', 'dungeonWins')
-    const weeklyRank = leaderboardManager.getPlayerRank(db, m.sender, 'weekly', 'dungeonWins')
-    const seasonalRank = leaderboardManager.getPlayerRank(db, m.sender, 'seasonal', 'dungeonWins')
+        const rank = getDungeonRank(user.level)
+        achievementSystem.initAchievements(user)
 
-    let text = `
-╭━━━━━━━━━━━━━━━━ 📊 RPG STATS ━━━━━━━━━━━━━━━━╮
+        // Stage 2: Calculating
+        await conn.sendMessage(m.chat, {
+            text: '⏳ Calculating global rankings...',
+            edit: statusMsg.key
+        })
+
+        const globalRank = {
+            level: (Object.entries(db.users).sort((a, b) => b[1].level - a[1].level).map(e => e[0]).indexOf(m.sender) + 1),
+            exp: (Object.entries(db.users).sort((a, b) => b[1].exp - a[1].exp).map(e => e[0]).indexOf(m.sender) + 1),
+            money: (Object.entries(db.users).sort((a, b) => b[1].money - a[1].money).map(e => e[0]).indexOf(m.sender) + 1)
+        }
+
+        // Stage 3: Leaderboard positions
+        await conn.sendMessage(m.chat, {
+            text: '⏳ Formatting leaderboard data...',
+            edit: statusMsg.key
+        })
+
+        const dailyRank = leaderboardManager.getPlayerRank(db, m.sender, 'daily', 'dungeonWins')
+        const weeklyRank = leaderboardManager.getPlayerRank(db, m.sender, 'weekly', 'dungeonWins')
+        const seasonalRank = leaderboardManager.getPlayerRank(db, m.sender, 'seasonal', 'dungeonWins')
+
+        let text = `
+╭━━━━ 📊 RPG STATS ━━━━━━━━━━━━━━━━╮
 ┃
 │ 👤 *${user.registered ? user.name : conn.getName(m.sender)}*
 │
@@ -99,7 +121,19 @@ For more info:
 » ${m.prefix}bosraid - Start a boss raid
 `
 
-    m.reply(text)
+        // Final: Complete
+        await conn.sendMessage(m.chat, {
+            text: text,
+            edit: statusMsg.key
+        })
+
+    } catch (error) {
+        console.error('Error in rpgstats:', error)
+        await conn.sendMessage(m.chat, {
+            text: '❌ Error loading stats',
+            edit: statusMsg.key
+        })
+    }
 }
 
 handler.help = ['rpgstats']

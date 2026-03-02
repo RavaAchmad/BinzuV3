@@ -1,154 +1,169 @@
+import toolSystem from "../lib/tool-system.js"
+
 let handler = async (m, { conn, command, args, usedPrefix }) => { 
-        let user = global.db.data.users[m.sender]
-        let wood = user.wood * 1
-        let rock = user.rock * 1
-        let string = user.string * 1
-        let money = user.money * 1
-        let iron = user.iron * 1
-        let fishingrod = user.fishingrod * 1
-        let pickaxe = user.pickaxe * 1
-        let sword = user.sword * 1
-        let diamond = user.diamond * 1
-        let emerald = user.emerald * 1
-        let armor = user.armor * 1
-        let atm = user.atm
-        let type = (args[0] || '').toLowerCase()
-        let prefix = usedPrefix
-        
-        let teks = `█▀▀▀▀█▀▀▀▀█▀▀▀▀█
-█────█────█────█
-█▄▄▄▄█▄▄▄▄█▄▄▄▄█
-█▀▀▀▀█▀▀▀▀█▀▀▀▀█
-█────█────█────█
-█▄▄▄▄█▄▄▄▄█▄▄▄▄█
-█▀▀▀▀█▀▀▀▀█▀▀▀▀█
-█────█────█────█
-█▄▄▄▄█▄▄▄▄█▄▄▄▄█
+    let user = global.db.data.users[m.sender]
+    let type = (args[0] || '').toLowerCase()
+    
+    // Create menu if no type specified
+    if (!type) {
+        let menu = `
+${toolSystem.tools.fishingrod.emoji} *TOOL & ITEM UPGRADE SYSTEM*
+━━━━━━━━━━━━━━━━━━━
 
-Gunakan Format *${usedPrefix}${command} [type]*
-contoh *${usedPrefix}${command} fishingRod*
+📝 *Usage:*
+${usedPrefix}upgrade [tool_name]
 
-*📌List yang Bisa Di Upgrade*
-${rpg.emoticon('fishingrod')}FishingRod
-${rpg.emoticon('pickaxe')}Pickaxe
-${rpg.emoticon('sword')}Sword
-${rpg.emoticon('armor')}Armor
-${rpg.emoticon('atm')}Atm
-`.trim()
-        
-        switch (type) {
-            case 'fishingrod':
-                if (fishingrod == 0) {
-                    let lmao = `anda belum memiliki *🎣FishingRod*
-untuk mendapatkannya ketik *${usedPrefix}craft fishingrod*`
-                    return m.reply(lmao)
-                }
-                if (fishingrod > 9) return m.reply(`*${rpg.emoticon('fishingrod')}FishingRod* kamu sudah level max`)
-                let _wood = fishingrod * 100
-                let _string = fishingrod * 100
-                let _money = fishingrod * 1000000
-                if (wood < _wood || string < _string || money < _money) return m.reply(`Material kamu kurang!!${wood < _wood ? `\n${rpg.emoticon('wood')}wood Kamu Kurang *${_wood - wood}*` : ''}${string < _string ? `\n${rpg.emoticon('string')}String Kamu Kurang *${_string - string}*` : ''}${user.money < _money ? `\n${rpg.emoticon('money')}Uang Kamu Kurang *${_money - money}*` : ''}`)
-                user.fishingrod += 1
-                user.wood -= _wood * 1
-                user.string -= _string * 1
-                user.money -= _money * 1
-                user.fishingroddurability = 0 
-                user.fishingroddurability += fishingrod * 50
-                m.reply(`Succes mengupgrade *${rpg.emoticon('fishingrod')}FishingRod*`)
-                break
-            case 'pickaxe':
-                if (pickaxe == 0) {
-                    let lmao = `anda belum memiliki *${rpg.emoticon('pickaxe')}Pickaxe*
-untuk memilikinya ketik *${usedPrefix}craft Pickaxe*`
-                    return m.reply(lmao)
-                }
-                if (pickaxe > 9) return m.reply(`*${rpg.emoticon('pickaxe')}Pickaxe* kamu sudah level max!!`)
-                let __rock = pickaxe * 250
-                let __wood = pickaxe * 150
-                let __money = pickaxe * 1500000
-                if (rock < __rock || wood < __wood || money < __money) return m.reply(`
-Material Anda Kurang!!
-${rock < __rock ? `\n${rpg.emoticon('rock')}rock kamu kurang *${__rock - rock}*` : ''}${wood < __wood ? `\n${rpg.emoticon('wood')}wood kamu kurang *${__wood - wood}*` : ''}${money < __money ? `\n${rpg.emoticon('money')}Uang kamu kurang *${__money - money}*` : ''}`)
-                user.pickaxe += 1
-                user.wood -= __wood * 1
-                user.rock -= __rock * 1
-                user.money -= __money * 1
-                user.pickaxedurability = 0
-                user.pickaxedurability += pickaxe * 50
-                m.reply(`Succes mengupgrade *${rpg.emoticon('pickaxe')}Pickaxe*`)
-                break
-            case 'sword':
-                if (sword == 0) {
-                    let lmao = `anda belum memiliki *${rpg.emoticon('sword')}Sword*
-untuk memilikinya ketik *${usedPrefix}craft sword*`
-                    return m.reply(lmao)
-                }
-                if (sword > 9) return m.reply(`*${rpg.emoticon('sword')}Sword* kamu sudah level max!!`)
-                let _iron = sword * 250
-                let ___wood = sword * 150
-                let ___money = sword * 1000000
-                if (iron < _iron || wood < ___wood || money < ___money) return m.reply(`
-Material Anda Kurang!!
-${iron < _iron ? `\n${rpg.emoticon('iron')}Iron kamu kurang *${_iron - iron}*` : ''}${wood < ___wood ? `\n${rpg.emoticon('wood')}wood kamu kurang *${___wood - wood}*` : ''}${money < ___money ? `\n${rpg.emoticon('money')}Uang kamu kurang *${___money - money}*` : ''}`)
-                user.sword += 1
-                user.iron -= _iron * 1
-                user.wood -= ___wood * 1
-                user.money -= ___money * 1
-                user.sworddurability = 0 
-                user.sworddurability += sword * 50 
-                m.reply(`Succes mengupgrade *${rpg.emoticon('sword')}Sword*`)
-                break
-                case 'armor':
-                if (armor == 0) {
-                    let lmao = `anda belum memiliki *${rpg.emoticon('armor')}Armor*
-untuk memilikinya ketik *${usedPrefix}craft armor*`
-                    return m.reply(lmao)
-                }
-                if (armor > 9) return m.reply(`*${rpg.emoticon('armor')}Armor* kamu sudah level max!!`)
-                let _diamond = armor * 2
-                let ____wood = armor * 150
-                let ____money = armor * 1000000
-                if (diamond < _diamond || wood < ____wood || money < ____money) return m.reply(`
-Material Anda Kurang!!
-${diamond < _diamond ? `\n${rpg.emoticon('diamond')}Diamond kamu kurang *${_diamond - diamond}*` : ''}${wood < ____wood ? `\n${rpg.emoticon('wood')}wood kamu kurang *${____wood - wood}*` : ''}${money < ____money ? `\n${rpg.emoticon('money')}Uang kamu kurang *${____money - money}*` : ''}`)
-                user.armor += 1
-                user.diamond -= _diamond * 1
-                user.wood -= ____wood * 1
-                user.money -= ____money * 1
-                user.armordurability = 0 
-                user.armordurability += sword * 50 
-                m.reply(`Succes mengupgrade *${rpg.emoticon('armor')}Armor*`)
-                break
-                case 'atm':
-                if (atm == 0) {
-                    let lmao = `anda belum memiliki *${rpg.emoticon('atm')}Atm*
-untuk memilikinya ketik *${usedPrefix}craft atm*`
-                    return m.reply(lmao)
-                }
-                if (atm > 999) return m.reply(`*${rpg.emoticon('atm')}Atm* kamu sudah level max!!`)
-                let __diamond = atm * 1
-                let _emerald = atm * 5
-                let _____money = atm * 10000
-                if (diamond < __diamond || emerald < _emerald || money < _____money) return m.reply(`
-Material Anda Kurang!!
-${diamond < __diamond ? `\n${rpg.emoticon('diamond')}Diamond kamu kurang *${__diamond - diamond}*` : ''}${emerald < _emerald ? `\n${rpg.emoticon('emerald')}Emerald kamu kurang *${_emerald - emerald}*` : ''}${money < _____money ? `\n${rpg.emoticon('money')}Uang kamu kurang *${_____money - money}*` : ''}`)
-                user.atm += 1
-                user.diamond -= __diamond * 1
-                user.emerald -= _emerald * 1
-                user.money -= _____money * 1
-                user.fullatm = 0 
-                user.fullatm += atm * 500000000
-                m.reply(`Succes mengupgrade *${rpg.emoticon('atm')}Atm*`)
-                break
-            default :
-                return m.reply(teks)
+🛠️ *Available Tools:*
+${Object.entries(toolSystem.tools).map(([key, data]) => 
+    `${data.emoji} ${data.name.padEnd(15)} → *${usedPrefix}upgrade ${key}*`
+).join('\n')}
+
+💡 *How Upgrades Work:*
+• Each level increases stats exponentially
+• Higher levels cost more materials
+• Stats show exact improvements before upgrading
+• 10 levels for tools, 100 levels for ATM
+
+⭐ *Tier System:*
+🟢 Common (1-25%)
+🔵 Rare (25-50%)
+⚫ Epic (50-70%)
+💎 Mythic (70-90%)
+👑 Legendary (90-100%)
+
+Type: ${usedPrefix}upgrade [tool] to preview upgrade
+        `.trim()
+
+        return m.reply(menu)
+    }
+
+    // Find tool
+    const tool = Object.keys(toolSystem.tools).find(t => t.toLowerCase() === type.toLowerCase())
+    if (!tool) {
+        return m.reply(`❌ Tool *${type}* not found!\n\nAvailable: ${Object.keys(toolSystem.tools).join(', ')}`)
+    }
+
+    const toolData = toolSystem.tools[tool]
+    const currentLevel = user[tool] || 0
+
+    // Check if tool exists
+    if (currentLevel === 0) {
+        return m.reply(`❌ You don't have *${toolData.emoji} ${toolData.name}* yet!\n\nCraft it first with: ${usedPrefix}craft ${tool}`)
+    }
+
+    // Check if max level
+    if (currentLevel >= toolData.maxLevel) {
+        return m.reply(`
+✨ *${toolData.emoji} ${toolData.name}* - LEVEL MAX!
+
+You've reached maximum level (${toolData.maxLevel})
+All stats are fully upgraded!
+${toolSystem.formatToolStats(tool, currentLevel)}`)
+    }
+
+    // Get cost and check materials
+    const cost = toolSystem.getUpgradeCost(tool, currentLevel)
+    let missingMaterials = []
+
+    for (const [item, amount] of Object.entries(cost)) {
+        const userHas = user[item] || 0
+        if (userHas < amount) {
+            missingMaterials.push(`${item}: need ${(amount - userHas).toLocaleString('id-ID')} more`)
         }
+    }
+
+    // If missing materials, show preview with requirements
+    if (missingMaterials.length > 0) {
+        return m.reply(`
+${toolSystem.formatUpgradePreview(tool, currentLevel, user)}
+
+❌ *Missing Materials:*
+${missingMaterials.map(m => `• ${m}`).join('\n')}
+`)
+    }
+
+    // Perform upgrade with animation
+    let statusMsg = await conn.sendMessage(m.chat, { text: '⏳ Validating materials...' }, { quoted: m })
+
+    try {
+        await conn.sendMessage(m.chat, {
+            text: '⏳ Verifying cost calculation...',
+            edit: statusMsg.key
+        })
+
+        const oldStats = toolSystem.getStats(tool, currentLevel)
+        const newStats = toolSystem.getStats(tool, currentLevel + 1)
+
+        await conn.sendMessage(m.chat, {
+            text: '⏳ Processing upgrade...',
+            edit: statusMsg.key
+        })
+
+        // Deduct costs
+        for (const [item, amount] of Object.entries(cost)) {
+            user[item] = (user[item] || 0) - amount
+        }
+
+        await conn.sendMessage(m.chat, {
+            text: '⏳ Updating tool stats...',
+            edit: statusMsg.key
+        })
+
+        // Upgrade tool
+        user[tool]++
+
+        // Update durability (scales exponentially)
+        const tooltier = toolSystem.getTierEmoji(user[tool], toolData.maxLevel)
+        user[`${tool}durability`] = Math.floor(oldStats.durability * (1 + (newStats.durability - oldStats.durability) / oldStats.durability * 1.5))
+
+        // Calculate stat improvements
+        let improvements = []
+        for (const [stat, oldValue] of Object.entries(oldStats)) {
+            if (typeof oldValue === 'number') {
+                const newValue = newStats[stat]
+                const diff = newValue - oldValue
+                const percent = ((diff / oldValue) * 100).toFixed(1)
+                improvements.push(`├─ ${stat}: ${oldValue} → ${newValue.toLocaleString('id-ID')} (+${percent}%)`)
+            }
+        }
+
+        let result = `
+${tooltier} *${toolData.emoji} ${toolData.name} Upgraded!*
+━━━━━━━━━━━━━━━━━━━
+
+Level: ${currentLevel} → ${user[tool]}
+Status: ${currentLevel + 1 === toolData.maxLevel ? '🔴 NEXT LEVEL IS MAX!' : ''}
+
+*Stat Improvements:*
+${improvements.join('\n')}
+
+💰 *Materials Used:*
+${Object.entries(cost).map(([item, amount]) => `• ${item}: ${amount.toLocaleString('id-ID')}`).join('\n')}
+
+🎯 *Improvement Score: ${toolSystem.calculateImprovementScore(oldStats, newStats).toFixed(2)}%*
+
+${user[tool] < toolData.maxLevel ? `\n✨ Next level: ${usedPrefix}upgrade ${tool}` : '\n👑 You have reached maximum level!'}
+`.trim()
+
+        await conn.sendMessage(m.chat, {
+            text: result,
+            edit: statusMsg.key
+        })
+
+    } catch (error) {
+        console.error('Error in upgrade:', error)
+        await conn.sendMessage(m.chat, {
+            text: '❌ Error during upgrade',
+            edit: statusMsg.key
+        })
+    }
 }
-handler.help = ['upgrade']
+
+handler.help = ['upgrade'].map(v => v + ' [tool]')
 handler.tags = ['rpg']
 handler.command = /^(up(grade)?)$/i
 handler.register = true
 handler.group = true
-handler.fail = null
 handler.rpg = true
+
 export default handler

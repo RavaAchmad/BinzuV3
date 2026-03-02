@@ -375,6 +375,478 @@ Displays:
 /trade            - Player trading
 /dungeonrank      - Rank info & bounties
 /rpgstats         - Full profile
+/rpgadmin         - Owner controls (ADMIN ONLY)
+```
+
+---
+
+## 🛠️ Enhanced Tool & Item Upgrade System
+
+Tools are essential in RPG progression! Each tool can be upgraded to become significantly more powerful.
+
+### Tool Types & Bonuses
+
+#### 🎣 Fishing Rod
+- **Max Level:** 10
+- **Stats:**
+  - Catch Rate: 35% → 85% (base → max)
+  - Speed Bonus: 1.0x → 1.72x (faster fishing)
+  - Durability: 100 → 900 (per upgrade)
+  - Success Exp Bonus: 0 → 450 (bonus exp per fish)
+- **Use:** `/fish` command
+
+#### ⛏️ Pickaxe
+- **Max Level:** 10
+- **Stats:**
+  - Mine Rate: 40% → 100% (success rate)
+  - Speed Bonus: 1.0x → 2.0x (faster mining)
+  - Durability: 120 → 1200
+  - Damage Bonus: 0 → 72 (ore quality multiplier)
+- **Use:** `/mine` command
+
+#### ⚔️ Sword
+- **Max Level:** 10
+- **Stats:**
+  - Damage: 50 → 200 (attack power)
+  - Crit Chance: 5% → 25% (critical hit %chance)
+  - Durability: 150 → 1350
+  - Heal Bonus: 0 → 100 HP (life steal per hit)
+- **Use:** `/dung`, `/bosraid` commands
+
+#### 🛡️ Armor
+- **Max Level:** 10
+- **Stats:**
+  - Defense: 20 → 100 (defense power)
+  - Damage Reduction: 5% → 20% (reduce incoming damage)
+  - Durability: 200 → 1700
+  - Block Chance: 0% → 20% (block attack %)
+- **Use:** `/dung`, `/bosraid` commands
+- **Benefit:** Reduce damage taken, protect from damage
+
+#### 🏧 ATM
+- **Max Level:** 100 (highest level cap!)
+- **Stats:**
+  - Money Capacity: 500M → 5.5B (max storable money)
+  - Interest Rate: 2% → 12% (hourly interest!)
+  - Withdraw Speed: 1.0x → 4.0x (faster withdrawals)
+  - Money Multiplier: 1.0x → 3.0x (earn more money)
+- **Use:** `/atm` command
+- **Benefit:** Store money safely, earn passive interest
+
+### Upgrade Mechanics
+
+#### 📈 Exponential Scaling
+- Each upgrade costs **1.4x more** than the previous
+- Level 1→2: Normal cost
+- Level 5→6: 3.6x base cost
+- Level 9→10: 12.84x base cost
+- **Tip:** Early levels are cheap, late levels are expensive!
+
+#### 💰 Upgrade Costs
+
+| Level | Fishing Rod | Pickaxe | Sword | Armor | ATM |
+|-------|-----------|---------|-------|-------|-----|
+| 1→2 | 150 wood, 150 string, 2M | 300 rock, 200 wood, 2.5M | 300 iron, 200 wood, 2M | 3 💎, 200 wood, 2M | 2 💎, 8 💚, 50k |
+| 5→6 | **540 wood, 540 string, 7.2M** | 1,080 rock, 720 wood, 9M | 1,080 iron, 720 wood, 7.2M | 10 💎, 720 wood, 7.2M | 7 💎, 29 💚, 180k |
+| 9→10 | **1,899 wood, 1,899 string, 25.4M** | 3,780 rock, 2,520 wood, 31.5M | 3,780 iron, 2,520 wood, 25.4M | 37 💎, 2,520 wood, 25.4M | 24 💎, 96 💚, 630k |
+
+**Higher levels need incredible resources!** Plan your upgrades carefully.
+
+### Commands
+
+#### View Tool Stats
+```
+/toolstats [tool_name]
+/toolstats fishingrod
+/toolstats sword
+```
+
+Shows:
+- Current level and percentage
+- All stats at current level
+- Cost for next upgrade
+- Whether you can afford next upgrade
+
+#### Upgrade Tool
+```
+/upgrade [tool_name]
+/upgrade pickaxe
+```
+
+Shows:
+- Preview of stat improvements
+- Exact percentages of improvement
+- Cost breakdown
+- Missing materials (if any)
+
+#### Upgrade Menu
+```
+/upgrade
+```
+
+Shows all available tools and upgrade info.
+
+### Tier System
+
+Your tools have visual tiers based on level:
+
+```
+🟢 Common    (1-25% of max level)   - Basic stats
+🔵 Rare     (25-50% of max level)  - Good improvement
+⚫ Epic     (50-70% of max level)  - Excellent stats
+💎 Mythic   (70-90% of max level)  - Powerful
+👑 Legendary (90-100% of max level) - Ultimate power!
+```
+
+### Strategy for Upgrades
+
+1. **Early Game (Levels 1-5):**
+   - Upgrade all tools somewhat evenly
+   - Cheap to upgrade, get quick benefits
+   - Stack gathering bonuses (fishing + mining)
+
+2. **Mid Game (Levels 5-8):**
+   - Focus on farming tools (rod + pickaxe)
+   - Costs start getting significant
+   - Plan your material farming
+
+3. **Late Game (Levels 8-10):**
+   - Expensive! Costs jump dramatically
+   - Sword/Armor for combat players
+   - ATM continues working up to level 100
+
+4. **End Game (ATM Pushing to 100):**
+   - ATM gives passive income with interest rates
+   - Can be upgraded much further than others
+   - Late game money sink (good for economy)
+
+### Stat Importance
+
+**For Farming:**
+- Fishing Rod: Catch Rate (success), Speed Bonus (fast)
+- Pickaxe: Mine Rate (success), Speed Bonus (fast)
+
+**For Combat:**
+- Sword: Damage (big hits), Crit Chance (random huge damage)
+- Armor: Defense, Damage Reduction (survive more)
+
+**For Money:**
+- ATM: Interest Rate (passive income!), Capacity (store more)
+- ATM Level 100: Can earn million per hour passively
+
+### Display After Upgrade
+
+When you upgrade, you see:
+
+```
+💎 Sword Upgraded!
+━━━━━━━━━━━━━━━━━━━
+
+Level: 5 → 6
+Status: ✨ Good progress
+
+Stat Improvements:
+├─ damage: 50 → 65 (+30.0%)
+├─ critChance: 5 → 7 (+40.0%)
+├─ durability: 150 → 270 (+80.0%)
+└─ healBonus: 0 → 60 (+∞%)
+
+💰 Materials Used:
+• iron: 1080
+• wood: 720
+• money: 7200000
+
+🎯 Improvement Score: 62.50%
+```
+
+**Improvement Score** shows how much better the tool got overall!
+
+### Pro Tips
+
+| Tip | Benefit |
+|-----|---------|
+| Focus farming tools first | Faster resource gathering |
+| Upgrade ATM constantly | Passive money farming |
+| Keep tools balanced | Better overall performance |
+| Check toolstats often | Know your power level |
+| Plan expensive upgrades | Don't get stuck without materials |
+
+---
+
+## 🎮 Admin Control Panel [OWNER ONLY]
+
+Owner-only commands to manage RPG settings, rewards, and seasonal resets.
+
+### Access
+
+```
+/rpgadmin [subcommand]
+/adminrpg [subcommand]
+```
+
+Only server **owner** can use these commands.
+
+### Subcommands
+
+#### ⚙️ Settings Management
+
+**View current settings:**
+```
+/rpgadmin settings
+```
+
+**Toggle RPG on/off:**
+```
+/rpgadmin toggle
+```
+
+**Set reward multipliers:**
+```
+/rpgadmin multiplier [type] [value]
+```
+- Types: `diamond`, `exp`, `money`
+- Values: 0.5 - 3.0x
+- Example: `/rpgadmin multiplier diamond 1.5` → 50% more diamond
+
+#### 🎉 Event Management
+
+**Activate event mode:**
+```
+/rpgadmin event on
+```
+
+**Set event bonus multiplier:**
+```
+/rpgadmin eventbonus [multiplier]
+```
+- Values: 1.5 - 5.0x
+- Example: `/rpgadmin eventbonus 2.0` → All rewards 2x during event
+
+#### 🔄 Season Reset
+
+**Check season info:**
+```
+/rpgadmin season check
+```
+
+**Preview what will happen:**
+```
+/rpgadmin season preview
+```
+
+**Execute season reset:**
+```
+/rpgadmin season reset
+```
+Then confirm with: `confirm`
+
+**Manually set season number:**
+```
+/rpgadmin season manual [number]
+```
+
+#### 📊 Statistics
+
+**View RPG statistics:**
+```
+/rpgadmin stats
+```
+
+Shows:
+- Total players & average level
+- Total economy (money, diamond, exp)
+- Game status info
+
+**View top 10 players:**
+```
+/rpgadmin topplayers
+```
+
+---
+
+## 🏆 Seasonal Reset - Best Practices Guide
+
+### What is a Season Reset?
+
+A complete reset of competitive leaderboards and rewards that happens every **6 months**. It allows fresh competition and prevents the same top players from dominating forever.
+
+### What Gets Reset
+
+✅ **Reset (Wiped):**
+- Daily leaderboards
+- Weekly leaderboards
+- Seasonal leaderboards
+- Daily mission counters
+
+❌ **NOT Reset (Kept):**
+- All-Time leaderboards (permanent records)
+- Player inventory (items, money, diamonds)
+- Player level and experience
+- Achievements (unlocked badges)
+- Overall stats
+
+### Recommended Reset Schedule
+
+| Timing | Frequency | Best For |
+|--------|-----------|----------|
+| **Every 6 months** | Standard | Most games |
+| **Every 3 months** | Aggressive | Highly competitive servers |
+| **Every 1 month** | Ultra-fresh | Events/tournaments |
+
+**Recommended:** Start with **6 months** and adjust based on engagement.
+
+### Reset Timeline
+
+**30 days before:**
+- Announce upcoming reset
+- Start "Race to Rank!" marketing
+- Highlight top players
+
+**7 days before:**
+- Final warning
+- Announce reward distribution
+- Preview top 3 players
+
+**3 days before:**
+- Prevent new registrations (optional)
+- Lock major feature updates
+- Last-minute grinding period
+
+**Reset Day:**
+- Execute reset during low-traffic time (2-4 AM server time)
+- Give immediate feedback
+- Announce results
+
+**After reset:**
+- Announce new season with special event
+- Display top 3 winners prominently
+- Start fresh leaderboards
+
+### Distribution of Seasonal Rewards
+
+**Default Rewards:**
+```
+🥇 Rank 1: 100 Diamond + 50 Emerald + 500 Gold + 5 Legendary
+🥈 Rank 2: 50 Diamond + 25 Emerald + 250 Gold + 3 Legendary
+🥉 Rank 3: 25 Diamond + 10 Emerald + 100 Gold + 1 Legendary
+```
+
+**Adjust based on server size:**
+
+| Players | Diamond | Emerald | Gold | Legendary |
+|---------|---------|---------|------|-----------|
+| <100 | 50/25/10 | 25/10/5 | 250/100/50 | 2/1/0 |
+| 100-500 | 100/50/25 | 50/25/10 | 500/250/100 | 5/3/1 |
+| 500-2k | 200/100/50 | 100/50/25 | 1k/500/250 | 10/5/2 |
+| 2k+ | Custom | Custom | Custom | Custom |
+
+### Event Timing Ideas
+
+**Best practices for events:**
+
+1. **Every 7 days:** Small bonus events (+20% exp/money)
+2. **Every 14 days:** Medium events (+50% one item type)
+3. **Every 3 months:** Major events (+100% all rewards, special crates)
+4. **On season reset:** Celebration event (+150% first 24 hrs)
+
+### Announcement Template
+
+```
+🔄 SEASON [NUMBER] STARTING SOON! 🔄
+
+📅 Reset Date: [DATE]
+👑 Top 3 Players Will Receive Legendary Rewards!
+
+🏆 CURRENT RANK 1:
+[Player Name] - Level [X]
+
+🎁 SEASONAL REWARDS:
+1st: 100 💎 + 50 💚 + 500 🟡 + 5 👑
+2nd: 50 💎 + 25 💚 + 250 🟡 + 3 👑
+3rd: 25 💎 + 10 💚 + 100 🟡 + 1 👑
+
+⚡ Get grinding! Last [DAYS] days!
+```
+
+### Preventing Abuse During Reset
+
+**Before reset:**
+- Snapshot top 100 players (in case of disputes)
+- Verify no bot accounts in top 10
+- Check for suspicious exp gains
+- Monitor unusual patterns
+
+**During reset:**
+- Log all reward distributions
+- Backup database before reset
+- Announce in real-time progress
+- Have rollback plan ready
+
+**After reset:**
+- Monitor for complaints
+- Check if rewards distributed correctly
+- Announce final standings
+- Lock rewards for 24 hours
+
+### Monitoring Post-Reset
+
+Track these metrics after reset:
+
+1. **Player Engagement:** Login rate, playtime
+2. **Top Climbers:** Is new #1 player emerging?
+3. **Economy Health:** Balance between money/diamond?
+4. **Churn Rate:** Did many players quit?
+
+If engagement drops > 20%, consider:
+- Increasing event bonus (2-3x)
+- Shortening next season (3 months instead of 6)
+- Adding special rewards
+- Hosting tournaments
+
+### Optional: Soft Reset Strategy
+
+Instead of full reset, try **partial reset:**
+- Keep daily/weekly leaderboards
+- Only reset seasonal leaderboard  
+- Reduce reward distribution (50%)
+- More frequent (every 2 weeks)
+
+**Pros:** Less disruption, keeps momentum
+**Cons:** Less competitive freshness
+
+---
+
+## 🎯 Quick Admin Setup
+
+1. **Initial Setup:**
+```
+/rpgadmin multiplier diamond 1.0
+/rpgadmin multiplier exp 1.0
+/rpgadmin multiplier money 1.0
+```
+
+2. **Before Season Reset:**
+```
+/rpgadmin season preview
+/rpgadmin season check
+```
+
+3. **Execute Reset:**
+```
+/rpgadmin season reset
+// Confirm when prompted
+```
+
+4. **Post-Reset Event:**
+```
+/rpgadmin event on
+/rpgadmin eventbonus 1.5
+```
+
+5. **Monitor:**
+```
+/rpgadmin stats
+/rpgadmin topplayers
 ```
 
 Enjoy grinding! 🎮✨

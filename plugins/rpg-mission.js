@@ -9,30 +9,54 @@ let handler = async (m, { conn, args, usedPrefix }) => {
 
     switch (subcommand) {
         case 'list': {
-            let text = `
-╭━━━━━━━━━━━━━ 📋 ━━━━━━━━━━━━━╮
+            let statusMsg = await conn.sendMessage(m.chat, { text: '⏳ Loading daily missions...' }, { quoted: m })
+
+            try {
+                await conn.sendMessage(m.chat, {
+                    text: '⏳ Fetching mission data...',
+                    edit: statusMsg.key
+                })
+
+                let text = `
+╭━━━━━━━━ 📋 ━━━━━━━━━━━━━╮
 ┃      DAILY MISSIONS - Today
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+╰━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
 `
-            availableMissions.forEach((mission, i) => {
-                const isCompleted = user.dailyMissions.completedToday.includes(mission.id)
-                const isInProgress = user.dailyMissions.inProgress.find(m => m.id === mission.id)
-                const status = isCompleted ? '✅ DONE' : isInProgress ? `🔄 ${isInProgress.progress}/${mission.objective.target}` : '⏳ NEW'
-                
-                text += `${i + 1}. *${mission.name}* [${mission.difficulty}] ${status}\n`
-                text += `   ${mission.description}\n`
-                text += `   💎 Reward: ${mission.rewards.exp} exp + ${mission.rewards.money} money\n\n`
-            })
+                availableMissions.forEach((mission, i) => {
+                    const isCompleted = user.dailyMissions.completedToday.includes(mission.id)
+                    const isInProgress = user.dailyMissions.inProgress.find(m => m.id === mission.id)
+                    const status = isCompleted ? '✅ DONE' : isInProgress ? `🔄 ${isInProgress.progress}/${mission.objective.target}` : '⏳ NEW'
+                    
+                    text += `${i + 1}. *${mission.name}* [${mission.difficulty}] ${status}\n`
+                    text += `   ${mission.description}\n`
+                    text += `   💎 Reward: ${mission.rewards.exp} exp + ${mission.rewards.money} money\n\n`
+                })
 
-            text += `╭━━━━━━━━━━━━━ 📊 ━━━━━━━━━━━━━╮\n`
-            text += `┃ Completed Today: ${user.dailyMissions.completedToday.length}\n`
-            text += `┃ In Progress: ${user.dailyMissions.inProgress.length}\n`
-            text += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n`
-            text += `Use: ${usedPrefix}mission start [number] to start a mission\n`
-            text += `Use: ${usedPrefix}mission progress to see your progress`
+                await conn.sendMessage(m.chat, {
+                    text: '⏳ Calculating progress...',
+                    edit: statusMsg.key
+                })
 
-            m.reply(text)
+                text += `╭━━━━━━━━ 📊 ━━━━━━━━━━━━━╮\n`
+                text += `┃ Completed Today: ${user.dailyMissions.completedToday.length}\n`
+                text += `┃ In Progress: ${user.dailyMissions.inProgress.length}\n`
+                text += `╰━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n`
+                text += `Use: ${usedPrefix}mission start [number] to start a mission\n`
+                text += `Use: ${usedPrefix}mission progress to see your progress`
+
+                await conn.sendMessage(m.chat, {
+                    text: text,
+                    edit: statusMsg.key
+                })
+
+            } catch (error) {
+                console.error('Error in mission list:', error)
+                await conn.sendMessage(m.chat, {
+                    text: '❌ Error loading missions',
+                    edit: statusMsg.key
+                })
+            }
             break
         }
 
@@ -62,23 +86,42 @@ let handler = async (m, { conn, args, usedPrefix }) => {
                 return m.reply('❌ No missions in progress. Start a mission first!')
             }
 
-            let text = `
-╭━━━━━━━━━━━━━ 🔄 ━━━━━━━━━━━━━╮
+            let statusMsg = await conn.sendMessage(m.chat, { text: '⏳ Loading progress data...' }, { quoted: m })
+
+            try {
+                await conn.sendMessage(m.chat, {
+                    text: '⏳ Calculating mission progress...',
+                    edit: statusMsg.key
+                })
+
+                let text = `
+╭━━━━━ 🔄 ━━━━━━━━━━━━━╮
 ┃      YOUR PROGRESS
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+╰━━━━━━━━━━━━━━━━━━━━━━╯
 
 `
-            user.dailyMissions.inProgress.forEach(mission => {
-                const percent = Math.min(100, Math.floor((mission.progress / mission.objective.target) * 100))
-                const bar = '█'.repeat(Math.floor(percent / 10)) + '░'.repeat(10 - Math.floor(percent / 10))
-                
-                text += `🎯 *${mission.name}*\n`
-                text += `${bar} ${percent}%\n`
-                text += `Progress: ${mission.progress}/${mission.objective.target}\n`
-                text += `Rewards: 💎 x${mission.rewards.diamond || 0}\n\n`
-            })
+                user.dailyMissions.inProgress.forEach(mission => {
+                    const percent = Math.min(100, Math.floor((mission.progress / mission.objective.target) * 100))
+                    const bar = '█'.repeat(Math.floor(percent / 10)) + '░'.repeat(10 - Math.floor(percent / 10))
+                    
+                    text += `🎯 *${mission.name}*\n`
+                    text += `${bar} ${percent}%\n`
+                    text += `Progress: ${mission.progress}/${mission.objective.target}\n`
+                    text += `Rewards: 💎 x${mission.rewards.diamond || 0}\n\n`
+                })
 
-            m.reply(text)
+                await conn.sendMessage(m.chat, {
+                    text: text,
+                    edit: statusMsg.key
+                })
+
+            } catch (error) {
+                console.error('Error in mission progress:', error)
+                await conn.sendMessage(m.chat, {
+                    text: '❌ Error loading progress',
+                    edit: statusMsg.key
+                })
+            }
             break
         }
 
