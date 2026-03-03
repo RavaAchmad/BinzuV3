@@ -219,16 +219,19 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
         let openedCount = 0
         // map of revealed items to stack counts for progress display
         let revealedMap = {}
-        
+        user.crateProgress = { type, total: count, opened: 0 }
+
         // Process each crate opening WITH ANIMATION but batch progress updates every 10 crates
         for (let i = 0; i < count; i++) {
             user[type] -= 1
+            openedCount++
+            user.crateProgress.opened = openedCount
+
             // Wait 400ms before revealing next item
                 await Promise.race([
                 new Promise(resolve => setTimeout(resolve, 1000)),
                 new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
             ])
-            openedCount++
 
             // helper to record item in revealedMap
             const addReveal = (label, amt = 1) => {
@@ -343,7 +346,7 @@ ${crateSystem.playerPity[m.sender][type] === 0 && guaranteedRewards.length > 0 ?
     } catch (error) {
         console.error('Error in open crate:', error)
         await conn.sendMessage(m.chat, {
-            text: '❌ Terjadi error saat membuka crate. Crate sudah dikurangi dari inventory.',
+            text: '❌ Terjadi error saat membuka crate. Crate sudah dikurangi dari inventory.\n\nBerhasil membuka ${openedCount}/${count} crate.',
             edit: statusMsg.key
         })
     }
