@@ -43,7 +43,7 @@ let handler = async (m, { conn, text, isOwner }) => {
 handler.help = ['addsewa <link/ID> [hari]']
 handler.tags = ['owner']
 handler.command = /^addsewa$/i
-handler.rowner = false
+handler.rowner = true
 handler.register = true
 export default handler
 
