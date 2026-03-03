@@ -1,41 +1,10 @@
 import {
-    emoji_role,
-    sesi,
-    playerOnGame,
-    playerOnRoom,
-    playerExit,
-    dataPlayer,
-    dataPlayerById,
-    getPlayerById,
-    getPlayerById2,
-    killWerewolf,
-    killww,
-    dreamySeer,
-    sorcerer,
-    protectGuardian,
-    roleShuffle,
-    roleChanger,
-    roleAmount,
-    roleGenerator,
-    addTimer,
-    startGame,
-    playerHidup,
-    playerMati,
-    vote,
-    voteResult,
-    clearAllVote,
-    getWinner,
-    win,
-    pagi,
-    malam,
-    skill,
-    voteStart,
-    voteDone,
-    voting,
-    run,
-    run_vote,
-    run_malam,
-    run_pagi
+    emoji_role, sesi, playerOnGame, playerOnRoom, playerExit, dataPlayer,
+    dataPlayerById, getPlayerById, getPlayerById2, killWerewolf, killww,
+    dreamySeer, sorcerer, protectGuardian, roleShuffle, roleChanger,
+    roleAmount, roleGenerator, addTimer, startGame, playerHidup, playerMati,
+    vote, voteResult, clearAllVote, getWinner, win, pagi, malam, skill,
+    voteStart, voteDone, voting, run, run_vote, run_malam, run_pagi
 } from '../lib/werewolf.js';
 
 let handler = async (m, { conn, command, usedPrefix, args }) => {
@@ -55,36 +24,36 @@ let handler = async (m, { conn, command, usedPrefix, args }) => {
         return m.reply(`Masukan nomor player \nContoh : \n${usedPrefix + command} kill 1`)
     if (isNaN(target)) 
         return m.reply("Gunakan hanya nomor");
+
+    // ✅ FIX BUG: byId harus dicek null/false DULU sebelum akses .db
+    // Sebelumnya: akses byId.db.isdead dulu -> crash TypeError kalau byId undefined
     let byId = getPlayerById2(sender, parseInt(target), ww)
+    if (!byId)
+        return m.reply("Player tidak terdaftar")
     if (byId.db.isdead === true) 
         return m.reply("Player sudah mati")
     if (byId.db.id === sender)
         return m.reply("Tidak bisa menggunakan skill untuk diri sendiri")
-    if (byId === false) 
-        return m.reply("Player tidak terdaftar")
+
     if (value === "kill") {
         if (dataPlayer(sender, ww).role !== "werewolf")
             return m.reply("Peran ini bukan untuk kamu")
-
         if (byId.db.role === "sorcerer") 
             return m.reply("Tidak bisa menggunakan skill untuk teman")
-
-            return m.reply("Berhasil membunuh player " + parseInt(target)).then(() => {
-                dataPlayer(sender, ww).status = true
-                killWerewolf(sender, parseInt(target), ww)
-            })
+        return m.reply("Berhasil membunuh player " + parseInt(target)).then(() => {
+            dataPlayer(sender, ww).status = true
+            killWerewolf(sender, parseInt(target), ww)
+        })
     } else if (value === "dreamy") {
         if (dataPlayer(sender, ww).role !== "seer") 
             return m.reply("Peran ini bukan untuk kamu")
-
         let dreamy = dreamySeer(sender, parseInt(target), ww)
         return m.reply(`Berhasil membuka identitas player ${target} adalah ${dreamy}`).then(() => {
-                dataPlayer(sender, ww).status = true
+            dataPlayer(sender, ww).status = true
         })
     } else if (value === "deff") {
         if (dataPlayer(sender, ww).role !== "guardian") 
             return m.reply("Peran ini bukan untuk kamu")
-
         return m.reply(`Berhasil melindungi player ${target}`).then(() => {
             protectGuardian(sender, parseInt(target), ww)
             dataPlayer(sender, ww).status = true
@@ -92,11 +61,12 @@ let handler = async (m, { conn, command, usedPrefix, args }) => {
     } else if (value === "sorcerer") {
         if (dataPlayer(sender, ww).role !== "sorcerer") 
             return m.reply("Peran ini bukan untuk kamu")
-
         let sorker = sorcerer(sender, parseInt(target), ww)
         return m.reply(`Berhasil membuka identitas player ${target} adalah ${sorker}`).then(() => {
             dataPlayer(sender, ww).status = true
         })
+    } else {
+        return m.reply(`Command tidak valid.\nGunakan: kill / dreamy / deff / sorcerer\nContoh: ${usedPrefix + command} kill 1`)
     }
 }
 handler.command = /^((ww|werewolf)pc)$/i
