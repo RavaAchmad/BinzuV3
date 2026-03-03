@@ -217,15 +217,19 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
         let totalReward = {}
         let guaranteedRewards = []
         let openedCount = 0
-        let revealedItems = []
+        // map of revealed items to stack counts for progress display
+        let revealedMap = {}
         
-        // Process each crate opening WITH ANIMATION
+        // Process each crate opening WITH ANIMATION but batch progress updates every 10 crates
         for (let i = 0; i < count; i++) {
             // Wait 400ms before revealing next item
             await new Promise(resolve => setTimeout(resolve, 400))
-            
             openedCount++
-            let currentReveals = []
+
+            // helper to record item in revealedMap
+            const addReveal = (label, amt = 1) => {
+                revealedMap[label] = (revealedMap[label] || 0) + amt
+            }
 
             // Check for guaranteed reward
             const guaranteed = crateSystem.checkPityGuarantee(m.sender, type)
@@ -234,13 +238,13 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
                 if (guaranteed.type === 'crate_drop') {
                     user[guaranteed.item] = (user[guaranteed.item] || 0) + guaranteed.amount
                     totalReward[guaranteed.item] = (totalReward[guaranteed.item] || 0) + guaranteed.amount
-                    currentReveals.push(`🎁 ${guaranteed.amount}x ${guaranteed.item}`)
+                    addReveal(`🎁 ${guaranteed.amount}x ${guaranteed.item}`, 1)
                 } else if (guaranteed.type === 'mix') {
                     for (const [item, amount] of Object.entries(guaranteed.items)) {
                         if (item in user) {
                             user[item] = (user[item] || 0) + amount
                             totalReward[item] = (totalReward[item] || 0) + amount
-                            currentReveals.push(`🎁 ${amount}x ${item}`)
+                            addReveal(`🎁 ${amount}x ${item}`, 1)
                         }
                     }
                 }
@@ -253,27 +257,26 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
                             const finalAmount = crateSystem.calculateReward(baseAmount, m.sender)
                             user[reward] = (user[reward] || 0) + finalAmount
                             totalReward[reward] = (totalReward[reward] || 0) + finalAmount
-                            currentReveals.push(`✨ ${finalAmount}x ${global.rpg.emoticon(reward)} ${reward}`)
+                            addReveal(`✨ ${finalAmount}x ${global.rpg.emoticon(reward)} ${reward}`, 1)
                         }
                     }
                 }
             }
 
-            // Add to revealed items
-            revealedItems.push(...currentReveals)
+            // update progress message every 10 crates or on last iteration
+            if (openedCount % 10 === 0 || openedCount === count) {
+                let animatedText = `🎁 *Opening ${count}x ${type} Crate*\n`
+                animatedText += `Progress: [${('█'.repeat(Math.floor((openedCount / count) * 10)) + '░'.repeat(10 - Math.floor((openedCount / count) * 10)))}] ${openedCount}/${count}\n\n`
+                animatedText += `📦 *Items Revealed:*\n`
+                // show stacked revealedMap entries
+                animatedText += Object.entries(revealedMap).map(([label, amt]) => `${label}`).join('\n')
+                animatedText += `\n\n⏳ Opening...`
 
-            // Build animated update message
-            let animatedText = `🎁 *Opening ${count}x ${type} Crate*\n`
-            animatedText += `Progress: [${('█'.repeat(Math.floor((openedCount / count) * 10)) + '░'.repeat(10 - Math.floor((openedCount / count) * 10)))}] ${openedCount}/${count}\n\n`
-            animatedText += `📦 *Items Revealed:*\n`
-            animatedText += revealedItems.map((item, idx) => `${idx + 1}. ${item}`).join('\n')
-            animatedText += `\n\n⏳ Opening...`
-
-            // Update status message
-            await conn.sendMessage(m.chat, {
-                text: animatedText,
-                edit: statusMsg.key
-            })
+                await conn.sendMessage(m.chat, {
+                    text: animatedText,
+                    edit: statusMsg.key
+                })
+            }
         }
 
         // Build final reward display
