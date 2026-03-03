@@ -201,8 +201,8 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
 `.trim())
     }
 
-    // Deduct crates first
-    user[type] -= count
+    const originalCount = user[type]  
+
     
     // Create status message
     let statusMsg = await conn.sendMessage(m.chat, {
@@ -222,8 +222,9 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
         
         // Process each crate opening WITH ANIMATION but batch progress updates every 10 crates
         for (let i = 0; i < count; i++) {
+            user[type] -= 1
             // Wait 400ms before revealing next item
-            await new Promise(resolve => setTimeout(resolve, 400))
+            await new Promise(resolve => setTimeout(resolve, 1000))
             openedCount++
 
             // helper to record item in revealedMap
