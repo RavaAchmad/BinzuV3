@@ -224,7 +224,10 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
         for (let i = 0; i < count; i++) {
             user[type] -= 1
             // Wait 400ms before revealing next item
-            await new Promise(resolve => setTimeout(resolve, 1000))
+                await Promise.race([
+                new Promise(resolve => setTimeout(resolve, 1000)),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+            ])
             openedCount++
 
             // helper to record item in revealedMap
