@@ -288,16 +288,24 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
             bonusMessage = `\n✨ ${dailyBonus.message} ✨`
         }
 
-        // Add guaranteed rewards notification
+        // Add guaranteed rewards notification (aggregate identical items and format inline)
         if (guaranteedRewards.length > 0) {
-            rewardText += '\n\n🎁 *GUARANTEED REWARDS:*\n' + 
-                guaranteedRewards.map((r, idx) => {
-                    if (r.type === 'crate_drop') {
-                        return `${idx + 1}. 📦 ${r.amount}x ${r.item}`
-                    } else {
-                        return `${idx + 1}. ✨ Special mix!`
-                    }
-                }).join('\n')
+            const agg = {}
+            const mixes = []
+            for (const r of guaranteedRewards) {
+                if (r.type === 'crate_drop') {
+                    agg[r.item] = (agg[r.item] || 0) + r.amount
+                } else if (r.type === 'mix') {
+                    mixes.push(Object.entries(r.items || {}).map(([itm, amt]) => `${amt}x ${itm}`).join(' + '))
+                }
+            }
+            const parts = []
+            for (const [item, amt] of Object.entries(agg)) {
+                parts.push(`📦${amt}x ${item}`)
+            }
+            parts.push(...mixes.map(m => `✨${m}`))
+            const stacked = parts.join(', ')
+            rewardText += `\n\n🎁 *GUARANTEED REWARDS:* ${stacked}`
         }
 
         // Final result
