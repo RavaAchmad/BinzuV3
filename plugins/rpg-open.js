@@ -229,7 +229,7 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
 
             // Wait 400ms before revealing next item
                 await Promise.race([
-                new Promise(resolve => setTimeout(resolve, 1000)),
+                new Promise(resolve => setTimeout(resolve, 500)),
                 new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
             ])
 
