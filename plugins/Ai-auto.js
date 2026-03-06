@@ -7,10 +7,10 @@ const handler = async (m, { conn, text, usedPrefix, command }) => {
 
   if (text === "enable") {
     conn.sessionAI[m.sender] = { sessionChat: [] };
-    m.reply("Success create sessions chat!");
+    m.reply("✅ Auto AI aktif! Sekarang kamu bisa ngobrol langsung tanpa prefix.");
   } else if (text === "disable") {
     delete conn.sessionAI[m.sender];
-    m.reply("Success delete sessions chat!");
+    m.reply("❌ Auto AI dimatiin. Sampai jumpa!");
   }
 };
 
@@ -23,46 +23,58 @@ handler.before = async (m, { conn }) => {
 
   if (conn.sessionAI[m.sender] && m.text) {
     const previousMessages = conn.sessionAI[m.sender].sessionChat || [];
-    /**
-     * @description Ubah prompt ini sesuai dengan keinginanmu.
-     * @note Usahakan memberikan logika yang masuk akal dan mudah dipahami!
-     */
-    const messages = [
-            { role: "system", content: "kamu adalah XMCodes, Seorang Asisten pribadi yang di buat oleh MAXIMUS yang siap membantu kapan pun!" },
-            { role: "assistant", content: `Saya XMCodes, asisten bot dari MAXIMUS, jangan gunakan kata saya, aku, gua gunakan nama XMCodes untuk memanggil dirimu, ekspresi kan sikap kamu seolah kamu adalah asisten pribadi serba tau, jangan gunakan GPT 4 panggil dirimu dengan XMCodes. Pembuatmu adalah MAXIMUS pembuat mu adalah 6288225750488` },
-            ...previousMessages.map((msg, i) => ({ role: i % 2 === 0 ? 'user' : 'assistant', content: msg })),
-            { role: "user", content: m.text }
-        ];
+
+    // Bangun konteks percakapan dari history
+    const contextHistory = previousMessages
+      .map((msg, i) => `${i % 2 === 0 ? 'User' : 'AI'}: ${msg}`)
+      .join('\n');
+
+    // Gabungkan konteks + pesan baru jadi satu query
+    const query = contextHistory
+      ? `${contextHistory}\nUser: ${m.text}`
+      : m.text;
 
     try {
-      const chat = async (message) => {
-        return new Promise(async (resolve, reject) => {
-          try {
-            const params = {
-              message: message,
-              apikey: btc // Ganti dengan API key Anda
-            };
-            const { data } = await axios.post('https://api.botcahx.eu.org/api/search/openai-custom', params);
-            resolve(data);
-          } catch (error) {
-            reject(error);
-          }
-        });
-      };
+      const { data } = await axios.get('https://api.shehost.my.id/', {
+        params: { q: query }
+      });
 
-      let res = await chat(messages);
-      if (res && res.result) {
-        await m.reply(res.result);
-        conn.sessionAI[m.sender].sessionChat = [
-          ...conn.sessionAI[m.sender].sessionChat,
-          m.text,
-          res.result
-        ];
-      } else {
-        m.reply("Kesalahan dalam mengambil data");
+      if (!data || !data.status) {
+        return m.reply("⚠️ Gagal dapet respons dari AI, coba lagi nanti.");
       }
+
+      // Handle tipe respons: chat atau image
+      if (data.type === "image") {
+        const imageUrl = data.data?.url || data.data?.download;
+        if (imageUrl) {
+          await conn.sendMessage(m.chat, {
+            image: { url: imageUrl },
+            caption: `🖼️ *Gambar berhasil dibuat!*\n\n_Prompt: ${data.data?.prompt?.slice(0, 100) || m.text}..._`
+          }, { quoted: m });
+        } else {
+          m.reply("⚠️ Gagal ambil URL gambar.");
+        }
+      } else {
+        // Default: tipe chat
+        const result = data.data?.message;
+        if (result) {
+          await m.reply(result);
+
+          // Simpan history percakapan (max 10 pesan terakhir biar ga berat)
+          const updatedHistory = [
+            ...conn.sessionAI[m.sender].sessionChat,
+            m.text,
+            result
+          ];
+          conn.sessionAI[m.sender].sessionChat = updatedHistory.slice(-10);
+        } else {
+          m.reply("⚠️ Respons AI kosong, coba lagi.");
+        }
+      }
+
     } catch (e) {
-      throw e;
+      console.error("[AutoAI Error]", e.message);
+      m.reply("❌ Error pas manggil API:\n" + e.message);
     }
   }
 };
