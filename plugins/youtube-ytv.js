@@ -51,7 +51,7 @@ const handler = async (m, { conn, text, args, usedPrefix, command }) => {
     }, { quoted: m });
 
     // Cleanup after send
-    setTimeout(() => ytdlpWrapper.cleanup(filePath), 5000);
+    setTimeout(() => ytdlpWrapper.cleanup(filePath), 1000);
 
   } catch (err) {
     console.error('[YTV] Error:', err.message);
