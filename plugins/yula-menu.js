@@ -9,6 +9,7 @@ import os from 'os'
 import axios from 'axios' 
 import fs from 'fs'
 import { toAudio } from '../lib/converter.js'
+import path from 'path'
 let cachedThumbnail = null
 let tags = {
   // 🧭 CORE / WAJIB (Tier 1)
@@ -287,7 +288,49 @@ if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
   } catch (e) {
     throw e
   }
+  
+  // Display ads after menu with delay
+  setTimeout(() => displayAds(m, conn), 1200)
 };
+
+/**
+ * Load and display ads from config
+ */
+function displayAds(m, conn) {
+  try {
+    const adsDir = './src/ads'
+    const configPath = path.join(adsDir, 'config.json')
+    
+    if (!fs.existsSync(configPath)) {
+      return // No ads configured
+    }
+
+    const adsConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+    const activeAds = Object.entries(adsConfig)
+      .filter(([_, ad]) => ad.active)
+      .map(([name, ad]) => ad)
+
+    if (activeAds.length === 0) return
+
+    // Select random ad from active ones
+    const selectedAd = activeAds[Math.floor(Math.random() * activeAds.length)]
+
+    if (selectedAd.type === 'text') {
+      // Send text ad
+      conn.sendMessage(m.chat, {
+        text: `\n${'━'.repeat(30)}\n📢 *ADVERTISEMENT*\n${'━'.repeat(30)}\n\n${selectedAd.content}\n\n${'━'.repeat(30)}`
+      }, { quoted: m })
+    } else if (selectedAd.type === 'image' && selectedAd.path) {
+      // Send image ad
+      if (fs.existsSync(selectedAd.path)) {
+        conn.sendFile(m.chat, selectedAd.path, selectedAd.filename, 
+          `📢 *ADVERTISEMENT*`, m)
+      }
+    }
+  } catch (e) {
+    console.error('Error displaying ads:', e)
+  }
+}
 
 handler.command = /^(menu|help|perintah)$/i
 handler.register = true;

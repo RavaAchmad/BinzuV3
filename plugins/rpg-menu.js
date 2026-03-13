@@ -50,9 +50,6 @@ let handler = async (m, { conn, usedPrefix }) => {
 ┃  ├─ ${usedPrefix}craft - Craft items
 ┃  └─ ${usedPrefix}claim - Daily rewards
 ┃
-┃  📖 DOCUMENTATION
-┃  └─ View: RPG_FEATURES_GUIDE.md
-┃
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
 🌟 *What's New in This Update:*
