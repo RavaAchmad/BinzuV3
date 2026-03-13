@@ -264,4 +264,4 @@ handler.owner = true
 handler.mods = false
 
 export default handler
-export { loadUpdateConfig, displayUpdateNotification }
+export { loadUpdateConfig }
