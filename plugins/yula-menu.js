@@ -66,8 +66,8 @@ const defaultMenu = {
 *「  I N F O  K A M U  」*
  •  *Premium :* %prems
  •  *Limits :* %limit
- •  *Level Rpg :* %level
- •  *Role Rpg :* %role 
+ •  *Level :* %level
+ •  *Role :* %role 
  •  *Exp :* %totalexp
  
 *「  I N F O  B O T  」*
