@@ -8,6 +8,7 @@ import { getDevice } from 'baileys'
 import os from 'os'
 import axios from 'axios' 
 import fs from 'fs'
+import { displayUpdateNotification } from './bot-updates.js'
 import { toAudio } from '../lib/converter.js'
 import path from 'path'
 let cachedThumbnail = null
@@ -185,10 +186,6 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
         }),
         after
       ]
-    let response = await axios.get(vn, { responseType: 'arraybuffer' })
-    let media = Buffer.from(response.data, 'binary')
-    let audio = await toAudio(media, 'mp4')
-    conn.sendFile(m.chat, audio.data, 'audio.mp3', '', m, true, { mimetype: 'audio/mp4' })
     } else if (tags[menuType]) {
       // Show specific menu when valid tag is specified
       menuText = [
@@ -302,7 +299,9 @@ function displayAds(m, conn) {
     const configPath = path.join(adsDir, 'config.json')
     
     if (!fs.existsSync(configPath)) {
-      return // No ads configured
+      // No ads config, try showing update instead
+      displayUpdateNotification(m, conn)
+      return
     }
 
     const adsConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
@@ -310,7 +309,11 @@ function displayAds(m, conn) {
       .filter(([_, ad]) => ad.active)
       .map(([name, ad]) => ad)
 
-    if (activeAds.length === 0) return
+    if (activeAds.length === 0) {
+      // No active ads, show update notification instead
+      displayUpdateNotification(m, conn)
+      return
+    }
 
     // Select random ad from active ones
     const selectedAd = activeAds[Math.floor(Math.random() * activeAds.length)]
@@ -321,10 +324,16 @@ function displayAds(m, conn) {
         text: `\n${'━'.repeat(30)}\n📢 *ADVERTISEMENT*\n${'━'.repeat(30)}\n\n${selectedAd.content}\n\n${'━'.repeat(30)}`
       }, { quoted: m })
     } else if (selectedAd.type === 'image' && selectedAd.path) {
-      // Send image ad
+      // Send image ad with optional caption
       if (fs.existsSync(selectedAd.path)) {
-        conn.sendFile(m.chat, selectedAd.path, selectedAd.filename, 
-          `📢 *ADVERTISEMENT*`, m)
+        const caption = selectedAd.caption 
+          ? `📢 *ADVERTISEMENT*\n\n${selectedAd.caption}`
+          : `📢 *ADVERTISEMENT*`
+        
+        conn.sendMessage(m.chat, {
+          image: fs.readFileSync(selectedAd.path),
+          caption: caption
+        }, { quoted: m })
       }
     }
   } catch (e) {

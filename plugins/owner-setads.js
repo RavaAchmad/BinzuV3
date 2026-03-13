@@ -27,7 +27,11 @@ let handler = async (m, { conn, args, usedPrefix, command, text }) => {
             return await setAdsText(m, conn, text, usedPrefix, command)
 
         case 'upload':
-            return await uploadAdsImage(m, conn, args[1])
+            // Format: .setads upload <filename> [caption text]
+            const uploadArgs = text.split(' ').slice(1) // Remove 'upload'
+            const filename = uploadArgs[0]
+            const caption = uploadArgs.slice(1).join(' ') || ''
+            return await uploadAdsImage(m, conn, filename, caption, usedPrefix, command)
 
         case 'remove':
             return await removeAds(m, conn, args[1])
@@ -71,13 +75,16 @@ async function setAdsText(m, conn, text, usedPrefix, command) {
 }
 
 /**
- * Upload image for ads
+ * Upload image for ads with optional caption
  */
-async function uploadAdsImage(m, conn, filename) {
+async function uploadAdsImage(m, conn, filename, caption = '', usedPrefix, command) {
     if (!filename) {
         return conn.reply(m.chat, 
-            `Please provide a filename or image URL\n` +
-            `Usage: ${command} upload <filename.jpg>`,
+            `*Ad Image Upload - Format:*\n` +
+            `${usedPrefix}${command} upload <filename.jpg> [optional caption]\n\n` +
+            `*Example:*\n` +
+            `${usedPrefix}${command} upload banner.jpg Check our new premium features!\n\n` +
+            `*Then reply to the image to upload*`,
             m
         )
     }
@@ -102,24 +109,26 @@ async function uploadAdsImage(m, conn, filename) {
                     type: 'image',
                     filename: filename,
                     path: filePath,
+                    caption: caption || undefined, // Only add if not empty
                     createdAt: new Date().toISOString(),
                     active: true
                 }
 
                 saveAdsConfig(adsConfig)
-                return conn.reply(m.chat, 
-                    `✅ Image ad "${adName}" uploaded!\n` +
-                    `File: ${filename}\n` +
-                    `Location: ${filePath}`,
-                    m
-                )
+                
+                let msg = `✅ Image ad "${adName}" uploaded!\n`
+                msg += `File: ${filename}\n`
+                if (caption) msg += `Caption: "${caption}"\n`
+                msg += `Location: ${filePath}`
+                
+                return conn.reply(m.chat, msg, m)
             }
         } catch (e) {
             return conn.reply(m.chat, `Error uploading image: ${e.message}`, m)
         }
     } else {
         return conn.reply(m.chat, 
-            `Please reply to an image to upload`,
+            `Please *reply to an image* first, then use the upload command`,
             m
         )
     }
@@ -177,6 +186,9 @@ function listAds(m, conn) {
             list += `   Content: ${ad.content.substring(0, 50)}...\n`
         } else {
             list += `   File: ${ad.filename}\n`
+            if (ad.caption) {
+                list += `   Caption: ${ad.caption.substring(0, 50)}${ad.caption.length > 50 ? '...' : ''}\n`
+            }
         }
         list += `   Created: ${new Date(ad.createdAt).toLocaleDateString('id-ID')}\n\n`
     })
@@ -200,6 +212,12 @@ function previewAds(m, conn) {
     activeAds.forEach((ad, idx) => {
         if (ad.type === 'text') {
             preview += `${ad.content}\n\n`
+        } else if (ad.type === 'image') {
+            preview += `🖼️ Image Ad #${idx + 1}`
+            if (ad.caption) {
+                preview += `\n📝 Caption: ${ad.caption}`
+            }
+            preview += `\n\n`
         }
     })
 
@@ -214,27 +232,33 @@ function showAdsMenu(m, usedPrefix, command) {
 *📢 ADS MANAGEMENT SYSTEM*
 ━━━━━━━━━━━━━━━━━━━━━
 
-Commands:
+**TEXT ADS:**
 ${usedPrefix}${command} set <name> <text>
    Create text advertisement
+   
+**IMAGE ADS (with optional caption):**
+${usedPrefix}${command} upload <filename> [caption text]
+   1. Reply to the image you want to upload
+   2. Use this command with filename and optional caption
+   
+   *Example:*
+   ${usedPrefix}${command} upload banner.jpg Check our new premium features!
 
-${usedPrefix}${command} upload <filename.jpg>
-   Upload image ad (reply to image)
-
-${usedPrefix}${command} remove <name>
-   Remove ad
-
+**MANAGEMENT:**
 ${usedPrefix}${command} list
    Show all ads
 
 ${usedPrefix}${command} preview
-   Preview ads
+   Preview active ads
+
+${usedPrefix}${command} remove <name>
+   Remove ad
 
 *Features:*
-• Multiple ads support
-• Text & image ads
+• Multiple ads support (text & image)
+• Image ads support captions
 • Automatic rotation
-• Active/Inactive toggle
+• Easy on/off toggle
 `.trim()
 
     return m.reply(menu)
