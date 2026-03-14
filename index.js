@@ -25,16 +25,46 @@ const checkCredsFile = () => {
 const deleteSessionsFolder = () => {
   fs.rmSync(path.join(__dirname, 'sessions'), { recursive: true });
 };
+
+let restartCount = 0;
+const MAX_RAPID_RESTARTS = 10;
+let lastRestartTime = Date.now();
+
 const metric = await import('./metrics.js');
 const start = async () => {
   const args = [path.join(__dirname, 'main.js'), ...process.argv.slice(2)];
+  
+  // Add delay jika terlalu banyak restart dalam waktu singkat
+  const timeSinceLastRestart = Date.now() - lastRestartTime;
+  if (timeSinceLastRestart < 5000) { // Less than 5 seconds
+    restartCount++;
+    if (restartCount > MAX_RAPID_RESTARTS) {
+      console.log(chalk.red(`[!] Too many restarts (${restartCount}). Waiting 30 seconds...`));
+      await new Promise(resolve => setTimeout(resolve, 30000));
+      restartCount = 0;
+    }
+  } else {
+    restartCount = 0; // Reset counter if enough time has passed
+  }
+  
+  lastRestartTime = Date.now();
+  
+  console.log(chalk.cyan(`[~] Starting bot process (restart #${restartCount + 1})...`));
+  
   const p = spawn(process.argv[0], args, { 
     stdio: ['inherit', 'inherit', 'inherit', 'ipc'] 
   });
   
   p.on('exit', (code) => {
-    console.log(chalk.red(`[!] Process exited with code: ${code}`));
-    if (code === 1 || code === 0) start();
+    console.log(chalk.red(`[!] Bot process exited with code: ${code}`));
+    console.log(chalk.yellow(`[~] Attempting to restart in 5 seconds...`));
+    setTimeout(() => start(), 5000);
+  });
+  
+  p.on('error', (error) => {
+    console.log(chalk.red(`[!] Bot process error:`, error.message));
+    console.log(chalk.yellow(`[~] Attempting to restart in 5 seconds...`));
+    setTimeout(() => start(), 5000);
   });
 };
 

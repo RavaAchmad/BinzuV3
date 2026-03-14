@@ -33,6 +33,7 @@ import {
   handlePairing,
   messageTemplates
 } from "./lib/connection.js";
+import { setupBadMacHandler } from './lib/bad-mac-handler.js';
 import { startCryptoTicker } from './plugins/crypto-ticker.js';
 
 const app = express();
@@ -156,6 +157,78 @@ Object.assign(conn, {
   sRevoke: messageTemplates.revoke
 });
 
+// ========== BAD MAC ERROR HANDLING ==========
+setupBadMacHandler(conn);
+console.log(chalk.cyan('[~] Bad MAC error handler initialized'));
+// ========== END BAD MAC HANDLING ==========
+
+// ========== KEEP-ALIVE & PROTECTION MECHANISM ==========
+conn._lastMessageTime = Date.now();
+conn._disconnectCount = 0;
+conn._isReconnecting = false;
+
+// Health check setiap 60 detik
+setInterval(() => {
+  if (conn.user) {
+    const timeSinceLastMessage = Date.now() - conn._lastMessageTime;
+    if (timeSinceLastMessage > 300000) { // 5 menit tanpa aktivitas
+      console.log(chalk.yellow('[!] No activity detected. Sending keep-alive ping...'));
+      try {
+        conn.sendPresenceUpdate('available', conn.user.id);
+      } catch (e) {
+        console.log(chalk.red('[!] Keep-alive failed, attempting reconnect...'));
+      }
+    }
+  }
+}, 60000);
+
+// Socket error listener untuk detect disconnect lebih cepat
+if (conn.ws) {
+  conn.ws.on('close', () => {
+    console.log(chalk.red('[!] WebSocket closed unexpectedly'));
+    if (!conn._isReconnecting) {
+      conn._isReconnecting = true;
+      setTimeout(() => {
+        console.log(chalk.cyan('[~] Initiating emergency reconnect...'));
+        global.reloadHandler(true).finally(() => {
+          conn._isReconnecting = false;
+        });
+      }, 3000);
+    }
+  });
+
+  conn.ws.on('error', (err) => {
+    console.log(chalk.red('[!] WebSocket error:'), err.message || err);
+    if (!conn._isReconnecting) {
+      conn._isReconnecting = true;
+      setTimeout(() => {
+        console.log(chalk.cyan('[~] Recovering from socket error...'));
+        global.reloadHandler(true).finally(() => {
+          conn._isReconnecting = false;
+        });
+      }, 3000);
+    }
+  });
+}
+
+// Track last message time untuk keep-alive
+conn.ev.on('messages.upsert', () => {
+  conn._lastMessageTime = Date.now();
+});
+
+// Track credentials update untuk MAC address consistency
+let lastCredsCheck = Date.now();
+conn.ev.on('creds.update', () => {
+  const now = Date.now();
+  // Only log updates yang tidak frequent (prevent spam)
+  if (now - lastCredsCheck > 10000) {
+    console.log(chalk.gray('[~] Session credentials updated'));
+    lastCredsCheck = now;
+  }
+});
+
+// ========== END KEEP-ALIVE ==========
+
 if (!opts.test) {
   setInterval(async () => {
     if (global.db.data) {
@@ -164,30 +237,76 @@ if (!opts.test) {
   }, 60000);
 }
 
-process.on("uncaughtException", console.error);
+process.on("uncaughtException", (error) => {
+  console.error(chalk.red('[CRITICAL ERROR]'), error);
+  // Don't exit process, try to recover
+  console.log(chalk.yellow('[!] Attempting to recover...'));
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error(chalk.red('[UNHANDLED REJECTION]'), reason);
+  // Don't exit, let the bot stay alive
+});
 
 let isHandlerInitializing = true;
 let handlerModule = await import("./handler.js");
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
 
-global.reloadHandler = async function reloadHandler(restartConn) {
+global.reloadHandler = async function reloadHandler(restartConn, attempt = 1) {
   try {
     const newHandler = await import(`./handler.js?update=${Date.now()}`).catch(console.error);
     if (newHandler && Object.keys(newHandler).length) {
       handlerModule = newHandler;
     }
   } catch (error) {
-    console.error(error);
+    console.error(chalk.red('[!] Error loading handler:'), error.message);
   }
 
   if (restartConn) {
-    const currentChats = global.conn.chats;
     try {
-      global.conn.ws.close();
-    } catch {}
-    
-    conn.ev.removeAllListeners();
-    global.conn = makeWASocket(connectionOptions, { chats: currentChats });
-    isHandlerInitializing = true;
+      reconnectAttempts++;
+      const currentChats = global.conn?.chats || {};
+      try {
+        global.conn?.ws?.close();
+      } catch {}
+      
+      conn?.ev?.removeAllListeners();
+      
+      console.log(chalk.cyan(`[~] Restarting connection (attempt ${reconnectAttempts})...`));
+      global.conn = makeWASocket(connectionOptions, { chats: currentChats });
+      
+      // Reset reconnect attempts on success
+      if (global.conn) {
+        await new Promise(resolve => {
+          const timeout = setTimeout(() => resolve(), 15000);
+          // Listen for successful connection
+          const connListener = (update) => {
+            if (update.connection === 'open') {
+              clearTimeout(timeout);
+              global.conn.ev.off('connection.update', connListener);
+              reconnectAttempts = 0; // Reset on success
+              resolve();
+            }
+          };
+          global.conn.ev.on('connection.update', connListener);
+        });
+      }
+      
+      isHandlerInitializing = true;
+    } catch (error) {
+      console.error(chalk.red('[!] Error restarting connection:'), error.message);
+      
+      // Retry dengan delay exponential
+      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        const delayMs = Math.min(5000 * Math.pow(2, attempt - 1), 30000);
+        console.log(chalk.yellow(`[!] Retrying in ${delayMs}ms...`));
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        return global.reloadHandler(true, attempt + 1);
+      } else {
+        console.log(chalk.red('[!] Max reconnect attempts reached. Keeping process alive.'));
+      }
+    }
   }
 
   if (!isHandlerInitializing) {
@@ -221,6 +340,62 @@ global.reloadHandler = async function reloadHandler(restartConn) {
   isHandlerInitializing = false;
   return true;
 };
+
+// ========== ADDITIONAL SAFEGUARDS ==========
+// Aggressive presence update setiap 2 menit untuk keep bot active
+const presenceUpdateInterval = setInterval(async () => {
+  try {
+    if (conn && conn.user && !conn._isReconnecting) {
+      const botJid = conn.user.id;
+      await conn.sendPresenceUpdate('available', botJid).catch(() => {
+        // Silently handle if this fails
+      });
+    }
+  } catch (error) {
+    console.log(chalk.gray('[~] Presence update request (normal, dapat diabaikan)'));
+  }
+}, 120000); // 2 minutes
+
+// Session integrity check setiap 10 menit
+const sessionCheckInterval = setInterval(async () => {
+  try {
+    if (conn && conn.user && conn.authState?.creds) {
+      // Verify session still valid
+      const sessionValid = conn.authState.creds?.me?.id;
+      if (sessionValid) {
+        console.log(chalk.gray('[✓] Session integrity check passed'));
+      } else {
+        console.log(chalk.yellow('[!] Session appears invalid, consider re-authenticating'));
+      }
+    }
+  } catch (error) {
+    console.log(chalk.gray('[~] Session check error (dapat diabaikan)'));
+  }
+}, 600000); // 10 minutes
+
+// Graceful shutdown handlers untuk prevent hanging
+process.on('SIGTERM', async () => {
+  console.log(chalk.yellow('[!] SIGTERM received, closing gracefully...'));
+  clearInterval(presenceUpdateInterval);
+  clearInterval(sessionCheckInterval);
+  try {
+    await conn?.ev?.removeAllListeners();
+    conn?.ws?.close();
+  } catch {}
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log(chalk.yellow('[!] SIGINT received, closing gracefully...'));
+  clearInterval(presenceUpdateInterval);
+  clearInterval(sessionCheckInterval);
+  try {
+    await conn?.ev?.removeAllListeners();
+    conn?.ws?.close();
+  } catch {}
+  process.exit(0);
+});
+// ========== END SAFEGUARDS ==========
 
 const pluginsDir = global.__dirname(pathJoin(currentDir, "./plugins/index"));
 const isPluginFile = (filename) => /\.js$/.test(filename);

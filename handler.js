@@ -1362,7 +1362,21 @@ export async function handler(chatUpdate) {
 			}
 		}
 	} catch (e) {
-		console.error(e)
+		// Handle Bad MAC and other errors gracefully
+		const errorMsg = e.message?.toLowerCase() || '';
+		
+		// Bad MAC errors - log and continue, don't crash
+		if (errorMsg.includes('bad mac') || errorMsg.includes('mac validation') || errorMsg.includes('mac error')) {
+			console.log(chalk.yellow('⚠️  Bad MAC error in message processing (ignored)'));
+		} 
+		// Session errors - log and continue
+		else if (errorMsg.includes('no session') || errorMsg.includes('session error') || errorMsg.includes('failed to decrypt')) {
+			console.log(chalk.yellow('⚠️  Session error in message (ignored)'));
+		}
+		// Other errors - log normally
+		else {
+			console.error(e);
+		}
 	} finally {
 		if (opts['queque'] && m.text) {
 			const quequeIndex = this.msgqueque.indexOf(m.id || m.key.id)
