@@ -250,7 +250,7 @@ export function displayUpdateNotification(m, conn) {
         }
 
         conn.sendMessage(m.chat, {
-            text: `\n${'━'.repeat(30)}\n📢 *LATEST UPDATE*\n${'━'.repeat(30)}\n\n${update.content}\n\n${'━'.repeat(30)}`
+            text: `\n${'━'.repeat(23)}\n📢 *Announcement!*\n${'━'.repeat(23)}\n\n${update.content}\n\n${'━'.repeat(23)}`
         }, { quoted: m })
     } catch (e) {
         console.error('Error displaying update:', e)
