@@ -23,6 +23,7 @@ ${Object.entries(toolSystem.tools).map(([key, data]) =>
 • Higher levels cost more materials
 • Stats show exact improvements before upgrading
 • 10 levels for tools, 100 levels for ATM
+• Durability improves with level (wear less)
 
 ⭐ *Tier System:*
 🟢 Common (1-25%)
@@ -109,12 +110,24 @@ ${missingMaterials.map(m => `• ${m}`).join('\n')}
             edit: statusMsg.key
         })
 
-        // Upgrade tool
+        // Get current durability before upgrade
+        const currentDurabilityKey = `${tool}durability`
+        const oldMaxDurability = toolData.baseStats.durability + (toolData.statGrowth.durability * currentLevel)
+        const currentDurability = user[currentDurabilityKey] || oldMaxDurability
+        
+        // Upgrade tool level
         user[tool]++
 
-        // Update durability (scales exponentially)
-        const tooltier = toolSystem.getTierEmoji(user[tool], toolData.maxLevel)
-        user[`${tool}durability`] = Math.floor(oldStats.durability * (1 + (newStats.durability - oldStats.durability) / oldStats.durability * 1.5))
+        // Update durability: scale up to maintain percentage
+        const newMaxDurability = toolData.baseStats.durability + (toolData.statGrowth.durability * user[tool])
+        if (currentDurability > 0) {
+          // Maintain durability ratio
+          const durabilityRatio = currentDurability / oldMaxDurability
+          user[currentDurabilityKey] = Math.floor(newMaxDurability * durabilityRatio)
+        } else {
+          // If broken, set to new max
+          user[currentDurabilityKey] = newMaxDurability
+        }
 
         // Calculate stat improvements
         let improvements = []
@@ -127,6 +140,7 @@ ${missingMaterials.map(m => `• ${m}`).join('\n')}
             }
         }
 
+        const tooltier = toolSystem.getTierEmoji(user[tool], toolData.maxLevel)
         let result = `
 ${tooltier} *${toolData.emoji} ${toolData.name} Upgraded!*
 ━━━━━━━━━━━━━━━━━━━
@@ -139,6 +153,10 @@ ${improvements.join('\n')}
 
 💰 *Materials Used:*
 ${Object.entries(cost).map(([item, amount]) => `• ${item}: ${amount.toLocaleString('id-ID')}`).join('\n')}
+
+🔧 *Durability:*
+Max Durability: ${oldMaxDurability} → ${newMaxDurability}
+Current Durability: ${user[currentDurabilityKey]}/${newMaxDurability}
 
 🎯 *Improvement Score: ${toolSystem.calculateImprovementScore(oldStats, newStats).toFixed(2)}%*
 
