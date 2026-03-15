@@ -5,7 +5,7 @@ let handler = async (m, { conn, text }) => {
     const userId = m.sender
     const userName = await conn.getName(userId)
     
-    const result = await RPGHandler.handleHunt(global.db, userId, userName)
+    const result = await RPGHandler.handleMine(global.db, userId, userName)
     const formattedMessage = RPGHandler.formatActivityResult(result, userName)
     
     m.reply(formattedMessage)
@@ -14,9 +14,9 @@ let handler = async (m, { conn, text }) => {
   }
 }
 
-handler.help = ['hunt']
+handler.help = ['mine', 'mining']
 handler.tags = ['rpg']
-handler.command = /^hunt$/i
+handler.command = /^(mine|mining)$/i
 handler.register = true
 handler.group = true
 handler.rpg = true

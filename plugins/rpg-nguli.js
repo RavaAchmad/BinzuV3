@@ -1,13 +1,18 @@
+﻿/**
+ * RPG - Nguli Activity
+ */
+import { RPGHandler } from '../lib/rpg-handler.js'
 let handler = async (m, { conn }) => {
-    if (new Date - global.db.data.users[m.sender].lastnguli > 86400000) {
-      global.db.data.users[m.sender].limit += 10
-      m.reply('_🎉Selamat kamu mendapatkan +10 limit_')
-      global.db.data.users[m.sender].lastnguli = new Date * 1
-    } else m.reply('[💬] Anda sudah mengklaim upah nguli hari ini')
+  try {
+    const result = await RPGHandler.handleWork(global.db, m.sender, await conn.getName(m.sender), 'general')
+    m.reply(RPGHandler.formatActivityResult(result, await conn.getName(m.sender)))
+  } catch (error) {
+    m.reply(? Error: )
   }
+}
 handler.help = ['nguli']
 handler.tags = ['rpg']
-handler.command = /^(nguli)$/i
+handler.command = /^nguli$/i
 handler.register = true
 handler.group = true
 handler.rpg = true

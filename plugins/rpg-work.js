@@ -1,11 +1,12 @@
 import { RPGHandler } from '../lib/rpg-handler.js'
 
-let handler = async (m, { conn, text }) => {
+let handler = async (m, { conn, text, args }) => {
   try {
     const userId = m.sender
     const userName = await conn.getName(userId)
+    const jobType = args[0] || 'default'
     
-    const result = await RPGHandler.handleHunt(global.db, userId, userName)
+    const result = await RPGHandler.handleWork(global.db, userId, userName, jobType)
     const formattedMessage = RPGHandler.formatActivityResult(result, userName)
     
     m.reply(formattedMessage)
@@ -14,9 +15,9 @@ let handler = async (m, { conn, text }) => {
   }
 }
 
-handler.help = ['hunt']
+handler.help = ['work', 'kerja', 'job']
 handler.tags = ['rpg']
-handler.command = /^hunt$/i
+handler.command = /^(work|kerja|job)$/i
 handler.register = true
 handler.group = true
 handler.rpg = true
