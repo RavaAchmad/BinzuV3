@@ -40,9 +40,9 @@ let handler = async (m, { conn, text, isOwner }) => {
     else chats.expired = now + jumlahHari
     m.reply(`Berhasil menambahkan sewa untuk grup ${groupId}${expired ? ` selama ${expired} hari` : ''}`)
 }
-handler.help = ['addsewa <link/ID> [hari]']
+handler.help = ['addtimer <link/ID> [hari]']
 handler.tags = ['owner']
-handler.command = /^addsewa$/i
+handler.command = /^addtimer$/i
 handler.rowner = true
 handler.register = true
 export default handler

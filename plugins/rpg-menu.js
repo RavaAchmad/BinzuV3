@@ -61,14 +61,14 @@ For details: !rpg detailed
 ║       📖 DETAILED GAME GUIDE        ║
 ╚═════════════════════════════════════╝
 
-**1. PROGRESSION SYSTEM**
+*1. PROGRESSION SYSTEM*
 ├─ Start Level 1 with 0 exp
 ├─ Gain exp from activities or dungeons
 ├─ 1000 exp = Level 2
 ├─ 1120 exp = Level 3 (grows ~12% per level)
 └─ Rinse, repeat → Eventually level 300!
 
-**2. STATS & ATTRIBUTES**
+*2. STATS & ATTRIBUTES*
 ├─ STR (Strength): Physical damage
 ├─ AGI (Agility): Attack speed & dodge
 ├─ DEF (Defense): Damage reduction
@@ -81,7 +81,7 @@ Stats increase from:
   • Skill levels (+bonus per skill level)
   • Equipment bonuses
 
-**3. SKILLS (Pick ONE to start)**
+*3. SKILLS (Pick ONE to start)*
 ├─ Swordmaster ⚔️: Best for hunters
 ├─ Archer 🏹: Best for speed
 ├─ Mage 🧙: Best for magic damage
@@ -95,7 +95,7 @@ Available at:
   - Equip skill essence
   - Start gaining skill exp
 
-**4. ACTIVITY COOLDOWNS**
+*4. ACTIVITY COOLDOWNS*
 Hunt: 5 minutes, 150 exp, 100 money
 Fish: 5 minutes, 120 exp, 80 money
 Mine: 5 minutes, 140 exp, 150 money
@@ -105,7 +105,7 @@ Skills boost rewards by ~20%
 Higher levels don't affect cooldown
 (Fair for all!)
 
-**5. DUNGEON COMBAT**
+*5. DUNGEON COMBAT*
 ├─ 1v1 turn-based batte
 ├─ You attack → Enemy counters
 ├─ Repeat until one dies
@@ -118,7 +118,7 @@ HARD: 1.8x (for pros)
 NIGHTMARE: 3x (skill required)
 INFERNO: 5x (hardcore only)
 
-**6. ECONOMY**
+*6. ECONOMY*
 Get money from:
   • Hunt/Mine/Work/Fish
   • Dungeon victories
@@ -132,7 +132,7 @@ Spend money on:
 Emeralds for top-tier upgrades
 (Don't worry, get free ones too)
 
-**7. MECHANICS**
+*7. MECHANICS*
 - Cooldowns are global (one per activity)
 - Stats update automatically on level up
 - Combat is FAIR (no pay-to-win)
@@ -203,29 +203,29 @@ To select:
 ║       ⚖️ BALANCE INFORMATION       ║
 ╚═════════════════════════════════════╝
 
-**DIFFICULTY MULTIPLIERS:**
+*DIFFICULTY MULTIPLIERS:*
 EASY:       0.7x exp, 0.7x money
 NORMAL:     1.0x exp, 1.0x money
 HARD:       1.8x exp, 1.8x money
 NIGHTMARE:  3.0x exp, 3.0x money
 INFERNO:    5.0x exp, 5.0x money
 
-**ACTIVITY BALANCING:**
+*ACTIVITY BALANCING:*
 All activities have same cooldown: 5min
 Fair solo grinding
 Rewards scale with difficulty
 
-**SKILL BENEFITS:**
+*SKILL BENEFITS:*
 ~20% better rewards from activities
 Unique stat bonuses per skill
 Level up skills independently
 
-**ECONOMY:**
+*ECONOMY:*
 Money from: activities, dungeons
 No inflation (carefully balanced)
 Cost scaling reasonable for all levels
 
-**COMBAT BALANCE:**
+*COMBAT BALANCE:*
 Enemy scales to your level
 Stats matter (no RNG BS)
 Higher levels = stronger enemies
