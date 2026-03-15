@@ -1,11 +1,19 @@
 import { RPGHandler } from '../lib/rpg-handler.js'
 
-let handler = async (m, { conn, text }) => {
+let handler = async (m, { conn, text, args }) => {
   try {
     const userId = m.sender
     const userName = await conn.getName(userId)
     
-    const result = await RPGHandler.handleFish(global.db, userId, userName)
+    // Check for auto-fish mode
+    const isAutoMode = args[0]?.toLowerCase() === 'auto'
+    const autoDays = isAutoMode ? Math.min(30, parseInt(args[1]) || 1) : 0
+    
+    if (isAutoMode && autoDays < 1) {
+      return m.reply('❌ Usage: !fish auto [days: 1-30]')
+    }
+
+    const result = await RPGHandler.handleFish(global.db, userId, userName, isAutoMode, autoDays)
     const formattedMessage = RPGHandler.formatActivityResult(result, userName)
     
     m.reply(formattedMessage)

@@ -7,7 +7,7 @@ let handler = async (m, { conn }) => {
     const result = await RPGHandler.handleMine(global.db, m.sender, await conn.getName(m.sender))
     m.reply(RPGHandler.formatActivityResult(result, await conn.getName(m.sender)))
   } catch (error) {
-    m.reply(? Error: )
+    m.reply(`❌ Error: ${error.message}`)
   }
 }
 handler.help = ['mining']
