@@ -1,124 +1,64 @@
-import { getAudioData, getAudioFile, cleanup } from './yt-dlp-utils.js';
-import fs from 'fs';
+import { downloadFromYouTube, formatFileSize, formatDuration, isValidDuration } from '../lib/youtube-api.js';
 
 // ============================================================
-// HELPER FUNCTIONS
-// ============================================================
-const formatSize = (bytes) => {
-  if (!bytes || bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
-
-const formatDuration = (seconds) => {
-  if (!seconds) return '00:00';
-  const date = new Date(seconds * 1000);
-  const hh = date.getUTCHours();
-  const mm = date.getUTCMinutes();
-  const ss = date.getUTCSeconds().toString().padStart(2, '0');
-  return hh > 0 ? `${hh}:${mm.toString().padStart(2, '0')}:${ss}` : `${mm}:${ss}`;
-};
-
-// ============================================================
-// YOUTUBE AUDIO DOWNLOADER (MP3)
+// YOUTUBE AUDIO DOWNLOADER (MP3) - DIRECT
 // ============================================================
 
-const handler = async (m, { conn, text, usedPrefix, command, args }) => {
+const handler = async (m, { conn, text, usedPrefix, command }) => {
   if (!text) {
-    throw `*Example:* ${usedPrefix + command} https://www.youtube.com/watch?v=Z28dtg_QmFw\n\nDefault bitrate: 128 (Supports: 128, 192, 320)`;
+    throw `Gunakan: ${usedPrefix}${command} <URL YouTube>\n\nContoh:\n${usedPrefix}${command} https://youtu.be/dQw4w9WgXcQ`;
+  }
+
+  if (!text.startsWith('https://')) {
+    return m.reply(`⚠️ Gunakan */.play* atau */.song* untuk mencari lagu.\nGunakan command ini untuk URL YouTube langsung.\n\nContoh:\n${usedPrefix}${command} https://youtu.be/...`);
   }
 
   try {
-    await m.reply(wait);
+    await m.reply('⏳ Mengunduh audio...');
 
-    const query = text.split(" ")[0];
-    const bitrate = args[0] || '128';
+    console.log('[YTA] Downloading audio from:', text);
 
-    console.log('[YTA] Starting:', { query, bitrate });
+    // Download audio from API
+    const downloadData = await downloadFromYouTube(text, 'audio');
+    const { downloadUrl, title, duration, views, fileSize } = downloadData;
 
-    // 1. GET AUDIO DATA (METADATA)
-    let audioData;
-    try {
-      audioData = await getAudioData(query);
-    } catch (infoErr) {
-      console.error('[YTA] getAudioData error:', infoErr.message);
-      const errMsg = infoErr.message.includes('lebih dari 1 jam')
-        ? 'Video terlalu panjang! (Max 1 jam)'
-        : infoErr.message.includes('tidak ditemukan')
-        ? 'Video tidak ditemukan'
-        : `Error: ${infoErr.message}`;
-      return m.reply(`❌ ${errMsg}`);
+    // Validate duration
+    if (!isValidDuration(duration)) {
+      return m.reply('❌ Video terlalu panjang! (Max 1 jam)');
     }
 
-    const { title, duration, bitrate: defaultBitrate } = audioData;
+    // Build caption
+    const caption = `🎵 *YOUTUBE MP3*
 
-    // 2. DOWNLOAD AUDIO
-    let result;
+📝 *Title:* ${title}
+⏱️ *Duration:* ${duration}
+👁️ *Views:* ${views}
+💾 *Size:* ${fileSize}`;
+
+    // Send audio
     try {
-      result = await getAudioFile(query, bitrate);
-    } catch (dlErr) {
-      console.error('[YTA] Download error:', dlErr.message);
-      return m.reply(`❌ Download failed: ${dlErr.message}`);
-    }
-
-    const { filePath } = result;
-    console.log('[YTA] Download success:', filePath);
-
-    // 3. VALIDATE FILE
-    if (!fs.existsSync(filePath)) {
-      console.error('[YTA] File not found:', filePath);
-      return m.reply('❌ File hilang!');
-    }
-
-    const fileStats = fs.statSync(filePath);
-    const fileSize = formatSize(fileStats.size);
-
-    // 4. BUILD MESSAGE
-    let caption = '';
-    caption += `🎵 *YOUTUBE MP3 DOWNLOADER*\n\n`;
-    caption += `📝 *Title:* ${title}\n`;
-    caption += `⏱️ *Duration:* ${formatDuration(duration)}\n`;
-    caption += `🔊 *Bitrate:* ${bitrate}kbps\n`;
-    caption += `💾 *Size:* ${fileSize}`;
-
-    await m.reply(caption);
-
-    // 5. SEND AUDIO FILE
-    try {
-      const fileName = `${title}.mp3`;
-      const audioBuffer = fs.readFileSync(filePath);
-
       await conn.sendMessage(m.chat, {
-        audio: audioBuffer,
+        audio: { url: downloadUrl },
         mimetype: 'audio/mpeg',
-        fileName: fileName
+        fileName: `${title}.mp3`
       }, { quoted: m });
 
-      console.log('[YTA] Audio sent:', fileName);
+      await m.reply(caption);
+      console.log('[YTA] Audio sent successfully:', title);
+
     } catch (sendErr) {
       console.error('[YTA] Send error:', sendErr.message);
-      m.reply(`❌ Send failed: ${sendErr.message}`);
+      m.reply(`❌ Gagal mengirim audio: ${sendErr.message}`);
     }
 
-    // 6. CLEANUP
-    setTimeout(() => {
-      try {
-        cleanup(filePath);
-      } catch (e) {
-        console.error('[YTA] Cleanup error:', e.message);
-      }
-    }, 5000);
-
   } catch (error) {
-    console.error('[YTA] Error:', error.message, error.stack);
-    m.reply(`❌ *Error:* ${error.message}`);
+    console.error('[YTA] Error:', error.message);
+    m.reply(`❌ ${error.message}`);
   }
 };
 
-handler.help = handler.command = ['ytmp3', 'yta'];
+handler.help = ['ytmp3 <URL>', 'yta <URL>'];
 handler.tags = ['downloader'];
-handler.limit = true;
+handler.command = /^(ytmp3|yta)$/i;
 
 export default handler;

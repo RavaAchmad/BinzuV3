@@ -1,160 +1,197 @@
-import { getVideoInfo, getAudioFile, cleanup } from './yt-dlp-utils.js';
-import fs from 'fs';
+import { searchYouTube, downloadFromYouTube, formatFileSize, formatDuration, isValidDuration } from '../lib/youtube-api.js';
 
 // ============================================================
-// HELPER FUNCTIONS 
-// ============================================================
-const formatSize = (bytes) => {
-  if (!bytes || bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
-
-const formatDuration = (seconds) => {
-  if (!seconds) return '00:00';
-  const date = new Date(seconds * 1000);
-  const hh = date.getUTCHours();
-  const mm = date.getUTCMinutes();
-  const ss = date.getUTCSeconds().toString().padStart(2, '0');
-  return hh > 0 ? `${hh}:${mm.toString().padStart(2, '0')}:${ss}` : `${mm}:${ss}`;
-};
-
-// ============================================================
-// YOUTUBE DOWNLOADER - YTDLP
+// YOUTUBE INTERACTIVE DOWNLOADER (AUDIO/VIDEO SELECTION)
 // ============================================================
 
-const handler = async (m, { conn, text, usedPrefix }) => {
-  if (!text) throw 'Enter Title / Link From YouTube!';
+const handler = async (m, { conn, text, usedPrefix, command }) => {
+  if (!text) {
+    throw `Gunakan contoh *${usedPrefix + command}* judul lagu`;
+  }
+
+  if (text.startsWith('https://')) {
+    return m.reply(`Silahkan gunakan \`.ytmp3\` atau \`.yta\` untuk audio, atau \`.ytmp4\` atau \`.ytv\` untuk video`);
+  }
+
+  conn.youtubePlay = conn.youtubePlay ? conn.youtubePlay : {};
+
   try {
-    await m.reply(wait);
+    // Wait message
+    const { key } = await conn.sendMessage(m.chat, {
+      text: 'Mencari video di YouTube...'
+    }, { quoted: m });
 
-    console.log('[PLAY] Query:', text);
+    // Search videos
+    const videos = await searchYouTube(text, 10);
+    const limitedVideos = videos.slice(0, 10);
 
-    // 1. GET VIDEO INFO (SEARCH + METADATA)
-    let videoInfo;
-    try {
-      videoInfo = await getVideoInfo(text);
-    } catch (infoErr) {
-      console.error('[PLAY] getVideoInfo error:', infoErr.message);
-      const errMsg = infoErr.message.includes('lebih dari 1 jam') 
-        ? 'Video terlalu panjang! (Max 1 jam)'
-        : infoErr.message.includes('tidak ditemukan')
-        ? 'Video tidak ditemukan di YouTube'
-        : `Gagal ambil info: ${infoErr.message}`;
-      return m.reply(`❌ ${errMsg}`);
-    }
+    const infoText = `Silahkan pilih lagu yang ingin diunduh dengan mereply pesan ini dengan angka yang sesuai (1-${Math.min(limitedVideos.length, 10)}).\n\n`;
 
-    const { title, videoId, duration, author, description, thumbnail, views, url } = videoInfo;
-    console.log('[PLAY] Video found:', videoId);
+    const orderedLinks = limitedVideos.map((link, index) => {
+      const sectionNumber = index + 1;
+      const { title, timestamp, author } = link;
+      return `${sectionNumber}. *${title}*\n> Duration: ${timestamp}\n> Author: ${author.name}`;
+    });
 
-    // 2. DOWNLOAD AUDIO
-    let result;
-    try {
-      result = await getAudioFile(text, '128');
-    } catch (dlErr) {
-      console.error('[PLAY] Download error:', dlErr.message);
-      const errMsg = dlErr.message.includes('tidak ditemukan')
-        ? 'File download tidak ditemukan (Server error)'
-        : `Download failed: ${dlErr.message}`;
-      return m.reply(`❌ ${errMsg}`);
-    }
+    const orderedLinksText = orderedLinks.join("\n\n");
+    const fullText = `${infoText}${orderedLinksText}`;
 
-    const { filePath } = result;
-    console.log('[PLAY] Download success:', filePath);
+    await conn.sendMessage(m.chat, {
+      text: fullText,
+      edit: key
+    });
 
-    // 3. VALIDATE FILE
-    if (!fs.existsSync(filePath)) {
-      console.error('[PLAY] File not found:', filePath);
-      return m.reply('❌ File hasil download hilang!');
-    }
-
-    const fileStats = fs.statSync(filePath);
-    const fileSize = formatSize(fileStats.size);
-
-    // 4. BUILD CAPTION
-    let caption = '';
-    caption += `🎵 *YOUTUBE DOWNLOADER*\n\n`;
-    caption += `📝 *Title:* ${title}\n`;
-    caption += `🔗 *ID:* ${videoId}\n`;
-    caption += `⏱️ *Duration:* ${formatDuration(duration)}\n`;
-    caption += `👤 *Author:* ${author}\n`;
-    caption += `👁️ *Views:* ${views || 'N/A'}\n`;
-    caption += `💾 *Size:* ${fileSize}\n`;
-    caption += `📄 *Desc:* ${description?.substring(0, 80) || 'N/A'}...`;
-
-    // 5. FETCH THUMBNAIL
-    let thumbnailBuffer = Buffer.alloc(0);
-    try {
-      const { data } = await conn.getFile(thumbnail, true);
-      thumbnailBuffer = data;
-    } catch (thumbErr) {
-      console.log('[PLAY] Thumbnail fetch failed:', thumbErr.message);
-      if (global.thum) {
-        try {
-          const { data } = await conn.getFile(global.thum, true);
-          thumbnailBuffer = data;
-        } catch (e) {
-          thumbnailBuffer = Buffer.alloc(0);
+    conn.youtubePlay[m.sender] = {
+      limitedVideos,
+      key,
+      step: 'select_song',
+      timeout: setTimeout(() => {
+        if (conn.youtubePlay[m.sender]) {
+          conn.sendMessage(m.chat, { delete: key }).catch(() => {});
+          delete conn.youtubePlay[m.sender];
         }
-      }
-    }
+      }, 60 * 1000),
+    };
 
-    // 6. SEND TEXT MESSAGE WITH THUMBNAIL
-    await conn.relayMessage(m.chat, {
-      extendedTextMessage: {
-        text: caption,
-        contextInfo: {
-          externalAdReply: {
-            title: title,
-            mediaType: 1,
-            previewType: 0,
-            renderLargerThumbnail: true,
-            thumbnail: thumbnailBuffer,
-            sourceUrl: url
-          }
-        },
-        mentions: [m.sender]
-      }
-    }, {});
-
-    // 7. SEND AUDIO FILE
-    try {
-      const fileName = `${title}.mp3`;
-      const audioBuffer = fs.readFileSync(filePath);
-      
-      await conn.sendMessage(m.chat, {
-        audio: audioBuffer,
-        mimetype: 'audio/mpeg',
-        fileName: fileName
-      }, { quoted: m });
-
-      console.log('[PLAY] Audio sent successfully:', fileName);
-    } catch (sendErr) {
-      console.error('[PLAY] Send error:', sendErr.message);
-      m.reply(`❌ Gagal kirim audio: ${sendErr.message}`);
-    }
-
-    // 8. CLEANUP AFTER SEND (5 DETIK)
-    setTimeout(() => {
-      try {
-        cleanup(filePath);
-      } catch (cleanErr) {
-        console.error('[PLAY] Cleanup error:', cleanErr.message);
-      }
-    }, 5000);
-
-  } catch (e) {
-    console.error('[PLAY] Error:', e.message, e.stack);
-    m.reply(`❌ *Error:* ${e.message}`);
+  } catch (error) {
+    console.error('[PLAY] Error:', error.message);
+    m.reply(`❌ ${error.message}`);
   }
 };
 
-handler.command = handler.help = ['play', 'song', 'xm'];
+handler.before = async (m, { conn }) => {
+  conn.youtubePlay = conn.youtubePlay ? conn.youtubePlay : {};
+  if (m.isBaileys || !(m.sender in conn.youtubePlay)) return;
+
+  const { limitedVideos, key, timeout, step } = conn.youtubePlay[m.sender];
+
+  if (!m.quoted || m.quoted.id !== key.id || !m.text) return;
+
+  try {
+    // --- STEP 1: SELECT SONG ---
+    if (step === 'select_song') {
+      const choice = m.text.trim();
+      const inputNumber = Number(choice);
+
+      if (inputNumber >= 1 && inputNumber <= limitedVideos.length) {
+        const info = limitedVideos[inputNumber - 1];
+        
+        // Validate duration
+        if (!isValidDuration(info.timestamp)) {
+          return m.reply('❌ Video terlalu panjang! (Max 1 jam)');
+        }
+
+        conn.youtubePlay[m.sender].selectedVideo = info;
+        conn.youtubePlay[m.sender].step = 'select_format';
+
+        const formatText = `Anda memilih lagu:
+*${info.title}*
+
+Silahkan pilih format yang diinginkan:
+1. Audio (MP3)
+2. Video (MP4)
+
+Reply dengan angka 1 atau 2`;
+
+        await conn.sendMessage(m.chat, {
+          text: formatText,
+          edit: key
+        });
+      } else {
+        await m.reply(`❌ Nomor urutan tidak valid. Silakan pilih nomor antara 1 sampai ${limitedVideos.length}`);
+      }
+
+    // --- STEP 2: SELECT FORMAT & DOWNLOAD ---
+    } else if (step === 'select_format') {
+      const formatChoice = m.text.trim();
+      const videoInfo = conn.youtubePlay[m.sender].selectedVideo;
+
+      if (!['1', '2'].includes(formatChoice)) {
+        return m.reply("❌ Pilihan format tidak valid. Silakan reply dengan:\n1 untuk Audio (MP3)\n2 untuk Video (MP4)");
+      }
+
+      clearTimeout(timeout);
+
+      const isAudio = formatChoice === '1';
+      const downloadType = isAudio ? 'audio' : 'video';
+
+      const infoText = `*${isAudio ? 'AUDIO' : 'VIDEO'} INFORMATION*
+- *Title:* ${videoInfo.title}
+- *Duration:* ${videoInfo.timestamp}
+- *Author:* ${videoInfo.author.name}
+- *Format:* ${isAudio ? 'MP3' : 'MP4'}
+
+${isAudio ? 'AUDIO' : 'VIDEO'} SEDANG DIUNDUH...`;
+
+      await conn.sendMessage(m.chat, {
+        text: infoText,
+        edit: key
+      });
+
+      try {
+        // Download from API
+        const downloadData = await downloadFromYouTube(videoInfo.url, downloadType);
+        const { downloadUrl, title, duration, views, fileSize } = downloadData;
+
+        if (isAudio) {
+          // --- AUDIO HANDLER ---
+          try {
+            await conn.sendMessage(m.chat, {
+              audio: { url: downloadUrl },
+              mimetype: 'audio/mpeg',
+              fileName: `${title}.mp3`
+            }, { quoted: m });
+
+            console.log('[PLAY] Audio sent:', title);
+          } catch (errAudio) {
+            console.error('[PLAY] Audio send error:', errAudio.message);
+            await m.reply('❌ Gagal mengirim audio.');
+          }
+        } else {
+          // --- VIDEO HANDLER ---
+          try {
+            const caption = `🎬 *Title:* ${title}\n⏱️ *Duration:* ${duration}\n👁️ *Views:* ${views}\n📁 *Size:* ${fileSize}`;
+
+            await conn.sendMessage(m.chat, {
+              video: { url: downloadUrl },
+              mimetype: 'video/mp4',
+              fileName: `${title}.mp4`,
+              caption: caption
+            }, { quoted: m });
+
+            console.log('[PLAY] Video sent:', title);
+          } catch (vidErr) {
+            console.error('[PLAY] Video send error, trying as document:', vidErr.message);
+            
+            // Fallback to document
+            try {
+              await conn.sendMessage(m.chat, {
+                document: { url: downloadUrl },
+                mimetype: 'video/mp4',
+                fileName: `${title}.mp4`,
+                caption: `🎬 Title: ${title}\n\n(Dikirim sebagai dokumen)`
+              }, { quoted: m });
+            } catch (docErr) {
+              await m.reply('❌ Gagal mengirim video.');
+            }
+          }
+        }
+      } catch (downloadErr) {
+        console.error('[PLAY] Download error:', downloadErr.message);
+        await m.reply(`❌ Gagal mengunduh: ${downloadErr.message}`);
+      } finally {
+        delete conn.youtubePlay[m.sender];
+        conn.sendMessage(m.chat, { delete: key }).catch(() => {});
+      }
+    }
+  } catch (error) {
+    console.error('[PLAY] Handler error:', error.message);
+    delete conn.youtubePlay[m.sender];
+  }
+};
+
+handler.help = ['play', 'song', 'xm'];
 handler.tags = ['downloader'];
-handler.exp = 0;
-handler.limit = true;
-handler.premium = false;
+handler.command = /^(play|song|xm)$/i;
 
 export default handler;
