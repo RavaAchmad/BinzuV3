@@ -1,4 +1,4 @@
-import ytdlpWrapper from '../lib/yt-dlp-wrapper.js';
+import { getAudioData, getAudioFile, cleanup } from './yt-dlp-utils.js';
 import fs from 'fs';
 
 // ============================================================
@@ -41,7 +41,7 @@ const handler = async (m, { conn, text, usedPrefix, command, args }) => {
     // 1. GET AUDIO DATA (METADATA)
     let audioData;
     try {
-      audioData = await ytdlpWrapper.getAudioData(query);
+      audioData = await getAudioData(query);
     } catch (infoErr) {
       console.error('[YTA] getAudioData error:', infoErr.message);
       const errMsg = infoErr.message.includes('lebih dari 1 jam')
@@ -57,7 +57,7 @@ const handler = async (m, { conn, text, usedPrefix, command, args }) => {
     // 2. DOWNLOAD AUDIO
     let result;
     try {
-      result = await ytdlpWrapper.getAudioFile(query, bitrate);
+      result = await getAudioFile(query, bitrate);
     } catch (dlErr) {
       console.error('[YTA] Download error:', dlErr.message);
       return m.reply(`❌ Download failed: ${dlErr.message}`);
@@ -105,7 +105,7 @@ const handler = async (m, { conn, text, usedPrefix, command, args }) => {
     // 6. CLEANUP
     setTimeout(() => {
       try {
-        ytdlpWrapper.cleanup(filePath);
+        cleanup(filePath);
       } catch (e) {
         console.error('[YTA] Cleanup error:', e.message);
       }

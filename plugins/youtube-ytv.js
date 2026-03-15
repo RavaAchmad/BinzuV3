@@ -1,4 +1,4 @@
-import ytdlpWrapper from '../lib/yt-dlp-wrapper.js';
+import { getVideoData, getVideoFile, cleanup } from './yt-dlp-utils.js';
 import fs from 'fs';
 
 // ============================================================
@@ -41,7 +41,7 @@ const handler = async (m, { conn, text, args, usedPrefix, command }) => {
     // 1. GET VIDEO DATA (METADATA)
     let videoData;
     try {
-      videoData = await ytdlpWrapper.getVideoData(query, quality);
+      videoData = await getVideoData(query, quality);
     } catch (infoErr) {
       console.error('[YTV] getVideoData error:', infoErr.message);
       const errMsg = infoErr.message.includes('lebih dari 1 jam')
@@ -57,14 +57,14 @@ const handler = async (m, { conn, text, args, usedPrefix, command }) => {
     // 2. DOWNLOAD VIDEO (WITH FALLBACK)
     let result;
     try {
-      result = await ytdlpWrapper.getVideoFile(query, quality);
+      result = await getVideoFile(query, quality);
     } catch (dlErr) {
       console.error('[YTV] Download @' + quality + 'p failed, trying 360p fallback...');
       
       // Fallback ke 360p jika kualitas lebih tinggi gagal
       if (quality !== '360') {
         try {
-          result = await ytdlpWrapper.getVideoFile(query, '360');
+          result = await getVideoFile(query, '360');
           console.log('[YTV] Fallback 360p success');
         } catch (fallbackErr) {
           console.error('[YTV] Fallback also failed:', fallbackErr.message);
@@ -117,7 +117,7 @@ const handler = async (m, { conn, text, args, usedPrefix, command }) => {
     // 6. CLEANUP
     setTimeout(() => {
       try {
-        ytdlpWrapper.cleanup(filePath);
+        cleanup(filePath);
       } catch (e) {
         console.error('[YTV] Cleanup error:', e.message);
       }

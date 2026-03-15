@@ -1,4 +1,4 @@
-import ytdlpWrapper from '../lib/yt-dlp-wrapper.js';
+import { getVideoInfo, getAudioFile, cleanup } from './yt-dlp-utils.js';
 import fs from 'fs';
 
 // ============================================================
@@ -35,7 +35,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     // 1. GET VIDEO INFO (SEARCH + METADATA)
     let videoInfo;
     try {
-      videoInfo = await ytdlpWrapper.getVideoInfo(text);
+      videoInfo = await getVideoInfo(text);
     } catch (infoErr) {
       console.error('[PLAY] getVideoInfo error:', infoErr.message);
       const errMsg = infoErr.message.includes('lebih dari 1 jam') 
@@ -52,7 +52,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     // 2. DOWNLOAD AUDIO
     let result;
     try {
-      result = await ytdlpWrapper.getAudioFile(text, '128');
+      result = await getAudioFile(text, '128');
     } catch (dlErr) {
       console.error('[PLAY] Download error:', dlErr.message);
       const errMsg = dlErr.message.includes('tidak ditemukan')
@@ -139,7 +139,7 @@ const handler = async (m, { conn, text, usedPrefix }) => {
     // 8. CLEANUP AFTER SEND (5 DETIK)
     setTimeout(() => {
       try {
-        ytdlpWrapper.cleanup(filePath);
+        cleanup(filePath);
       } catch (cleanErr) {
         console.error('[PLAY] Cleanup error:', cleanErr.message);
       }
