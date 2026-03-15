@@ -11,7 +11,9 @@ const __dirname = dirname(__filename);
 
 const BINARY_PATH = path.join(__dirname, '../bin/yt-dlp');
 const COOKIES_PATH = path.join(__dirname, '../cookies.txt');
-const AUDIO_DIR = path.join(__dirname, '../tmp');
+const AUDIO_DIR = path.resolve(__dirname, '../tmp');
+
+console.log(`[YTDLP] AUDIO_DIR: ${AUDIO_DIR}`);
 
 const MEDIA_EXTS = ['.mp3', '.mp4', '.webm', '.m4a', '.opus', '.ogg', '.wav', '.mkv', '.mov', '.avi'];
 
@@ -254,8 +256,10 @@ export async function getAudioFile(query, _bitrate = '128') {
   const videoUrl = await resolveUrl(query);
   const ts = Date.now();
   const prefix = `track_${ts}`;
+  const outputPath = path.resolve(AUDIO_DIR, `${prefix}.%(ext)s`);
 
   console.log(`[YTDLP-AUDIO] downloading: ${videoUrl}`);
+  console.log(`[YTDLP-AUDIO] output path: ${outputPath}`);
 
   let title = query;
   try {
@@ -271,13 +275,19 @@ export async function getAudioFile(query, _bitrate = '128') {
     console.warn(`[YTDLP-AUDIO] Duration validation skipped`);
   }
 
+  // Ensure directory exists
+  if (!fs.existsSync(AUDIO_DIR)) {
+    fs.mkdirSync(AUDIO_DIR, { recursive: true });
+    console.log(`[YTDLP-AUDIO] Created directory: ${AUDIO_DIR}`);
+  }
+
   await ytdlp.execAsync([
     videoUrl,
     '-f', 'bestaudio[ext=m4a]/bestaudio/best',
     '-x',
     '--audio-format', 'mp3',
     '--audio-quality', '0',
-    '-o', path.join(AUDIO_DIR, `${prefix}.%(ext)s`),
+    '-o', outputPath,
     ...DOWNLOAD_ARGS,
     ...getCookieArgs(),
   ]);
@@ -293,6 +303,7 @@ export async function getVideoFile(query, quality = '720') {
   const videoUrl = await resolveUrl(query);
   const ts = Date.now();
   const prefix = `video_${ts}`;
+  const outputPath = path.resolve(AUDIO_DIR, `${prefix}.%(ext)s`);
 
   let title = query;
   try {
@@ -309,12 +320,19 @@ export async function getVideoFile(query, quality = '720') {
   }
 
   console.log(`[YTDLP-VIDEO] downloading: ${title} @${quality}p`);
+  console.log(`[YTDLP-VIDEO] output path: ${outputPath}`);
+
+  // Ensure directory exists
+  if (!fs.existsSync(AUDIO_DIR)) {
+    fs.mkdirSync(AUDIO_DIR, { recursive: true });
+    console.log(`[YTDLP-VIDEO] Created directory: ${AUDIO_DIR}`);
+  }
 
   await ytdlp.execAsync([
     videoUrl,
     '-f', `best[height<=${quality}]/best`,
     '--merge-output-format', 'mp4',
-    '-o', path.join(AUDIO_DIR, `${prefix}.%(ext)s`),
+    '-o', outputPath,
     ...DOWNLOAD_ARGS,
     ...getCookieArgs(),
   ]);
