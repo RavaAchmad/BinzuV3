@@ -4,6 +4,40 @@ import monthly from './rpg-monthly.js'
 import adventure from './rpg-adventure.js'
 import fetch from 'node-fetch'
 
+// Emoji mapping for tools and items
+const EMOJI_MAP = {
+  level: '⭐',
+  limit: '🎟️',
+  money: '💰',
+  bank: '🏦',
+  diamond: '💎',
+  gold: '🟨',
+  health: '❤️',
+  chip: '🃏',
+  exp: '✨',
+  atm: '🏧',
+  // Tools
+  fishingrod: '🎣',
+  sword: '⚔️',
+  pickaxe: '⛏️',
+  armor: '🛡️',
+  // Common items
+  wood: '🪵',
+  rock: '🪨',
+  string: '📍',
+  emerald: '💚',
+  iron: '⚪',
+  // Durability
+  sworddurability: '⚔️',
+  pickaxedurability: '⛏️',
+  fishingroddurability: '🎣',
+  armordurability: '🛡️'
+}
+
+function getEmoji(name) {
+  return EMOJI_MAP[name] || '📦'
+}
+
 const inventory = {
   others: {
     joinlimit: true,
@@ -149,17 +183,17 @@ let handler = async (m, { conn }) => {
   let usersgold = sortedgold.map(v => v[0])
   let imgr = flaaa.getRandom()
   let limit = user.premiumTime >= 1 ? 'Unlimited' : user.limit
-  const tools = Object.keys(inventory.tools).map(v => user[v] && `*${rpg.emoticon(v)} ${v}:* ${typeof inventory.tools[v] === 'object' ? inventory.tools[v][user[v]?.toString()] : `Level(s) ${user[v]}`}`).filter(v => v).join('\n').trim()
-  const items = Object.keys(inventory.items).map(v => user[v] && `*${rpg.emoticon(v)} ${v}:* ${user[v]}`).filter(v => v).join('\n').trim()
-  const dura = Object.keys(inventory.durabi).map(v => user[v] && `*${rpg.emoticon(v)} ${v}:* ${user[v]}`).filter(v => v).join('\n').trim()
-  const crates = Object.keys(inventory.crates).map(v => user[v] && `*${rpg.emoticon(v)} ${v}:* ${user[v]}`).filter(v => v).join('\n').trim()
-  const pets = Object.keys(inventory.pets).map(v => user[v] && `*${rpg.emoticon(v)} ${v}:* ${user[v] >= inventory.pets[v] ? 'Max Levels' : `Level(s) ${user[v]}`}`).filter(v => v).join('\n').trim()
+  const tools = Object.keys(inventory.tools).map(v => user[v] && `*${getEmoji(v)} ${v}:* ${typeof inventory.tools[v] === 'object' ? inventory.tools[v][(user[v] || '0').toString()] : `Level(s) ${user[v]}`}`).filter(v => v).join('\n').trim()
+  const items = Object.keys(inventory.items).map(v => user[v] && `*${getEmoji(v)} ${v}:* ${user[v]}`).filter(v => v).join('\n').trim()
+  const dura = Object.keys(inventory.durabi).map(v => user[v] && `*${getEmoji(v)} ${v}:* ${user[v]}`).filter(v => v).join('\n').trim()
+  const crates = Object.keys(inventory.crates).map(v => user[v] && `*${getEmoji(v)} ${v}:* ${user[v]}`).filter(v => v).join('\n').trim()
+  const pets = Object.keys(inventory.pets).map(v => user[v] && `*${getEmoji(v)} ${v}:* ${user[v] >= inventory.pets[v] ? 'Max Levels' : `Level(s) ${user[v]}`}`).filter(v => v).join('\n').trim()
   const cooldowns = Object.entries(inventory.cooldowns).map(([cd, { name, time }]) => cd in user && `*✧ ${name}*: ${new Date() - user[cd] >= time ? '✅' : '❌'}`).filter(v => v).join('\n').trim()
   const caption = `
 🧑🏻‍🏫 ᴜsᴇʀ: *${user.registered ? user.name : conn.getName(who)}* ${user.level ? `
-➠ ${rpg.emoticon('level')} level: ${user.level}` : ''} ${user.limit ? `
-➠ ${rpg.emoticon('limit')} limit: ${limit}` : ''}
-${Object.keys(inventory.others).map(v => user[v] && `➠ ${rpg.emoticon(v)} ${v}: ${user[v]}`).filter(v => v).join('\n')} ${tools ? `
+➠ ${getEmoji('level')} level: ${user.level}` : ''} ${user.limit ? `
+➠ ${getEmoji('limit')} limit: ${limit}` : ''}
+${Object.keys(inventory.others).map(v => user[v] && `➠ ${getEmoji(v)} ${v}: ${user[v]}`).filter(v => v).join('\n')} ${tools ? `
 
 *ʟɪꜱᴛ ᴛᴏᴏʟs* :
 ${tools}` : ''}${items ? `
@@ -174,11 +208,11 @@ ${crates}` : ''}${pets ? `
 ${pets}` : ''}${cooldowns ? `
 
 *ʟɪꜱᴛ ᴀʀᴄʜɪᴇᴠᴇᴍᴇɴᴛ* :
-${rpg.emoticon('money')} ᴛᴏᴘ ᴍᴏɴᴇʏ *${usersmoney.indexOf(who) + 1}* ᴅᴀʀɪ *${usersmoney.length}*
-${rpg.emoticon('bank')} ᴛᴏᴘ ʙᴀɴᴋ *${usersbank.indexOf(who) + 1}* ᴅᴀʀɪ *${usersbank.length}*
-${rpg.emoticon('level')} ᴛᴏᴘ ʟᴇᴠᴇʟ *${userslevel.indexOf(who) + 1}* ᴅᴀʀɪ *${userslevel.length}*
-${rpg.emoticon('diamond')} ᴛᴏᴘ ᴅɪᴀᴍᴏɴᴅ *${usersdiamond.indexOf(who) + 1}* ᴅᴀʀɪ *${usersdiamond.length}*
-${rpg.emoticon('gold')} ᴛᴏᴘ ɢᴏʟᴅ *${usersgold.indexOf(who) + 1}* ᴅᴀʀɪ *${usersgold.length}*
+${getEmoji('money')} ᴛᴏᴘ ᴍᴏɴᴇʏ *${usersmoney.indexOf(who) + 1}* ᴅᴀʀɪ *${usersmoney.length}*
+${getEmoji('bank')} ᴛᴏᴘ ʙᴀɴᴋ *${usersbank.indexOf(who) + 1}* ᴅᴀʀɪ *${usersbank.length}*
+${getEmoji('level')} ᴛᴏᴘ ʟᴇᴠᴇʟ *${userslevel.indexOf(who) + 1}* ᴅᴀʀɪ *${userslevel.length}*
+${getEmoji('diamond')} ᴛᴏᴘ ᴅɪᴀᴍᴏɴᴅ *${usersdiamond.indexOf(who) + 1}* ᴅᴀʀɪ *${usersdiamond.length}*
+${getEmoji('gold')} ᴛᴏᴘ ɢᴏʟᴅ *${usersgold.indexOf(who) + 1}* ᴅᴀʀɪ *${usersgold.length}*
 
 ♻️ *ᴄᴏʟʟᴇᴄᴛ ʀᴇᴡᴀʀᴅs* :
 ${cooldowns}` : ''}
