@@ -4,6 +4,8 @@
  */
 import { RPGHandler } from '../lib/rpg-handler.js'
 
+const cooldown = 86400000 // 24 hours
+
 let handler = async (m, { conn }) => {
   try {
     const userId = m.sender
@@ -11,7 +13,7 @@ let handler = async (m, { conn }) => {
     const result = await RPGHandler.handleAdventure(global.db, userId, userName, 1)
     m.reply(RPGHandler.formatActivityResult(result, userName))
   } catch (error) {
-    m.reply(? Error: )
+    m.reply('❌ Error: ' + error.message)
   }
 }
 
@@ -20,5 +22,6 @@ handler.tags = ['rpg']
 handler.command = /^(adventure|adventure)$/i
 handler.register = true
 handler.group = true
+handler.cooldown = cooldown
 handler.rpg = true
 export default handler

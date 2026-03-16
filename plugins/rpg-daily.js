@@ -24,7 +24,7 @@ ${text}`.trim())
 handler.help = ['daily', 'claim']
 handler.tags = ['xp']
 handler.command = /^(daily|claim)$/i
-
+handler.cooldown = cooldown
 handler.register = true
 handler.group = true
 handler.rpg = true

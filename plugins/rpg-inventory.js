@@ -38,6 +38,27 @@ function getEmoji(name) {
   return EMOJI_MAP[name] || '📦'
 }
 
+function getCooldownsConfig() {
+  return {
+    lastclaim: {
+      name: 'claim',
+      time: daily.cooldown || 79200000
+    },
+    lastweekly: {
+      name: 'weekly',
+      time: weekly.cooldown || 604800000
+    },
+    lastmonthly: {
+      name: 'monthly',
+      time: monthly.cooldown || 2592000000
+    },
+    lastadventure: {
+      name: 'adventure',
+      time: adventure.cooldown || 86400000
+    }
+  }
+}
+
 const inventory = {
   others: {
     joinlimit: true,
@@ -147,28 +168,12 @@ const inventory = {
     fox: 10,
     dog: 10,
     robo: 10,
-  },
-  cooldowns: {
-    lastclaim: {
-      name: 'claim',
-      time: daily.cooldown
-    },
-    lastweekly: {
-    	name: 'weekly',
-        time: weekly.cooldown
-        },
-    lastmonthly: {
-      name: 'monthly',
-      time: monthly.cooldown
-    },
-    lastadventure: {
-      name: 'adventure',
-      time: adventure.cooldown
-    }
   }
 }
+
 let handler = async (m, { conn }) => {
   try {
+    const cooldowns = getCooldownsConfig()
     let who = m.mentionedJid && m.mentionedJid[0] ? m.mentionedJid[0] : m.fromMe ? conn.user.jid : m.sender
     if (!(who in global.db.data.users)) return m.reply(`User ${who} not in database`)
     let user = global.db.data.users[who]
@@ -188,7 +193,7 @@ let handler = async (m, { conn }) => {
   const dura = Object.keys(inventory.durabi).map(v => user[v] && `*${getEmoji(v)} ${v}:* ${user[v]}`).filter(v => v).join('\n').trim()
   const crates = Object.keys(inventory.crates).map(v => user[v] && `*${getEmoji(v)} ${v}:* ${user[v]}`).filter(v => v).join('\n').trim()
   const pets = Object.keys(inventory.pets).map(v => user[v] && `*${getEmoji(v)} ${v}:* ${user[v] >= inventory.pets[v] ? 'Max Levels' : `Level(s) ${user[v]}`}`).filter(v => v).join('\n').trim()
-  const cooldowns = Object.entries(inventory.cooldowns).map(([cd, { name, time }]) => cd in user && `*✧ ${name}*: ${new Date() - user[cd] >= time ? '✅' : '❌'}`).filter(v => v).join('\n').trim()
+  const cooldownsText = Object.entries(cooldowns).map(([cd, { name, time }]) => cd in user && `*✧ ${name}*: ${new Date() - user[cd] >= time ? '✅' : '❌'}`).filter(v => v).join('\n').trim()
   const caption = `
 🧑🏻‍🏫 ᴜsᴇʀ: *${user.registered ? user.name : conn.getName(who)}* ${user.level ? `
 ➠ ${getEmoji('level')} level: ${user.level}` : ''} ${user.limit ? `
@@ -215,7 +220,7 @@ ${getEmoji('diamond')} ᴛᴏᴘ ᴅɪᴀᴍᴏɴᴅ *${usersdiamond.indexOf(who
 ${getEmoji('gold')} ᴛᴏᴘ ɢᴏʟᴅ *${usersgold.indexOf(who) + 1}* ᴅᴀʀɪ *${usersgold.length}*
 
 ♻️ *ᴄᴏʟʟᴇᴄᴛ ʀᴇᴡᴀʀᴅs* :
-${cooldowns}` : ''}
+${cooldownsText}` : ''}
 *✧ dungeon: ${user.lastdungeon == 0 ? '✅': '❌'}*
 *✧ mining: ${user.lastmining == 0 ? '✅': '❌'}*
 `.trim()
