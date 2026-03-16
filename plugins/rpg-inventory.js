@@ -38,6 +38,14 @@ function getEmoji(name) {
   return EMOJI_MAP[name] || '📦'
 }
 
+function formatValue(key, value) {
+  // Format exp as integer without decimals
+  if (key === 'exp') {
+    return Math.floor(value).toLocaleString()
+  }
+  return value
+}
+
 function getCooldownsConfig() {
   return {
     lastclaim: {
@@ -198,7 +206,7 @@ let handler = async (m, { conn }) => {
 🧑🏻‍🏫 ᴜsᴇʀ: *${user.registered ? user.name : conn.getName(who)}* ${user.level ? `
 ➠ ${getEmoji('level')} level: ${user.level}` : ''} ${user.limit ? `
 ➠ ${getEmoji('limit')} limit: ${limit}` : ''}
-${Object.keys(inventory.others).map(v => user[v] && `➠ ${getEmoji(v)} ${v}: ${user[v]}`).filter(v => v).join('\n')} ${tools ? `
+${Object.keys(inventory.others).map(v => user[v] && `➠ ${getEmoji(v)} ${v}: ${formatValue(v, user[v])}`).filter(v => v).join('\n')} ${tools ? `
 
 *ʟɪꜱᴛ ᴛᴏᴏʟs* :
 ${tools}` : ''}${items ? `
