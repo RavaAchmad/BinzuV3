@@ -168,20 +168,20 @@ const inventory = {
   }
 }
 let handler = async (m, { conn }) => {
-  let who = m.mentionedJid && m.mentionedJid[0] ? m.mentionedJid[0] : m.fromMe ? conn.user.jid : m.sender
-  if (!(who in db.data.users)) return m.reply(`User ${who} not in database`)
-  let user = db.data.users[who]
-  let sortedlevel = Object.entries(db.data.users).sort((a, b) => b[1].level - a[1].level)
-  let userslevel = sortedlevel.map(v => v[0])
-  let sortedmoney = Object.entries(db.data.users).sort((a, b) => b[1].money - a[1].money)
-  let usersmoney = sortedmoney.map(v => v[0])
-  let sorteddiamond = Object.entries(db.data.users).sort((a, b) => b[1].diamond - a[1].diamond)
-  let usersdiamond = sorteddiamond.map(v => v[0])
-  let sortedbank = Object.entries(db.data.users).sort((a, b) => b[1].bank - a[1].bank)
-  let usersbank = sortedbank.map(v => v[0])
-  let sortedgold = Object.entries(db.data.users).sort((a, b) => b[1].gold - a[1].gold)
-  let usersgold = sortedgold.map(v => v[0])
-  let imgr = flaaa.getRandom()
+  try {
+    let who = m.mentionedJid && m.mentionedJid[0] ? m.mentionedJid[0] : m.fromMe ? conn.user.jid : m.sender
+    if (!(who in global.db.data.users)) return m.reply(`User ${who} not in database`)
+    let user = global.db.data.users[who]
+    let sortedlevel = Object.entries(global.db.data.users).sort((a, b) => b[1].level - a[1].level)
+    let userslevel = sortedlevel.map(v => v[0])
+    let sortedmoney = Object.entries(global.db.data.users).sort((a, b) => b[1].money - a[1].money)
+    let usersmoney = sortedmoney.map(v => v[0])
+    let sorteddiamond = Object.entries(global.db.data.users).sort((a, b) => b[1].diamond - a[1].diamond)
+    let usersdiamond = sorteddiamond.map(v => v[0])
+    let sortedbank = Object.entries(global.db.data.users).sort((a, b) => b[1].bank - a[1].bank)
+    let usersbank = sortedbank.map(v => v[0])
+    let sortedgold = Object.entries(global.db.data.users).sort((a, b) => b[1].gold - a[1].gold)
+    let usersgold = sortedgold.map(v => v[0])
   let limit = user.premiumTime >= 1 ? 'Unlimited' : user.limit
   const tools = Object.keys(inventory.tools).map(v => user[v] && `*${getEmoji(v)} ${v}:* ${typeof inventory.tools[v] === 'object' ? inventory.tools[v][(user[v] || '0').toString()] : `Level(s) ${user[v]}`}`).filter(v => v).join('\n').trim()
   const items = Object.keys(inventory.items).map(v => user[v] && `*${getEmoji(v)} ${v}:* ${user[v]}`).filter(v => v).join('\n').trim()
@@ -220,7 +220,11 @@ ${cooldowns}` : ''}
 *✧ mining: ${user.lastmining == 0 ? '✅': '❌'}*
 `.trim()
 
-await conn.reply(m.chat, caption, m)  
+await conn.reply(m.chat, caption, m)
+  } catch (error) {
+    console.error('Error in inventory:', error)
+    m.reply('❌ Error displaying inventory: ' + error.message)
+  }
 }
 handler.help = ['inventory', 'inv']
 handler.tags = ['rpg']
