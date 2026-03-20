@@ -397,7 +397,7 @@ process.on('SIGINT', async () => {
 });
 // ========== END SAFEGUARDS ==========
 
-const pluginsDir = global.__dirname(pathJoin(currentDir, "./plugins"));
+const pluginsDir = global.__dirname(pathJoin(currentDir, "./plugins/index"));
 const isPluginFile = (filename) => /\.js$/.test(filename);
 
 global.plugins = {};
