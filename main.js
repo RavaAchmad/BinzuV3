@@ -397,92 +397,70 @@ process.on('SIGINT', async () => {
 });
 // ========== END SAFEGUARDS ==========
 
-const pluginsDir = global.__dirname(pathJoin(currentDir, "./plugins"));
+const pluginsDir = global.__dirname(pathJoin(currentDir, "./plugins/index"));
 const isPluginFile = (filename) => /\.js$/.test(filename);
 
 global.plugins = {};
-let debounceReload = null;
 
 async function loadPlugins() {
-  try {
-    if (!existsSync(pluginsDir)) {
-      console.warn(chalk.yellow(`[!] Plugins directory not found: ${pluginsDir}`));
-      return;
+  for (let filename of readDirSync(pluginsDir).filter(isPluginFile)) {
+    try {
+      let filePath = global.__filename(pathJoin(pluginsDir, filename));
+      const plugin = await import(filePath);
+      global.plugins[filename] = plugin.default || plugin;
+    } catch (error) {
+      conn.logger.error(error);
+      delete global.plugins[filename];
     }
-    
-    for (let filename of readDirSync(pluginsDir).filter(isPluginFile)) {
-      try {
-        let filePath = global.__filename(pathJoin(pluginsDir, filename));
-        const plugin = await import(filePath);
-        global.plugins[filename] = plugin.default || plugin;
-      } catch (error) {
-        console.error(chalk.red(`[!] Error loading plugin ${filename}:`), error.message);
-        delete global.plugins[filename];
-      }
-    }
-  } catch (error) {
-    console.error(chalk.red(`[!] Error reading plugins directory:`), error.message);
   }
 }
 
 loadPlugins()
   .then(() => {
     const pluginCount = Object.keys(global.plugins).length;
-    console.log(chalk.bold.green(`✓ Plugins Total : ${pluginCount} Plugins`));
+    console.log(chalk.bold.green(`Plugins Total : ${pluginCount} Plugins`));
   })
   .catch(console.error);
 
 global.reload = async function reloadPlugin(event, filename) {
-  // Debounce: jangan reload jika sudah ada yang pending
-  if (debounceReload) clearTimeout(debounceReload);
-  
-  debounceReload = setTimeout(async () => {
-    if (!isPluginFile(filename)) return;
+  if (isPluginFile(filename)) {
+    let filePath = global.__filename(pathJoin(pluginsDir, filename), true);
     
-    try {
-      let filePath = global.__filename(pathJoin(pluginsDir, filename), true);
-      
+    if (filename in global.plugins) {
       if (!existsSync(filePath)) {
-        if (filename in global.plugins) {
-          console.warn(chalk.yellow(`[!] Deleted plugin '${filename}'`));
-          delete global.plugins[filename];
-        }
-        return;
+        conn.logger.warn(`Deleted plugin '${filename}'`);
+        return delete global.plugins[filename];
       }
-      
-      const errorCheck = syntaxError(readFileSync(filePath), filename, {
-        sourceType: "module",
-        allowAwaitOutsideFunction: true
-      });
-      
-      if (errorCheck) {
-        console.error(chalk.red(`[!] Syntax error in '${filename}'\n${formatUtil(errorCheck)}`));
-        return;
-      }
-      
-      const isNewPlugin = !(filename in global.plugins);
-      if (isNewPlugin) {
-        console.log(chalk.cyan(`[+] Loading new plugin '${filename}'`));
-      }
-      
-      const plugin = await import(`${global.__filename(filePath)}?update=${Date.now()}`);
-      global.plugins[filename] = plugin.default || plugin;
-      
-      if (!isNewPlugin) {
-        console.log(chalk.cyan(`[~] Reloaded plugin '${filename}'`));
-      }
-    } catch (error) {
-      console.error(chalk.red(`[!] Error loading plugin '${filename}':\n${formatUtil(error)}`));
+      conn.logger.info(`Reloading plugin '${filename}'`);
+    } else {
+      conn.logger.info(`Loading new plugin '${filename}'`);
     }
     
-    debounceReload = null;
-  }, 1000); // Wait 1 second before reloading
+    const errorCheck = syntaxError(readFileSync(filePath), filename, {
+      sourceType: "module",
+      allowAwaitOutsideFunction: true
+    });
+    
+    if (errorCheck) {
+      conn.logger.error(`Syntax error while loading '${filename}'\n${formatUtil(errorCheck)}`);
+      return;
+    }
+    
+    try {
+      const plugin = await import(`${global.__filename(filePath)}?update=${Date.now()}`);
+      global.plugins[filename] = plugin.default || plugin;
+    } catch (error) {
+      conn.logger.error(`Error loading plugin '${filename}'\n${formatUtil(error)}`);
+    } finally {
+      global.plugins = Object.fromEntries(
+        Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b))
+      );
+    }
+  }
 };
 
 Object.freeze(global.reload);
-if (existsSync(pluginsDir)) {
-  watchFile(pluginsDir, global.reload);
-}
+watchFile(pluginsDir, global.reload);
 await global.reloadHandler();
 await handlePairing(conn, opts);
 
