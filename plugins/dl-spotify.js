@@ -13,7 +13,6 @@ const CACHE_FILE = `${CACHE_DIR}/cache.json`;
 // Supaya ga kena rate limit GitHub (60 req/jam untuk unauthenticated)
 const UPDATE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
-// Pesan error untuk user — semua error teknis disembunyiin
 const USER_ERROR_MSG =
   `❌ Waduh, ada yang error nih!\n\n` +
   `Tolong laporkan ke admin dengan info berikut:\n` +
