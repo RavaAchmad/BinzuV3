@@ -374,27 +374,72 @@ const sessionCheckInterval = setInterval(async () => {
 }, 600000); // 10 minutes
 
 // Graceful shutdown handlers untuk prevent hanging
-process.on('SIGTERM', async () => {
-  console.log(chalk.yellow('[!] SIGTERM received, closing gracefully...'));
-  clearInterval(presenceUpdateInterval);
-  clearInterval(sessionCheckInterval);
-  try {
-    await conn?.ev?.removeAllListeners();
-    conn?.ws?.close();
-  } catch {}
-  process.exit(0);
-});
+let isShuttingDown = false;
 
-process.on('SIGINT', async () => {
-  console.log(chalk.yellow('[!] SIGINT received, closing gracefully...'));
-  clearInterval(presenceUpdateInterval);
-  clearInterval(sessionCheckInterval);
+async function gracefulShutdown(signal) {
+  if (isShuttingDown) return; // Prevent double shutdown
+  isShuttingDown = true;
+  
+  console.log(chalk.yellow(`[!] ${signal} received, graceful shutdown...`));
+  
   try {
-    await conn?.ev?.removeAllListeners();
-    conn?.ws?.close();
-  } catch {}
-  process.exit(0);
-});
+    // Stop accepting new requests
+    clearInterval(presenceUpdateInterval);
+    clearInterval(sessionCheckInterval);
+    
+    // Save database
+    if (global.db?.write) {
+      console.log(chalk.gray('[~] Saving database...'));
+      await global.db.write().catch(() => {});
+    }
+    
+    // Close WebSocket first
+    if (conn?.ws) {
+      console.log(chalk.gray('[~] Closing WebSocket...'));
+      try {
+        await conn.ws.close();
+      } catch (e) {
+        console.log(chalk.gray('[~] WebSocket close error (ignored)'));
+      }
+    }
+    
+    // Remove all listeners
+    if (conn?.ev) {
+      console.log(chalk.gray('[~] Removing event listeners...'));
+      try {
+        conn.ev.removeAllListeners();
+      } catch (e) {
+        console.log(chalk.gray('[~] Event removal error (ignored)'));
+      }
+    }
+    
+    // Close HTTP server
+    if (global.httpServer) {
+      console.log(chalk.gray('[~] Closing HTTP server...'));
+      global.httpServer.close(() => {
+        console.log(chalk.green('[✓] HTTP server closed'));
+      });
+    }
+    
+    console.log(chalk.green('[✓] Graceful shutdown complete'));
+    
+    // Exit after 3 seconds max
+    setTimeout(() => {
+      console.log(chalk.red('[!] Force exit due to timeout'));
+      process.exit(1);
+    }, 3000);
+    
+    process.exit(0);
+  } catch (error) {
+    console.error(chalk.red('[!] Error during shutdown:'), error);
+    process.exit(1);
+  }
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
+
 // ========== END SAFEGUARDS ==========
 
 const pluginsDir = global.__dirname(pathJoin(currentDir, "./plugins/index"));
@@ -518,21 +563,165 @@ await handlePairing(conn, opts);
 })().then(() => conn.logger.info("✓ Quick Test Done"))
   .catch(console.error);
 
-      app.post("/webhook/send-promo", async (req, res) => {
-        const { number, message } = req.body;
-        if (!number || !message) return res.status(400).json({ error: "number & message required" });
+// ========== WEBHOOK HANDLERS ==========
+/**
+ * Helper function untuk check apakah bot siap
+ */
+function isBotReady() {
+  return conn && conn.user && !conn._isReconnecting && conn.ev;
+}
 
-        try {
-            const jid = number.includes('@s.whatsapp.net') ? number : `${number}@s.whatsapp.net`;
-            await conn.sendMessage(jid, { text: message });
-            res.json({ status: 'ok', sent_to: number });
-        } catch (err) {
-            console.error(err);
-            res.status(500).json({ error: 'Failed to send message' });
-        }
+/**
+ * Helper function untuk delay retry
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Send message dengan retry logic
+ */
+async function sendMessageWithRetry(jid, message, maxRetries = 3) {
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Check bot ready
+      if (!isBotReady()) {
+        throw new Error('Bot not ready (not connected)');
+      }
+      
+      // Validate JID format
+      if (!jid || typeof jid !== 'string') {
+        throw new Error('Invalid JID format');
+      }
+      
+      // Format JID properly
+      const formattedJid = jid.includes('@') ? jid : `${jid}@s.whatsapp.net`;
+      
+      // Validate message
+      if (!message || typeof message !== 'string') {
+        throw new Error('Invalid message format');
+      }
+      
+      // Send with timeout
+      const sendPromise = conn.sendMessage(formattedJid, { text: message });
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Send timeout (30s)')), 30000)
+      );
+      
+      await Promise.race([sendPromise, timeoutPromise]);
+      
+      console.log(chalk.green(`[✓] Message sent to ${formattedJid}`));
+      return { success: true, jid: formattedJid };
+      
+    } catch (error) {
+      lastError = error;
+      console.log(chalk.yellow(`[!] Send attempt ${attempt}/${maxRetries} failed: ${error.message}`));
+      
+      // Don't retry on validation errors
+      if (error.message.includes('Invalid') || error.message.includes('invalid')) {
+        break;
+      }
+      
+      // Wait before retry
+      if (attempt < maxRetries) {
+        const delayMs = 1000 * attempt; // Exponential backoff
+        await sleep(delayMs);
+      }
+    }
+  }
+  
+  // All retries exhausted
+  throw lastError || new Error('Failed to send message after retries');
+}
+
+/**
+ * Webhook: Send promotional message
+ */
+app.post("/webhook/send-promo", async (req, res) => {
+  try {
+    const { number, message } = req.body;
+    
+    // Validate input
+    if (!number || !message) {
+      console.log(chalk.red('[!] Webhook error: Missing parameters'));
+      return res.status(400).json({ 
+        error: 'Missing required parameters',
+        required: ['number', 'message'],
+        statusCode: 400
+      });
+    }
+    
+    console.log(chalk.cyan(`[~] Webhook request: number=${number}`));
+    
+    // Check bot connection status
+    if (!isBotReady()) {
+      console.log(chalk.yellow('[!] Bot not ready'));
+      return res.status(503).json({ 
+        error: 'Bot not ready (still connecting)',
+        statusCode: 503,
+        retryAfter: 5
+      });
+    }
+    
+    // Send message with retry
+    const result = await sendMessageWithRetry(number, message);
+    
+    console.log(chalk.green(`[✓] Webhook success: ${result.jid}`));
+    return res.status(200).json({ 
+      status: 'ok',
+      sent_to: result.jid,
+      statusCode: 200
     });
+    
+  } catch (error) {
+    console.error(chalk.red('[!] Webhook error:'), error.message);
+    
+    // Determine appropriate error code
+    let statusCode = 500;
+    let errorMsg = error.message;
+    
+    if (error.message.includes('Invalid')) {
+      statusCode = 400;
+    } else if (error.message.includes('not ready')) {
+      statusCode = 503;
+    } else if (error.message.includes('timeout')) {
+      statusCode = 504;
+    } else if (error.message.includes('Bad MAC') || error.message.includes('session')) {
+      statusCode = 502; // Bad Gateway - bot connection issue
+    }
+    
+    return res.status(statusCode).json({ 
+      error: errorMsg,
+      statusCode: statusCode,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * Health check endpoint
+ */
+app.get('/health', (req, res) => {
+  const isReady = isBotReady();
+  const status = {
+    status: isReady ? 'ready' : 'not-ready',
+    botConnected: !!conn?.user,
+    botActive: !!conn?.ev,
+    isReconnecting: !!conn?._isReconnecting,
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  };
+  
+  return res.status(isReady ? 200 : 503).json(status);
+});
+
+// ========== END WEBHOOK ==========
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, async () => {
-    console.log(`🚀 WhatsApp Webhook & Bot running on port ${PORT}`);
+global.httpServer = app.listen(PORT, async () => {
+    console.log(chalk.bold.green(`\n🚀 WhatsApp Webhook & Bot running on port ${PORT}`));
+    console.log(chalk.gray('   Webhook: POST http://localhost:' + PORT + '/webhook/send-promo'));
+    console.log(chalk.gray('   Health: GET http://localhost:' + PORT + '/health\n'));
 });
