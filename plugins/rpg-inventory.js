@@ -47,23 +47,20 @@ function formatValue(key, value) {
 }
 
 function getCooldownsConfig() {
-  return {
-    lastclaim: {
-      name: 'claim',
-      time: daily.cooldown || 79200000
-    },
-    lastweekly: {
-      name: 'weekly',
-      time: weekly.cooldown || 604800000
-    },
-    lastmonthly: {
-      name: 'monthly',
-      time: monthly.cooldown || 2592000000
-    },
-    lastadventure: {
-      name: 'adventure',
-      time: adventure.cooldown || 86400000
+  // Get cooldowns from unified GAME_CONFIG if available, otherwise use defaults
+  try {
+    const gc = global.GAME_CONFIG || {}
+    const cooldowns = gc.COOLDOWNS || {}
+    return {
+      hunt: { name: 'Hunt', remaining: 0 },
+      fishing: { name: 'Fishing', remaining: 0 },
+      mining: { name: 'Mining', remaining: 0 },
+      work: { name: 'Work', remaining: 0 },
+      adventure: { name: 'Adventure', remaining: 0 },
+      dungeon: { name: 'Dungeon', remaining: 0 }
     }
+  } catch (e) {
+    return {}
   }
 }
 
@@ -201,7 +198,25 @@ let handler = async (m, { conn }) => {
   const dura = Object.keys(inventory.durabi).map(v => user[v] && `*${getEmoji(v)} ${v}:* ${user[v]}`).filter(v => v).join('\n').trim()
   const crates = Object.keys(inventory.crates).map(v => user[v] && `*${getEmoji(v)} ${v}:* ${user[v]}`).filter(v => v).join('\n').trim()
   const pets = Object.keys(inventory.pets).map(v => user[v] && `*${getEmoji(v)} ${v}:* ${user[v] >= inventory.pets[v] ? 'Max Levels' : `Level(s) ${user[v]}`}`).filter(v => v).join('\n').trim()
-  const cooldownsText = Object.entries(cooldowns).map(([cd, { name, time }]) => cd in user && `*✧ ${name}*: ${new Date() - user[cd] >= time ? '✅' : '❌'}`).filter(v => v).join('\n').trim()
+  // Get cooldown remaining times from player object (new unified system)
+  let cooldownDisplay = ''
+  if (user.getCooldownRemaining) {
+    const activities = ['hunt', 'fishing', 'mining', 'work', 'adventure', 'dungeon']
+    const cooldownLines = []
+    for (const activity of activities) {
+      const remaining = user.getCooldownRemaining(activity)
+      const emoji = getEmoji(activity) || '⏱️'
+      if (remaining <= 0) {
+        cooldownLines.push(`*✧ ${activity}:* ✅`)
+      } else {
+        const mins = Math.floor(remaining / 60)
+        const secs = remaining % 60
+        cooldownLines.push(`*✧ ${activity}:* ⏳ ${mins}m ${secs}s`)
+      }
+    }
+    cooldownDisplay = cooldownLines.join('\n')
+  }
+
   const caption = `
 🧑🏻‍🏫 ᴜsᴇʀ: *${user.registered ? user.name : conn.getName(who)}* ${user.level ? `
 ➠ ${getEmoji('level')} level: ${user.level}` : ''} ${user.limit ? `
@@ -218,7 +233,7 @@ ${items}` : ''}${crates ? `
 ${crates}` : ''}${pets ? `
 
 *ʟɪꜱᴛ ᴩᴇᴛs* :
-${pets}` : ''}${cooldowns ? `
+${pets}` : ''}
 
 *ʟɪꜱᴛ ᴀʀᴄʜɪᴇᴠᴇᴍᴇɴᴛ* :
 ${getEmoji('money')} ᴛᴏᴘ ᴍᴏɴᴇʏ *${usersmoney.indexOf(who) + 1}* ᴅᴀʀɪ *${usersmoney.length}*
@@ -227,10 +242,8 @@ ${getEmoji('level')} ᴛᴏᴘ ʟᴇᴠᴇʟ *${userslevel.indexOf(who) + 1}* �
 ${getEmoji('diamond')} ᴛᴏᴘ ᴅɪᴀᴍᴏɴᴅ *${usersdiamond.indexOf(who) + 1}* ᴅᴀʀɪ *${usersdiamond.length}*
 ${getEmoji('gold')} ᴛᴏᴘ ɢᴏʟᴅ *${usersgold.indexOf(who) + 1}* ᴅᴀʀɪ *${usersgold.length}*
 
-♻️ *ᴄᴏʟʟᴇᴄᴛ ʀᴇᴡᴀʀᴅs* :
-${cooldownsText}` : ''}
-*✧ dungeon: ${user.lastdungeon == 0 ? '✅': '❌'}*
-*✧ mining: ${user.lastmining == 0 ? '✅': '❌'}*
+⏱️ *ᴀᴄᴛɪᴠɪᴛʏ ᴄᴏᴏʟᴅᴏᴡɴ* :
+${cooldownDisplay || 'Loading...'}
 `.trim()
 
 await conn.reply(m.chat, caption, m)
