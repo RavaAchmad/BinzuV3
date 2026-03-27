@@ -11,6 +11,13 @@ import fs from 'fs'
 import { displayUpdateNotification } from './bot-updates.js'
 import { toAudio } from '../lib/converter.js'
 import path from 'path'
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
+
+// Fix for __dirname in ES6 modules
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
 let cachedThumbnail = null
 let tags = {
   // 🧭 CORE / WAJIB (Tier 1)
@@ -45,7 +52,7 @@ let tags = {
   'news': 'News & Updates',
 
   // 💫 ENTERTAINMENT (Tier 4)
-  'entertainment': 'Entertainment Zone', // merge fun/pacaran/kerang/quotes if needed
+  'entertainment': 'Entertainment Zone',
   'pacaran': 'Relationship & Couple',
   'kerang': 'Kerang Ajaib',
   'absen': 'Attendance System',
@@ -58,7 +65,6 @@ let tags = {
   'owner': 'Owner Only',
   'nsfw': 'NSFW Menu',
 }
-
 
 const defaultMenu = {
   before: `Hallo %name!\nSaya adalah Bot Otomatis. Saya dapat membantu Anda mencari data, mendownload data, dan mengelola data dengan mudah dan efisien. Saya siap membantu Anda 24/7!
@@ -84,19 +90,71 @@ const defaultMenu = {
   after: `Powered By RavaAchmad`,
 }
 
-let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
+// ✅ FIXED: Helper function to create safe dividers for WhatsApp mobile
+function createSafeDivider(width = 25, style = 'line') {
+  const maxWidth = 25 // Safe for WhatsApp mobile (40-45 char wrap limit)
+  const safeWidth = Math.min(width, maxWidth)
+  
+  switch (style) {
+    case 'box-top':
+      return '╔' + '═'.repeat(safeWidth) + '╗'
+    case 'box-mid':
+      return '║'
+    case 'box-bot':
+      return '╚' + '═'.repeat(safeWidth) + '╝'
+    case 'line':
+      return '─'.repeat(safeWidth)
+    case 'heavy':
+      return '━'.repeat(safeWidth)
+    default:
+      return '─'.repeat(safeWidth)
+  }
+}
+
+// ✅ FIXED: Fetch with timeout to prevent hanging
+async function fetchThumbnailWithTimeout(url, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), timeoutMs)
+    
+    fetch(url, { signal: controller.signal })
+      .then(res => {
+        clearTimeout(timeout)
+        if (!res.ok) reject(new Error(`HTTP ${res.status}`))
+        return res.arrayBuffer()
+      })
+      .then(buffer => {
+        if (buffer.byteLength < 1000) {
+          reject(new Error('Image too small'))
+        } else {
+          resolve(Buffer.from(buffer))
+        }
+      })
+      .catch(err => {
+        clearTimeout(timeout)
+        reject(err)
+      })
+  })
+}
+
+let handler = async (m, { conn, usedPrefix, command, __dirname: cmdDirname, text }) => {
   try {
+    // Use provided __dirname or fallback to computed one
+    const workDir = cmdDirname || __dirname
+    
     let wib = moment.tz('Asia/Jakarta').format('HH:mm:ss')
-    let _package = JSON.parse(await promises.readFile(join(__dirname, '../package.json')).catch(_ => ({}))) || {}
+    let _package = JSON.parse(await promises.readFile(join(workDir, '../package.json')).catch(_ => ({}))) || {}
     let { exp, level, role } = global.db.data.users[m.sender]
     let { min, xp, max } = xpRange(level, global.multiplier)
     let tag = `@${m.sender.split`@`[0]}`
     let user = global.db.data.users[m.sender]
-    let limit = user.premiumTime >= 1 ? 'Unlimited' : user.limit
-    let premium = global.db.data.users[m.sender].premiumTime
+    
+    // ✅ FIXED: Safe null checks for optional values
+    let limit = user?.premiumTime >= 1 ? 'Unlimited' : user?.limit ?? 'N/A'
+    let premium = global.db.data.users[m.sender]?.premiumTime ?? 0
     let prems = `${premium > 0 ? 'Yes': 'No'}`
     let name = `@${m.sender.split`@`[0]}`
-    let status = `${m.sender.split`@`[0] == info.nomorown ? 'Developer' : user.premiumTime >= 1 ? 'Premium User' : user.level >= 1000 ? 'Elite User' : 'Free User'}`
+    let status = `${m.sender.split`@`[0] == global.info?.nomorown ? 'Developer' : user?.premiumTime >= 1 ? 'Premium User' : user?.level >= 1000 ? 'Elite User' : 'Free User'}`
     let who = m.mentionedJid && m.mentionedJid[0] ? m.mentionedJid[0] : m.fromMe ? conn.user.jid : m.sender
     let d = new Date(new Date + 3600000)
     let locale = 'id'
@@ -152,7 +210,7 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
     let header = conn.menu.header || defaultMenu.header
     let body = conn.menu.body || defaultMenu.body
     let footer = conn.menu.footer || defaultMenu.footer
-    let after = conn.menu.after || (conn.user.jid == global.conn.user.jid ? '' : `Powered by wa.me/${global.info.nomorown}\n`) + defaultMenu.after
+    let after = conn.menu.after || (conn.user.jid == global.conn.user.jid ? '' : `Powered by wa.me/${global.info?.nomorown}\n`) + defaultMenu.after
     
     // Handle menu type based on text input
     let menuType = text ? text.toLowerCase() : ''
@@ -216,73 +274,122 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
     let textToSend = menuText.join('\n')
     let replace = {
       '%': '%',
-      p: usedPrefix, uptime, muptime,
-      me: conn.getName(conn.user.jid),
-      npmname: _package.name,
-      npmdesc: _package.description,
-      version: _package.version,
+      p: usedPrefix, 
+      uptime: uptime ?? '00:00:00', 
+      muptime: muptime ?? '00:00:00',
+      me: conn.getName(conn.user.jid) ?? conn.user.jid ?? 'Bot',
+      npmname: _package?.name ?? 'Binzu v3',
+      npmdesc: _package?.description ?? 'RPG Fantasy Bot',
+      version: _package?.version ?? 'unknown',
       exp: exp - min,
       maxexp: xp,
       totalexp: exp,
       xp4levelup: max - exp,
-      github: _package.homepage ? _package.homepage.url || _package.homepage : '[unknown github url]',
-      level, limit, name, weton, week, date, year, dateIslamic, time, totalreg, rtotalreg, role, prems, tag, status, wib, platform, mode, 
+      github: _package?.homepage?.url ?? _package?.homepage ?? '[unknown github url]',
+      level: level ?? 1, 
+      limit: limit ?? 'N/A', 
+      name: name ?? 'User', 
+      weton, 
+      week, 
+      date, 
+      year, 
+      dateIslamic, 
+      time, 
+      totalreg, 
+      rtotalreg, 
+      role, 
+      prems, 
+      tag, 
+      status, 
+      wib, 
+      platform, 
+      mode, 
       readmore: readMore
     }
-    textToSend = textToSend.replace(new RegExp(`%(${Object.keys(replace).sort((a, b) => b.length - a.length).join`|`})`, 'g'), (_, name) => '' + replace[name])
     
-    let xm4ze = await( await fetch(xmenus)).json()
-    let thumb = xm4ze[Math.floor(Math.random() * xm4ze.length)]
+    textToSend = textToSend.replace(
+      new RegExp(`%(${Object.keys(replace).sort((a, b) => b.length - a.length).join`|`})`, 'g'), 
+      (_, name) => String(replace[name] ?? '')
+    )
+    
+    // ✅ FIXED: Fetch thumbnail with timeout and better error handling
+    let xm4ze = await (await fetch(xmenus)).json().catch(_ => [])
+    let thumb = xm4ze[Math.floor(Math.random() * xm4ze.length)] || 'https://g.top4top.io/p_353640c0q1.png'
+    
     if (!cachedThumbnail) {
       try {
-        cachedThumbnail = await fetch(global.thum ? global.thum : thumb)
-          .then(res => res.arrayBuffer())
-          .then(ab => Buffer.from(ab))
-      } catch {
-        cachedThumbnail = await fetch('https://g.top4top.io/p_353640c0q1.png')
-          .then(res => res.arrayBuffer())
-          .then(ab => Buffer.from(ab))
+        cachedThumbnail = await fetchThumbnailWithTimeout(global.thum || thumb, 5000)
+      } catch (err) {
+        console.warn(`Failed to fetch primary thumbnail (${global.thum || thumb}):`, err.message)
+        try {
+          cachedThumbnail = await fetchThumbnailWithTimeout('https://g.top4top.io/p_353640c0q1.png', 3000)
+        } catch (fallbackErr) {
+          console.warn('Failed to fetch fallback thumbnail:', fallbackErr.message)
+          cachedThumbnail = Buffer.from([]) // Empty buffer fallback
+        }
       }
     }
 
-    let fkon = { key: { fromMe: false, participant: `0@s.whatsapp.net`, ...(m.chat ? { remoteJid: '0@s.whatsapp.net' } : {}) }, message: { contactMessage: { displayName: `${conn.getName(conn.user.jid)}`, vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;a,;;;\nFN:${conn.getName(conn.user.jid)}\nitem1.TEL;waid=${m.sender.split('@')[0]}:${m.sender.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`}}}
+    let fkon = { 
+      key: { 
+        fromMe: false, 
+        participant: `0@s.whatsapp.net`, 
+        ...(m.chat ? { remoteJid: '0@s.whatsapp.net' } : {}) 
+      }, 
+      message: { 
+        contactMessage: { 
+          displayName: `${conn.getName(conn.user.jid)}`, 
+          vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;a,;;;\nFN:${conn.getName(conn.user.jid)}\nitem1.TEL;waid=${m.sender.split('@')[0]}:${m.sender.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
+        }
+      }
+    }
 
-if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
-  if (!db.data.settings[conn.user.jid].thumbnail) {
-        conn.sendMessage(m.chat, {
-            text: textToSend,
-            contextInfo: {
-                mentionedJid: [m.sender],
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: global.info.channel,
-                    serverMessageId: null,
-                    newsletterName: global.info.namechannel,
-                },
-                externalAdReply: {
-                    showAdAttribution: false,
-                    title: global.info.namebot + ` © ` + year,
-                    body: '',
-                    mediaType: 1,
-                    sourceUrl: gcbot,
-                    renderLargerThumbnail: true,
-                    thumbnail: cachedThumbnail, // ← pindah ke sini, harus Buffer jpeg
-                }
-            },
-        }, { quoted: m });
-  } else {
-      conn.sendMessage(m.chat, { text: textToSend, contextInfo: { mentionedJid: [m.sender] }}, { quoted: m });
-  }
-} else await conn.sendMessage(m.chat, { 
-          image: { 
-             url: "https://files.catbox.moe/morbwn.mp4" 
-             }, 
-             fileName: wm, 
-             caption: textToSend, 
-                 contextInfo: { 
-                     mentionedJid: [m.sender] 
-                 }
-          }, { quoted: m });
+    // ✅ FIXED: Better device handling with proper fallbacks
+    const isAndroid = await getDevice(m.key.id) === 'android'
+    const hasSettings = db.data.settings?.[conn.user.jid]
+    const useThumbnail = hasSettings?.thumbnail !== false && isAndroid && cachedThumbnail?.length > 0
+
+    if (useThumbnail && !/all/.test(command)) {
+      // Send with thumbnail on Android
+      conn.sendMessage(m.chat, {
+        text: textToSend,
+        contextInfo: {
+          mentionedJid: [m.sender],
+          forwardedNewsletterMessageInfo: {
+            newsletterJid: global.info?.channel,
+            serverMessageId: null,
+            newsletterName: global.info?.namechannel,
+          },
+          externalAdReply: {
+            showAdAttribution: false,
+            title: `${global.info?.namebot || 'Bot'} © ${year}`,
+            body: '',
+            mediaType: 1,
+            sourceUrl: global.info?.gcbot || 'https://wa.me',
+            renderLargerThumbnail: true,
+            thumbnail: cachedThumbnail,
+          }
+        },
+      }, { quoted: m }).catch(err => {
+        console.error('Error sending with thumbnail:', err.message)
+        // Fallback to text-only
+        conn.sendMessage(m.chat, { 
+          text: textToSend, 
+          contextInfo: { mentionedJid: [m.sender] }
+        }, { quoted: m })
+      })
+    } else {
+      // Fallback: text-only or video format
+      conn.sendMessage(m.chat, { 
+        text: textToSend,
+        contextInfo: { mentionedJid: [m.sender] }
+      }, { quoted: m }).catch(err => {
+        console.error('Error sending menu:', err.message)
+      })
+    }
+    
   } catch (e) {
+    console.error('Menu handler error:', e)
     throw e
   }
   
@@ -291,66 +398,81 @@ if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
 };
 
 /**
- * Load and display ads from config
+ * Load and display ads from config with safe dividers
  */
 function displayAds(m, conn) {
   try {
-    const adsDir = './src/ads'
+    // ✅ FIXED: Better path resolution using fileURLToPath
+    const pluginDir = dirname(__dirname) // Go up to plugins parent
+    const adsDir = path.join(pluginDir, 'src', 'ads')
     const configPath = path.join(adsDir, 'config.json')
     
+    // Check if config exists before trying to read
     if (!fs.existsSync(configPath)) {
       // No ads config, try showing update instead
       displayUpdateNotification(m, conn)
       return
     }
 
-    const adsConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
-    const activeAds = Object.entries(adsConfig)
-      .filter(([_, ad]) => ad.active)
-      .map(([name, ad]) => ad)
+    try {
+      const adsConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+      const activeAds = Object.entries(adsConfig)
+        .filter(([_, ad]) => ad?.active)
+        .map(([name, ad]) => ad)
 
-    if (activeAds.length === 0) {
-      // No active ads, show update notification instead
-      displayUpdateNotification(m, conn)
-      return
-    }
+      if (activeAds.length === 0) {
+        // No active ads, show update notification instead
+        displayUpdateNotification(m, conn)
+        return
+      }
 
-    // Select random ad from active ones
-    const selectedAd = activeAds[Math.floor(Math.random() * activeAds.length)]
+      // Select random ad from active ones
+      const selectedAd = activeAds[Math.floor(Math.random() * activeAds.length)]
 
-    if (selectedAd.type === 'text') {
-      // Send text ad
-      conn.sendMessage(m.chat, {
-        text: `\n${'━'.repeat(30)}\n📢 *ADVERTISEMENT*\n${'━'.repeat(30)}\n\n${selectedAd.content}\n\n${'━'.repeat(30)}`
-      }, { quoted: m })
-    } else if (selectedAd.type === 'image' && selectedAd.path) {
-      // Send image ad with optional caption
-      if (fs.existsSync(selectedAd.path)) {
-        const caption = selectedAd.caption 
-          ? `📢 *ADVERTISEMENT*\n\n${selectedAd.caption}`
-          : `📢 *ADVERTISEMENT*`
+      if (selectedAd.type === 'text') {
+        // ✅ FIXED: Send text ad with safe dividers for WhatsApp mobile
+        const divider = createSafeDivider(25, 'box-top')
+        const dividerBot = createSafeDivider(25, 'box-bot')
+        const adContent = `\n${divider}\n📢 *ADVERTISEMENT*\n${dividerBot}\n\n${selectedAd.content}\n\n${divider}`
         
         conn.sendMessage(m.chat, {
-          image: fs.readFileSync(selectedAd.path),
-          caption: caption
-        }, { quoted: m })
+          text: adContent
+        }, { quoted: m }).catch(err => console.error('Error sending ad:', err.message))
+        
+      } else if (selectedAd.type === 'image' && selectedAd.path) {
+        // Send image ad with optional caption
+        if (fs.existsSync(selectedAd.path)) {
+          const divider = createSafeDivider(25, 'box-top')
+          const dividerBot = createSafeDivider(25, 'box-bot')
+          const caption = selectedAd.caption 
+            ? `${divider}\n📢 *ADVERTISEMENT*\n${dividerBot}\n\n${selectedAd.caption}`
+            : `${divider}\n📢 *ADVERTISEMENT*\n${dividerBot}`
+          
+          conn.sendMessage(m.chat, {
+            image: fs.readFileSync(selectedAd.path),
+            caption: caption
+          }, { quoted: m }).catch(err => console.error('Error sending image ad:', err.message))
+        }
       }
+    } catch (parseErr) {
+      console.error('Failed to parse ads config:', parseErr.message)
+      displayUpdateNotification(m, conn)
     }
   } catch (e) {
-    console.error('Error displaying ads:', e)
+    console.error('Error displaying ads:', e.message)
   }
 }
 
 handler.command = /^(menu|help|perintah)$/i
-handler.register = true;
+handler.register = true
 
-export default handler;
+export default handler
 
 const more = String.fromCharCode(8206)
 const readMore = more.repeat(4001)
 
 function wish() {
-    let wishloc = ''
+  let wishloc = ''
   const time = moment.tz('Asia/Jakarta').format('HH')
   wishloc = ('Hi')
   if (time >= 0) {
