@@ -9,7 +9,7 @@ let handler = async (m, { conn }) => {
     const result = await RPGHandler.handleAdventure(global.db, userId, userName, 1)
     m.reply(RPGHandler.formatActivityResult(result, userName))
   } catch (error) {
-    m.reply(? Error: )
+    m.reply('❌ Error: ' + error.message)
   }
 }
 handler.help = ['taxy']
