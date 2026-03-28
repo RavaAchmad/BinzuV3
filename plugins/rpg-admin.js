@@ -5,9 +5,20 @@ import rpgAdmin from "../lib/rpg-admin.js"
  * Owner commands to manage RPG settings and seasonal resets
  */
 
+const pendingSeasonReset = {}
+
 let handler = async (m, { command, args, usedPrefix, conn, isOwner }) => {
     if (!isOwner) {
         return m.reply('❌ Only owner can use this command!')
+    }
+
+    // Check if this is a reply-confirm for season reset
+    if (m.quoted && m.quoted.key && pendingSeasonReset[m.quoted.key.id]) {
+        const entry = pendingSeasonReset[m.quoted.key.id]
+        if (entry.user === m.sender && /^confirm$/i.test(m.text?.trim())) {
+            delete pendingSeasonReset[m.quoted.key.id]
+            return await executeSeasonReset(m, conn, usedPrefix)
+        }
     }
 
     const subcommand = (args[0] || 'menu').toLowerCase()
@@ -33,9 +44,10 @@ ${usedPrefix}rpgadmin multiplier [type] [value] - Set reward multiplier
 ${usedPrefix}rpgadmin event [on/off] - Toggle event mode
 ${usedPrefix}rpgadmin eventbonus [multiplier] - Set event bonus (1.5-5.0)
 
-🔄 *Season Management:*
+🔄 *Season Management (Reset tiap 2 bulan):*
 ${usedPrefix}rpgadmin season check - Check season info
-${usedPrefix}rpgadmin season reset - Execute season reset
+${usedPrefix}rpgadmin season reset - Konfirmasi season reset
+${usedPrefix}rpgadmin season execute - Langsung execute reset
 ${usedPrefix}rpgadmin season preview - Preview reset results
 ${usedPrefix}rpgadmin season manual [number] - Manually set season
 
@@ -150,7 +162,7 @@ Days Until Reset: ${daysLeft}
 Reset Date: ${resetDate.toLocaleDateString('id-ID')}
 
 Last Reset: ${new Date(rpgAdmin.settings.lastSeasonReset).toLocaleDateString('id-ID')}
-Reset Interval: 6 months
+Reset Interval: 2 bulan
 
 ${daysLeft < 7 ? '⚠️ SEASON RESET COMING SOON!' : 'ℹ️ Season is stable'}
 `)
@@ -169,24 +181,33 @@ ${daysLeft < 7 ? '⚠️ SEASON RESET COMING SOON!' : 'ℹ️ Season is stable'}
             }
 
             if (action === 'reset') {
-                // Confirm reset is needed
-                const text = `
+                const confirmText = `
 ⚠️ *SEASON RESET CONFIRMATION*
 
-This will:
-✓ Archive current season data
-✓ Give rewards to top 3 players
+Ini akan:
+✓ Archive data season saat ini
+✓ Beri rewards ke top 3 players
 ✓ Reset daily/weekly/seasonal leaderboards
 ✓ Keep all-time leaderboard
 ✓ Reset daily missions
-✓ Increment season to ${rpgAdmin.settings.currentSeason + 1}
-
-*REPLY WITH: confirm*
-Type this to confirm season reset!
+✓ Season naik ke ${rpgAdmin.settings.currentSeason + 1}
 
 ${rpgAdmin.formatSeasonResetPreview(Object.values(global.db.data.leaderboards?.alltime || {}).sort((a, b) => b.exp - a.exp))}
+
+*⚡ Balas pesan ini dengan:* confirm
+*atau ketik:* ${usedPrefix}rpgadmin season execute
 `
-                return m.reply(text)
+                const sent = await conn.sendMessage(m.chat, { text: confirmText.trim() }, { quoted: m })
+                if (sent?.key?.id) {
+                    pendingSeasonReset[sent.key.id] = { user: m.sender, timestamp: Date.now() }
+                    // Auto-expire after 5 minutes
+                    setTimeout(() => delete pendingSeasonReset[sent.key.id], 300000)
+                }
+                return
+            }
+
+            if (action === 'execute') {
+                return await executeSeasonReset(m, conn, usedPrefix)
             }
 
             if (action === 'manual') {
@@ -207,28 +228,16 @@ Actions: check, preview, reset, manual [number]
 
         case 'stats':
         case 'statistik': {
-            let statusMsg = await conn.sendMessage(m.chat, { text: '⏳ Loading RPG statistics...' }, { quoted: m })
-
             try {
-                await conn.sendMessage(m.chat, {
-                    text: '⏳ Calculating player data...',
-                    edit: statusMsg.key
-                })
-
                 const users = global.db.data.users || {}
                 const totalPlayers = Object.keys(users).length
                 const totalExp = Object.values(users).reduce((sum, u) => sum + (u.exp || 0), 0)
                 const totalMoney = Object.values(users).reduce((sum, u) => sum + (u.money || 0), 0)
                 const totalDiamond = Object.values(users).reduce((sum, u) => sum + (u.diamond || 0), 0)
                 const totalLevel = Object.values(users).reduce((sum, u) => sum + (u.level || 1), 0)
-                const avgLevel = Math.round(totalLevel / totalPlayers)
+                const avgLevel = totalPlayers ? Math.round(totalLevel / totalPlayers) : 0
 
-                await conn.sendMessage(m.chat, {
-                    text: '⏳ Formatting statistics...',
-                    edit: statusMsg.key
-                })
-
-                const reply = `
+                return m.reply(`
 📊 *RPG STATISTICS*
 
 👥 *Player Stats:*
@@ -240,39 +249,24 @@ Actions: check, preview, reset, manual [number]
 ├─ Total Money: ${totalMoney.toLocaleString('id-ID')}
 ├─ Total Diamond: ${totalDiamond}
 ├─ Total Exp: ${totalExp.toLocaleString('id-ID')}
-└─ Avg per Player: ${Math.round(totalMoney / totalPlayers)} money
+└─ Avg per Player: ${totalPlayers ? Math.round(totalMoney / totalPlayers) : 0} money
 
 🎮 *Game Status:*
 ├─ RPG Enabled: ${rpgAdmin.settings.rpgEnabled ? '✅' : '❌'}
 ├─ Event Active: ${rpgAdmin.settings.eventActive ? '✅' : '❌'}
 ├─ Season: ${rpgAdmin.settings.currentSeason}
 └─ Days to Reset: ${rpgAdmin.daysUntilSeasonReset()}
-`
-
-                await conn.sendMessage(m.chat, {
-                    text: reply,
-                    edit: statusMsg.key
-                })
+`)
 
             } catch (error) {
                 console.error('Error in admin stats:', error)
-                await conn.sendMessage(m.chat, {
-                    text: '❌ Error loading statistics',
-                    edit: statusMsg.key
-                })
+                return m.reply('❌ Error loading statistics')
             }
         }
 
         case 'topplayers':
         case 'topemain': {
-            let statusMsg = await conn.sendMessage(m.chat, { text: '⏳ Fetching player rankings...' }, { quoted: m })
-
             try {
-                await conn.sendMessage(m.chat, {
-                    text: '⏳ Sorting player data...',
-                    edit: statusMsg.key
-                })
-
                 const users = global.db.data.users || {}
                 const sorted = Object.entries(users)
                     .map(([id, user]) => ({
@@ -286,18 +280,7 @@ Actions: check, preview, reset, manual [number]
                     .sort((a, b) => b.level - a.level || b.exp - a.exp)
                     .slice(0, 10)
 
-                if (sorted.length === 0) {
-                    await conn.sendMessage(m.chat, {
-                        text: 'No players found',
-                        edit: statusMsg.key
-                    })
-                    return
-                }
-
-                await conn.sendMessage(m.chat, {
-                    text: '⏳ Formatting leaderboard...',
-                    edit: statusMsg.key
-                })
+                if (sorted.length === 0) return m.reply('No players found')
 
                 let text = '🏆 *TOP 10 PLAYERS*\n\n'
                 sorted.forEach((p, idx) => {
@@ -305,17 +288,11 @@ Actions: check, preview, reset, manual [number]
                     text += `   Lvl ${p.level} | EXP: ${p.exp.toLocaleString('id-ID')} | 💎 ${p.diamond}\n\n`
                 })
 
-                await conn.sendMessage(m.chat, {
-                    text: text,
-                    edit: statusMsg.key
-                })
+                return m.reply(text)
 
             } catch (error) {
                 console.error('Error in topplayers:', error)
-                await conn.sendMessage(m.chat, {
-                    text: '❌ Error loading leaderboard',
-                    edit: statusMsg.key
-                })
+                return m.reply('❌ Error loading leaderboard')
             }
         }
 
@@ -330,3 +307,70 @@ handler.command = /^(rpgadmin|adminrpg)$/i
 handler.owner = true
 
 export default handler
+
+async function executeSeasonReset(m, conn, usedPrefix) {
+    try {
+        const users = global.db.data.users || {}
+        const leaderboards = global.db.data.leaderboards || {}
+        const leaderboardData = Object.values(leaderboards.alltime || {})
+            .sort((a, b) => b.exp - a.exp)
+
+        const result = rpgAdmin.executeSeasonReset(users, leaderboardData, leaderboards)
+
+        if (!result.success) {
+            return m.reply(`❌ Season reset gagal!\nError: ${result.error}`)
+        }
+
+        // Build reward report
+        let rewardReport = ''
+        if (result.actions.rewardsApplied?.length > 0) {
+            rewardReport = result.actions.rewardsApplied.map(r => 
+                `🏅 *#${r.rank}* ${r.playerName}\n   └─ ${Object.entries(r.reward).map(([k, v]) => `${v}x ${k}`).join(', ')}`
+            ).join('\n')
+        }
+
+        // Broadcast season reset announcement to all groups
+        const groups = Object.entries(conn.chats)
+            .filter(([jid, chat]) => jid.endsWith('@g.us') && chat.isChats && !chat.metadata?.read_only && !chat.metadata?.announce)
+            .map(v => v[0])
+
+        const announcement = `
+🔄 *SEASON ${result.season} TELAH BERAKHIR!*
+
+🎊 Selamat kepada top players!
+
+${rewardReport || '_Tidak ada rewards_'}
+
+🆕 *Season ${result.actions.newSeason} dimulai sekarang!*
+Semua leaderboard seasonal telah direset.
+Ayo mainkan RPG dan raih peringkat tertinggi! 🏆
+
+_Good luck, adventurers!_ ⚔️
+`.trim()
+
+        for (const id of groups) {
+            try {
+                await conn.sendMessage(id, { text: announcement })
+            } catch (_) {}
+            await new Promise(r => setTimeout(r, 3000))
+        }
+
+        return m.reply(`
+✅ *SEASON RESET BERHASIL!*
+
+📊 *Report:*
+├─ Old Season: ${result.season}
+├─ New Season: ${result.actions.newSeason}
+├─ Rewards Distributed: ${result.actions.rewardsApplied?.length || 0} players
+├─ Leaderboards Reset: ${result.actions.resetLeaderboards?.join(', ') || 'none'}
+├─ Missions Reset: ${result.actions.missionsReset || 0} players
+└─ Broadcast: ${groups.length} groups
+
+${rewardReport ? `\n🏆 *Rewarded Players:*\n${rewardReport}` : ''}
+`.trim())
+
+    } catch (error) {
+        console.error('Season reset error:', error)
+        return m.reply(`❌ Error: ${error.message}`)
+    }
+}

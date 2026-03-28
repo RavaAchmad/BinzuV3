@@ -3,10 +3,10 @@ let handler = async (m, { conn, command }) => {
     let randomaku = Math.floor(Math.random() * 101)
     let randomkamu = Math.floor(Math.random() * 101)
     let __timers = (new Date - user.lastbansos)
-    let _timers = (3600000 - __timers) 
+    let _timers = (120000 - __timers) 
     let timers = clockString(_timers)
     if (user.money < 3000000) return m.reply(`Uang Anda Harus Diatas 3Juta Untuk Menggunakan Command Ini`)
-    if (new Date - user.lastbansos > 300000) {
+    if (new Date - user.lastbansos > 120000) {
       if (randomaku > randomkamu) {
         conn.sendFile(m.chat, 'https://telegra.ph/file/afcf9a7f4e713591080b5.jpg', 'korupsi.jpg', `Kamu Tertangkap Setelah Kamu korupsi dana bansos🕴️💰,  Dan Kamu harus membayar denda 3 Juta rupiah💵`, m)
         user.money -= 3000000

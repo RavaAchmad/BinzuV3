@@ -1,9 +1,6 @@
 import fetch from "node-fetch"
 import crateSystem from "../lib/crate-system.js"
 
-// keep track of pending crate-opening confirmations keyed by warning message id
-const pendingConfirms = {}
-
 const tfinventory = {
   others: {
     money: true,
@@ -100,27 +97,8 @@ let handler = async (m, { command, args, usedPrefix, conn }) => {
     
     const listCrate = Object.fromEntries(Object.entries(rewards).filter(([v]) => v && v in user))
     
-    // parse parameters (may be replaced by stored values when reply-confirm is used)
     let type = (args[0] || '').toLowerCase()
     let count = Math.floor(isNumber(args[1]) ? Math.max(parseInt(args[1]), 1) : 1) * 1
-
-    // check for stored context in case user replied to the warning message
-    let isReplyConfirm = false
-    if (m.quoted && m.quoted.key && pendingConfirms[m.quoted.key.id]) {
-        const entry = pendingConfirms[m.quoted.key.id]
-        if (entry.user === m.sender && /confirm/i.test(m.text)) {
-            isReplyConfirm = true
-            // restore original parameters
-            type = entry.type
-            count = entry.count
-            // clear the pending entry once used
-            delete pendingConfirms[m.quoted.key.id]
-        }
-    }
-
-    // confirmation helpers (command arg or reply to warning)
-    const confirmArg = args[2]?.toLowerCase()
-    const repliedConfirm = isReplyConfirm
 
     // Show info if no type provided
     if (!type) {
@@ -147,7 +125,6 @@ ${usedPrefix}open legendary 1
 ⮕ Luck multiplier increases with consecutive opens (Max 2.5x)
 ⮕ First open of day gives +50% bonus!
 ⮕ Pity counter guarantees rare items every X opens
-⚠️ *Max 10 opens per sekali! Lebih dari itu perlu warning*
 `.trim()
         return await conn.reply(m.chat, info, m, {
             contextInfo: {
@@ -165,29 +142,8 @@ ${usedPrefix}open legendary 1
         })
     }
 
-    // ⚠️ WARNING: Jika count > 10 dan belum dikonfirmasi
-    const isConfirmed = confirmArg === 'confirm' || repliedConfirm
-    if (count > 10 && !isConfirmed) {
-        let warningMsg = `
-⚠️ *PERHATIAN!*
-
-Anda ingin membuka ${count}x ${global.rpg.emoticon(type)} ${type} crate
-
-*⚡ PEMBERITAHUAN:*
-• Jangan close chat atau restart bot sampai selesai
-• Crate akan langsung dikurangi dari inventory
-
-Apakah Anda yakin? 
-
-*Ketik:* ${usedPrefix}open ${type} ${count} confirm
-*atau* balas pesan ini dengan "confirm"
-`.trim()
-        const sent = await m.reply(warningMsg)
-        if (sent && sent.key && sent.key.id) {
-            pendingConfirms[sent.key.id] = { user: m.sender, type, count }
-        }
-        return
-    }
+    // Cap max opens at 50 per command
+    if (count > 50) count = 50
 
     if (!(type in listCrate)) {
         return m.reply(`❌ Crate *${type}* tidak ditemukan! Available: ${Object.keys(listCrate).join(', ')}`)
@@ -201,14 +157,6 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
 `.trim())
     }
 
-    const originalCount = user[type]  
-
-    
-    // Create status message
-    let statusMsg = await conn.sendMessage(m.chat, {
-        text: `⏳ ${global.rpg.emoticon(type)} Membuka ${count}x ${type} crate...\n\n🔄 Silahkan tunggu...`
-    }, { quoted: m })
-
     try {
         // Update luck system
         const luck = crateSystem.updateLuck(m.sender)
@@ -216,27 +164,10 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
         
         let totalReward = {}
         let guaranteedRewards = []
-        let openedCount = 0
-        // map of revealed items to stack counts for progress display
-        let revealedMap = {}
-        user.crateProgress = { type, total: count, opened: 0 }
 
-        // Process each crate opening WITH ANIMATION but batch progress updates every 10 crates
+        // Process all crates instantly (no animation delay)
         for (let i = 0; i < count; i++) {
             user[type] -= 1
-            openedCount++
-            user.crateProgress.opened = openedCount
-
-            // Wait 400ms before revealing next item
-                await Promise.race([
-                new Promise(resolve => setTimeout(resolve, 500)),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
-            ])
-
-            // helper to record item in revealedMap
-            const addReveal = (label, amt = 1) => {
-                revealedMap[label] = (revealedMap[label] || 0) + amt
-            }
 
             // Check for guaranteed reward
             const guaranteed = crateSystem.checkPityGuarantee(m.sender, type)
@@ -245,13 +176,11 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
                 if (guaranteed.type === 'crate_drop') {
                     user[guaranteed.item] = (user[guaranteed.item] || 0) + guaranteed.amount
                     totalReward[guaranteed.item] = (totalReward[guaranteed.item] || 0) + guaranteed.amount
-                    addReveal(`🎁 ${guaranteed.amount}x ${guaranteed.item}`, 1)
                 } else if (guaranteed.type === 'mix') {
                     for (const [item, amount] of Object.entries(guaranteed.items)) {
                         if (item in user) {
                             user[item] = (user[item] || 0) + amount
                             totalReward[item] = (totalReward[item] || 0) + amount
-                            addReveal(`🎁 ${amount}x ${item}`, 1)
                         }
                     }
                 }
@@ -264,25 +193,9 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
                             const finalAmount = crateSystem.calculateReward(baseAmount, m.sender)
                             user[reward] = (user[reward] || 0) + finalAmount
                             totalReward[reward] = (totalReward[reward] || 0) + finalAmount
-                            addReveal(`✨ ${finalAmount}x ${global.rpg.emoticon(reward)} ${reward}`, 1)
                         }
                     }
                 }
-            }
-
-            // update progress message every 10 crates or on last iteration
-            if (openedCount % 10 === 0 || openedCount === count) {
-                let animatedText = `🎁 *Opening ${count}x ${type} Crate*\n`
-                animatedText += `Progress: [${('█'.repeat(Math.floor((openedCount / count) * 10)) + '░'.repeat(10 - Math.floor((openedCount / count) * 10)))}] ${openedCount}/${count}\n\n`
-                animatedText += `📦 *Items Revealed:*\n`
-                // show stacked revealedMap entries
-                animatedText += Object.entries(revealedMap).map(([label, amt]) => `${label}`).join('\n')
-                animatedText += `\n\n⏳ Opening...`
-
-                await conn.sendMessage(m.chat, {
-                    text: animatedText,
-                    edit: statusMsg.key
-                })
             }
         }
 
@@ -298,7 +211,7 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
             bonusMessage = `\n✨ ${dailyBonus.message} ✨`
         }
 
-        // Add guaranteed rewards notification (aggregate identical items and format inline)
+        // Add guaranteed rewards notification
         if (guaranteedRewards.length > 0) {
             const agg = {}
             const mixes = []
@@ -313,12 +226,12 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
             for (const [item, amt] of Object.entries(agg)) {
                 parts.push(`📦${amt}x ${item}`)
             }
-            parts.push(...mixes.map(m => `✨${m}`))
+            parts.push(...mixes.map(mx => `✨${mx}`))
             const stacked = parts.join(', ')
             rewardText += `\n\n🎁 *GUARANTEED REWARDS:* ${stacked}`
         }
 
-        // Final result
+        // Send single result message
         let result = `
 ✅ *Selesai! ${count}x ${type} Crate Terbuka*
 🎊 ${crateSystem.getOpeningAnimation(count)}
@@ -337,24 +250,16 @@ ${bonusMessage}
 ${crateSystem.playerPity[m.sender][type] === 0 && guaranteedRewards.length > 0 ? '⚡ Pity Counter Reset!' : ''}
 `.trim()
 
-        // Final update with complete results
-        await conn.sendMessage(m.chat, {
-            text: result,
-            edit: statusMsg.key
-        })
+        m.reply(result)
 
     } catch (error) {
         console.error('Error in open crate:', error)
-        await conn.sendMessage(m.chat, {
-            text: '❌ Terjadi error saat membuka crate. Crate sudah dikurangi dari inventory.\n\nBerhasil membuka ${openedCount}/${count} crate.',
-            edit: statusMsg.key
-        })
+        m.reply('❌ Terjadi error saat membuka crate.')
     }
 }
 handler.help = ['open'].map(v => v + ' [crate] [count]')
 handler.tags = ['rpg']
-// allow running when user replies with just "confirm" to a warning, or normal open/gacha commands
-handler.command = /^((open|buka|gacha)( .*)?|confirm)$/i
+handler.command = /^(open|buka|gacha)$/i
 handler.register = true
 handler.group = true
 handler.rpg = true

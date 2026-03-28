@@ -13,7 +13,7 @@ let handler = async(m, { conn, usedPrefix, command, text }) => {
     conn.room = conn.room ? conn.room: {}
     if (Object.values(conn.room).find(room => room.id.startsWith('dungeon') && [room.game.player1, room.game.player2, room.game.player3, room.game.player4].includes(m.sender))) return m.reply('Kamu masih di dalam Dungeon') // nek iseh neng njero dungeon
     let timing = (new Date - (user.lastdungeon * 1)) * 1
-    if (timing < 600000) return m.reply(`*––––––『 COOLDOWN 』––––––*\nʏᴏᴜ ʜᴀᴠᴇ ɢᴏɴᴇ ᴛᴏ ᴛʜᴇ ᴅᴜɴɢᴇᴏɴ, please wait...\n➞ ${clockString(600000 - timing)}`) // Cooldown
+    if (timing < 120000) return m.reply(`*––––––『 COOLDOWN 』––––––*\nʏᴏᴜ ʜᴀᴠᴇ ɢᴏɴᴇ ᴛᴏ ᴛʜᴇ ᴅᴜɴɢᴇᴏɴ, please wait...\n➞ ${clockString(120000 - timing)}`) // Cooldown 2 min
     let room = Object.values(conn.room).find(room => room.state === 'WAITING' && (text ? room.name === text : true))
     if (room) {
         // Biar simple :v

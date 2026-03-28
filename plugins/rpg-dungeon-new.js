@@ -30,7 +30,7 @@ let handler = async (m, { conn, text, args }) => {
       chatId: m.chat,
       timeout: setTimeout(() => {
         delete global.activeCombats[m.sender]
-      }, 300000) // 5 minute timeout
+      }, 180000) // 3 minute timeout
     }
 
     // Display combat start

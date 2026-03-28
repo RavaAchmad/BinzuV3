@@ -23,9 +23,9 @@ let pesan = pickRandom(['ɴʏᴜᴍᴍᴍ~', 'ᴛʜᴀɴᴋs', 'ᴛʜᴀɴᴋʏ�
             if (rubah == 0) return m.reply('ʏᴏᴜ ᴅᴏɴ\'ᴛ ʜᴀᴠᴇ ᴛʜɪs ᴘᴇᴛ ʏᴇᴛ!')
             if (rubah == 10) return m.reply('ʏᴏᴜʀ ᴘᴇᴛ ɪs ᴍᴀx ʟᴇᴠᴇʟ !')
             let __waktur = (new Date - user.foxlastfeed)
-            let _waktur = (600000 - __waktur)
+            let _waktur = (180000 - __waktur)
             let waktur = clockString(_waktur)
-            if (new Date - user.foxlastfeed > 600000) {
+            if (new Date - user.foxlastfeed > 180000) {
                 if (user.petfood > 0) {
                     user.petfood -= 1
                     user.foxexp += 20
@@ -46,9 +46,9 @@ let pesan = pickRandom(['ɴʏᴜᴍᴍᴍ~', 'ᴛʜᴀɴᴋs', 'ᴛʜᴀɴᴋʏ�
             if (kucing == 0) return m.reply('ʏᴏᴜ ᴅᴏɴ\'ᴛ ʜᴀᴠᴇ ᴛʜɪs ᴘᴇᴛ ʏᴇᴛ!')
             if (kucing == 10) return m.reply('ʏᴏᴜʀ ᴘᴇᴛ ɪs ᴍᴀx ʟᴇᴠᴇʟ !')
             let __waktuc = (new Date - user.catlastfeed)
-            let _waktuc = (600000 - __waktuc)
+            let _waktuc = (180000 - __waktuc)
             let waktuc = clockString(_waktuc)
-            if (new Date - user.catlastfeed > 600000) {
+            if (new Date - user.catlastfeed > 180000) {
                 if (user.petfood > 0) {
                     user.petfood -= 1
                     user.catexp += 20
@@ -70,9 +70,9 @@ let pesan = pickRandom(['ɴʏᴜᴍᴍᴍ~', 'ᴛʜᴀɴᴋs', 'ᴛʜᴀɴᴋʏ�
             if (anjing == 0) return m.reply('ʏᴏᴜ ᴅᴏɴ\'ᴛ ʜᴀᴠᴇ ᴛʜɪs ᴘᴇᴛ ʏᴇᴛ!')
             if (anjing == 10) return m.reply('ʏᴏᴜʀ ᴘᴇᴛ ɪs ᴍᴀx ʟᴇᴠᴇʟ !')
             let __waktua = (new Date - user.doglastfeed)
-            let _waktua = (600000 - __waktua)
+            let _waktua = (180000 - __waktua)
             let waktua = clockString(_waktua)
-            if (new Date - user.doglastfeed > 600000) {
+            if (new Date - user.doglastfeed > 180000) {
                 if (user.petfood > 0) {
                     user.petfood -= 1
                     user.dogexp += 20
@@ -93,9 +93,9 @@ let pesan = pickRandom(['ɴʏᴜᴍᴍᴍ~', 'ᴛʜᴀɴᴋs', 'ᴛʜᴀɴᴋʏ�
             if (kuda == 0) return m.reply('ʏᴏᴜ ᴅᴏɴ\'ᴛ ʜᴀᴠᴇ ᴛʜɪs ᴘᴇᴛ ʏᴇᴛ!')
             if (kuda == 10) return m.reply('ʏᴏᴜʀ ᴘᴇᴛ ɪs ᴍᴀx ʟᴇᴠᴇʟ !')
             let __waktuk = (new Date - user.horselastfeed)
-            let _waktuk = (600000 - __waktuk)
+            let _waktuk = (180000 - __waktuk)
             let waktuk = clockString(_waktuk)
-            if (new Date - user.horselastfeed > 600000) {
+            if (new Date - user.horselastfeed > 180000) {
                 if (user.petfood > 0) {
                     user.petfood -= 1
                     user.horseexp += 20
@@ -116,9 +116,9 @@ let pesan = pickRandom(['ɴʏᴜᴍᴍᴍ~', 'ᴛʜᴀɴᴋs', 'ᴛʜᴀɴᴋʏ�
             if (robot == 0) return m.reply('ʏᴏᴜ ᴅᴏɴ\'ᴛ ʜᴀᴠᴇ ᴛʜɪs ᴘᴇᴛ ʏᴇᴛ!')
             if (robot == 10) return m.reply('ʏᴏᴜʀ ᴘᴇᴛ ɪs ᴍᴀx ʟᴇᴠᴇʟ !')
             let __wakturb = (new Date - user.robolastfeed)
-            let _wakturb = (600000 - __wakturb)
+            let _wakturb = (180000 - __wakturb)
             let wakturb = clockString(_wakturb)
-            if (new Date - user.robolastfeed > 600000) {
+            if (new Date - user.robolastfeed > 180000) {
                 if (user.petfood > 0) {
                     user.petfood -= 1
                     user.roboexp += 20

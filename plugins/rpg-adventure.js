@@ -4,7 +4,7 @@
  */
 import { RPGHandler } from '../lib/rpg-handler.js'
 
-const cooldown = 86400000 // 24 hours
+const cooldown = 120000 // 2 minutes - real cooldown handled by RPGHandler
 
 let handler = async (m, { conn }) => {
   try {
