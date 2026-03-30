@@ -1,24 +1,16 @@
 import rpgAdmin from "../lib/rpg-admin.js"
 
 /**
- * RPG Admin Control Plugin
- * Owner commands to manage RPG settings and seasonal resets
+ * RPG Admin Control Plugin v2.0
+ * Full season wipe + MLBB rewards + season fix
+ * Confirm pattern: conn.game (like game-asahotak.js)
  */
 
-const pendingSeasonReset = {}
+const CONFIRM_TIMEOUT = 300000 // 5 menit
 
 let handler = async (m, { command, args, usedPrefix, conn, isOwner }) => {
     if (!isOwner) {
         return m.reply('❌ Only owner can use this command!')
-    }
-
-    // Check if this is a reply-confirm for season reset
-    if (m.quoted && m.quoted.key && pendingSeasonReset[m.quoted.key.id]) {
-        const entry = pendingSeasonReset[m.quoted.key.id]
-        if (entry.user === m.sender && /^confirm$/i.test(m.text?.trim())) {
-            delete pendingSeasonReset[m.quoted.key.id]
-            return await executeSeasonReset(m, conn, usedPrefix)
-        }
     }
 
     const subcommand = (args[0] || 'menu').toLowerCase()
@@ -35,31 +27,29 @@ ${rpgAdmin.formatSettings()}
 📋 *AVAILABLE COMMANDS:*
 
 ⚙️ *Settings:*
-${usedPrefix}rpgadmin settings - View all settings
-${usedPrefix}rpgadmin toggle - Enable/disable RPG
-${usedPrefix}rpgadmin multiplier [type] [value] - Set reward multiplier
-  └─ Types: diamond, exp, money (value 0.5-3.0)
+• ${usedPrefix}rpgadmin settings
+• ${usedPrefix}rpgadmin toggle
+• ${usedPrefix}rpgadmin multiplier [type] [value]
 
 🎉 *Events:*
-${usedPrefix}rpgadmin event [on/off] - Toggle event mode
-${usedPrefix}rpgadmin eventbonus [multiplier] - Set event bonus (1.5-5.0)
+• ${usedPrefix}rpgadmin event [on/off]
+• ${usedPrefix}rpgadmin eventbonus [1.5-5.0]
 
-🔄 *Season Management (Reset tiap 2 bulan):*
-${usedPrefix}rpgadmin season check - Check season info
-${usedPrefix}rpgadmin season reset - Konfirmasi season reset
-${usedPrefix}rpgadmin season execute - Langsung execute reset
-${usedPrefix}rpgadmin season preview - Preview reset results
-${usedPrefix}rpgadmin season manual [number] - Manually set season
+🔄 *Season (Reset tiap 2 bulan, FULL WIPE):*
+• ${usedPrefix}rpgadmin season check
+• ${usedPrefix}rpgadmin season preview
+• ${usedPrefix}rpgadmin season reset _(konfirmasi)_
+• ${usedPrefix}rpgadmin season execute _(langsung)_
+• ${usedPrefix}rpgadmin season manual [number]
+• ${usedPrefix}rpgadmin season rewards _(lihat reward table)_
+
+🔧 *Season Fix:*
+• ${usedPrefix}rpgadmin fix rewards [season] _(re-apply rewards)_
+• ${usedPrefix}rpgadmin fix wipe [jid] _(re-wipe 1 user)_
 
 📊 *Statistics:*
-${usedPrefix}rpgadmin stats - View RPG statistics
-${usedPrefix}rpgadmin topplayers - View top 10 players
-
-⚡ *EXAMPLES:*
-${usedPrefix}rpgadmin multiplier diamond 1.5
-${usedPrefix}rpgadmin event on
-${usedPrefix}rpgadmin eventbonus 2.0
-${usedPrefix}rpgadmin season reset
+• ${usedPrefix}rpgadmin stats
+• ${usedPrefix}rpgadmin topplayers
 `.trim())
         }
 
@@ -71,11 +61,7 @@ ${usedPrefix}rpgadmin season reset
         case 'toggle':
         case 'aktif': {
             rpgAdmin.updateSetting('rpgEnabled', !rpgAdmin.settings.rpgEnabled)
-            return m.reply(`
-✅ *RPG Status Changed*
-
-RPG is now: ${rpgAdmin.settings.rpgEnabled ? '✅ ENABLED' : '❌ DISABLED'}
-`)
+            return m.reply(`✅ RPG is now: ${rpgAdmin.settings.rpgEnabled ? '✅ ENABLED' : '❌ DISABLED'}`)
         }
 
         case 'multiplier':
@@ -90,13 +76,7 @@ RPG is now: ${rpgAdmin.settings.rpgEnabled ? '✅ ENABLED' : '❌ DISABLED'}
             const typeKey = `${type}RateMultiplier`
             if (typeKey in rpgAdmin.settings) {
                 rpgAdmin.updateSetting(typeKey, value)
-                return m.reply(`
-✅ *Multiplier Updated*
-
-Type: ${type}
-New Value: ${value}x
-Old Value: ${rpgAdmin.settings[typeKey]}x
-`)
+                return m.reply(`✅ ${type} multiplier set to ${value}x`)
             }
 
             return m.reply('❌ Unknown multiplier type! Available: diamond, exp, money')
@@ -108,22 +88,10 @@ Old Value: ${rpgAdmin.settings[typeKey]}x
 
             if (status === 'on' || status === 'mulai') {
                 rpgAdmin.updateSetting('eventActive', true)
-                return m.reply(`
-✅ *Event Activated*
-
-Event Mode: ✅ ON
-Current Bonus: ${(rpgAdmin.settings.eventBonus - 1) * 100}% extra rewards
-
-All rewards will be multiplied by ${rpgAdmin.settings.eventBonus}x!
-`)
+                return m.reply(`✅ *Event Activated!* Bonus: ${rpgAdmin.settings.eventBonus}x rewards`)
             } else if (status === 'off' || status === 'stop') {
                 rpgAdmin.updateSetting('eventActive', false)
-                return m.reply(`
-✅ *Event Deactivated*
-
-Event Mode: ❌ OFF
-Rewards are back to normal multiplier
-`)
+                return m.reply(`✅ *Event Deactivated.* Rewards back to normal.`)
             }
 
             return m.reply('Usage: ' + usedPrefix + 'rpgadmin event [on/off]')
@@ -138,12 +106,7 @@ Rewards are back to normal multiplier
             }
 
             rpgAdmin.updateSetting('eventBonus', bonus)
-            return m.reply(`
-✅ *Event Bonus Updated*
-
-New Bonus: ${bonus}x (${(bonus - 1) * 100}% extra)
-Effect: All rewards × ${bonus} during event
-`)
+            return m.reply(`✅ Event bonus set to ${bonus}x (${(bonus - 1) * 100}% extra)`)
         }
 
         case 'season':
@@ -155,54 +118,58 @@ Effect: All rewards × ${bonus} during event
                 const resetDate = new Date(rpgAdmin.settings.lastSeasonReset + rpgAdmin.settings.seasonResetInterval)
 
                 return m.reply(`
-📊 *SEASON INFORMATION*
+📊 *SEASON ${rpgAdmin.settings.currentSeason} INFO*
 
-Current Season: ${rpgAdmin.settings.currentSeason}
-Days Until Reset: ${daysLeft}
-Reset Date: ${resetDate.toLocaleDateString('id-ID')}
+⏰ Sisa waktu: *${daysLeft} hari*
+📅 Reset: *${resetDate.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}*
+📆 Last Reset: ${new Date(rpgAdmin.settings.lastSeasonReset).toLocaleDateString('id-ID')}
+🔄 Interval: 2 bulan
 
-Last Reset: ${new Date(rpgAdmin.settings.lastSeasonReset).toLocaleDateString('id-ID')}
-Reset Interval: 2 bulan
-
-${daysLeft < 7 ? '⚠️ SEASON RESET COMING SOON!' : 'ℹ️ Season is stable'}
+${daysLeft <= 7 ? '🚨 *SEASON RESET SEGERA!*' : daysLeft <= 30 ? '⚠️ Kurang dari 1 bulan lagi!' : 'ℹ️ Season masih berjalan'}
 `)
             }
 
             if (action === 'preview') {
-                // Get leaderboard data from global db
-                let leaderboardData = []
-                if (global.db.data.leaderboards?.alltime) {
-                    leaderboardData = Object.values(global.db.data.leaderboards.alltime)
-                        .sort((a, b) => b.exp - a.exp)
-                        .slice(0, 10)
-                }
+                const users = global.db.data.users || {}
+                return m.reply(rpgAdmin.formatSeasonResetPreview(users))
+            }
 
-                return m.reply(rpgAdmin.formatSeasonResetPreview(leaderboardData))
+            if (action === 'rewards' || action === 'reward') {
+                return m.reply(rpgAdmin.formatRewardTable())
             }
 
             if (action === 'reset') {
-                const confirmText = `
-⚠️ *SEASON RESET CONFIRMATION*
-
-Ini akan:
-✓ Archive data season saat ini
-✓ Beri rewards ke top 3 players
-✓ Reset daily/weekly/seasonal leaderboards
-✓ Keep all-time leaderboard
-✓ Reset daily missions
-✓ Season naik ke ${rpgAdmin.settings.currentSeason + 1}
-
-${rpgAdmin.formatSeasonResetPreview(Object.values(global.db.data.leaderboards?.alltime || {}).sort((a, b) => b.exp - a.exp))}
-
-*⚡ Balas pesan ini dengan:* confirm
-*atau ketik:* ${usedPrefix}rpgadmin season execute
-`
-                const sent = await conn.sendMessage(m.chat, { text: confirmText.trim() }, { quoted: m })
-                if (sent?.key?.id) {
-                    pendingSeasonReset[sent.key.id] = { user: m.sender, timestamp: Date.now() }
-                    // Auto-expire after 5 minutes
-                    setTimeout(() => delete pendingSeasonReset[sent.key.id], 300000)
+                conn.game = conn.game ? conn.game : {}
+                let gameId = 'seasonreset-' + m.chat
+                if (gameId in conn.game) {
+                    return m.reply('⚠️ Masih ada konfirmasi season reset yang pending di chat ini!')
                 }
+
+                const users = global.db.data.users || {}
+                const confirmText = `
+⚠️ *FULL SEASON RESET — KONFIRMASI*
+
+🚨 *INI AKAN MENGHAPUS SEMUA DATA RPG!*
+Semua level, money, items, equipment, pets — WIPE TOTAL.
+
+${rpgAdmin.formatSeasonResetPreview(users)}
+
+Balas pesan ini dengan *confirm* untuk melanjutkan
+Ketik *batal* untuk membatalkan
+
+Timeout *${(CONFIRM_TIMEOUT / 1000 / 60).toFixed(0)} menit*
+`.trim()
+
+                conn.game[gameId] = [
+                    await m.reply(confirmText),
+                    { owner: m.sender, usedPrefix },
+                    setTimeout(() => {
+                        if (conn.game[gameId]) {
+                            conn.reply(m.chat, '⏰ Waktu konfirmasi season reset habis. Silakan ulangi.', conn.game[gameId][0])
+                        }
+                        delete conn.game[gameId]
+                    }, CONFIRM_TIMEOUT)
+                ]
                 return
             }
 
@@ -215,14 +182,70 @@ ${rpgAdmin.formatSeasonResetPreview(Object.values(global.db.data.leaderboards?.a
                 if (!newSeason || newSeason < 1) {
                     return m.reply('❌ Invalid season number!')
                 }
-
                 rpgAdmin.settings.currentSeason = newSeason
                 return m.reply(`✅ Season manually set to: ${newSeason}`)
             }
 
             return m.reply(`
 Usage: ${usedPrefix}rpgadmin season [action]
-Actions: check, preview, reset, manual [number]
+Actions: check, preview, rewards, reset, execute, manual [number]
+`)
+        }
+
+        case 'fix': {
+            const fixAction = (args[1] || '').toLowerCase()
+
+            if (fixAction === 'rewards' || fixAction === 'reward') {
+                const targetSeason = parseInt(args[2])
+                if (!targetSeason) {
+                    return m.reply(`❌ Masukkan nomor season!\nContoh: ${usedPrefix}rpgadmin fix rewards 1`)
+                }
+
+                const users = global.db.data.users || {}
+                const result = rpgAdmin.fixSeasonRewards(users, targetSeason)
+
+                if (!result.success) {
+                    return m.reply(`❌ ${result.error}`)
+                }
+
+                if (result.fixed.length === 0) {
+                    return m.reply(`ℹ️ Semua player di season ${targetSeason} sudah mendapat reward.`)
+                }
+
+                let fixReport = result.fixed.map(f =>
+                    `✅ *#${f.rank}* ${f.name}\n   └─ ${f.reward.tierTitle}: ${Object.entries(f.reward.items).map(([k, v]) => `${v}x ${k}`).join(', ')}`
+                ).join('\n')
+
+                return m.reply(`
+🔧 *SEASON FIX — Rewards Restored*
+
+Season: ${targetSeason}
+Fixed: ${result.fixed.length} players
+
+${fixReport}
+`.trim())
+            }
+
+            if (fixAction === 'wipe') {
+                const targetJid = args[2]
+                if (!targetJid) {
+                    return m.reply(`❌ Masukkan JID user!\nContoh: ${usedPrefix}rpgadmin fix wipe 628xxx@s.whatsapp.net`)
+                }
+
+                const users = global.db.data.users || {}
+                const result = rpgAdmin.fixResetUser(users, targetJid)
+
+                if (!result.success) {
+                    return m.reply(`❌ ${result.error}`)
+                }
+
+                return m.reply(`✅ User ${targetJid} telah di-wipe ulang.`)
+            }
+
+            return m.reply(`
+🔧 *Season Fix Commands:*
+• ${usedPrefix}rpgadmin fix rewards [season] — Re-apply rewards yang belum diterima
+• ${usedPrefix}rpgadmin fix wipe [jid] — Wipe ulang data RPG 1 user
 `)
         }
 
@@ -238,26 +261,15 @@ Actions: check, preview, reset, manual [number]
                 const avgLevel = totalPlayers ? Math.round(totalLevel / totalPlayers) : 0
 
                 return m.reply(`
-📊 *RPG STATISTICS*
+📊 *RPG STATISTICS — Season ${rpgAdmin.settings.currentSeason}*
 
-👥 *Player Stats:*
-├─ Total Players: ${totalPlayers}
-├─ Average Level: ${avgLevel}
-└─ Active: ${Math.round(totalPlayers * 0.7)} (est.)
-
-💰 *Economy:*
-├─ Total Money: ${totalMoney.toLocaleString('id-ID')}
-├─ Total Diamond: ${totalDiamond}
-├─ Total Exp: ${totalExp.toLocaleString('id-ID')}
-└─ Avg per Player: ${totalPlayers ? Math.round(totalMoney / totalPlayers) : 0} money
-
-🎮 *Game Status:*
-├─ RPG Enabled: ${rpgAdmin.settings.rpgEnabled ? '✅' : '❌'}
-├─ Event Active: ${rpgAdmin.settings.eventActive ? '✅' : '❌'}
-├─ Season: ${rpgAdmin.settings.currentSeason}
-└─ Days to Reset: ${rpgAdmin.daysUntilSeasonReset()}
+👥 Total Players: ${totalPlayers} | Avg Level: ${avgLevel}
+💰 Total Money: ${totalMoney.toLocaleString('id-ID')}
+💎 Total Diamond: ${totalDiamond.toLocaleString('id-ID')}
+⭐ Total Exp: ${totalExp.toLocaleString('id-ID')}
+🎮 RPG: ${rpgAdmin.settings.rpgEnabled ? '✅' : '❌'} | Event: ${rpgAdmin.settings.eventActive ? '✅' : '❌'}
+📅 Days to Reset: ${rpgAdmin.daysUntilSeasonReset()}
 `)
-
             } catch (error) {
                 console.error('Error in admin stats:', error)
                 return m.reply('❌ Error loading statistics')
@@ -268,28 +280,21 @@ Actions: check, preview, reset, manual [number]
         case 'topemain': {
             try {
                 const users = global.db.data.users || {}
-                const sorted = Object.entries(users)
-                    .map(([id, user]) => ({
-                        id,
-                        name: user.name || 'Unknown',
-                        level: user.level || 1,
-                        exp: user.exp || 0,
-                        money: user.money || 0,
-                        diamond: user.diamond || 0
-                    }))
-                    .sort((a, b) => b.level - a.level || b.exp - a.exp)
-                    .slice(0, 10)
+                const ranking = rpgAdmin.buildRanking(users).slice(0, 10)
 
-                if (sorted.length === 0) return m.reply('No players found')
+                if (ranking.length === 0) return m.reply('No players found')
 
-                let text = '🏆 *TOP 10 PLAYERS*\n\n'
-                sorted.forEach((p, idx) => {
-                    text += `${idx + 1}. ${p.name}\n`
-                    text += `   Lvl ${p.level} | EXP: ${p.exp.toLocaleString('id-ID')} | 💎 ${p.diamond}\n\n`
+                const medals = ['🏆', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
+                let text = `🏆 *TOP 10 PLAYERS — Season ${rpgAdmin.settings.currentSeason}*\n\n`
+                ranking.forEach((p, idx) => {
+                    const tier = rpgAdmin.getRewardTier(idx + 1)
+                    const tierInfo = rpgAdmin.seasonalRewards.tiers[tier]
+                    text += `${medals[idx]} *${p.name}*\n`
+                    text += `   Lvl ${p.level} | EXP: ${p.exp.toLocaleString('id-ID')} | 💎 ${p.diamond}\n`
+                    text += `   └─ Reward: ${tierInfo?.title || '-'}\n\n`
                 })
 
                 return m.reply(text)
-
             } catch (error) {
                 console.error('Error in topplayers:', error)
                 return m.reply('❌ Error loading leaderboard')
@@ -312,10 +317,11 @@ async function executeSeasonReset(m, conn, usedPrefix) {
     try {
         const users = global.db.data.users || {}
         const leaderboards = global.db.data.leaderboards || {}
-        const leaderboardData = Object.values(leaderboards.alltime || {})
-            .sort((a, b) => b.exp - a.exp)
 
-        const result = rpgAdmin.executeSeasonReset(users, leaderboardData, leaderboards)
+        // Build ranking from actual user data (not leaderboard)
+        const ranking = rpgAdmin.buildRanking(users)
+
+        const result = rpgAdmin.executeSeasonReset(users, leaderboards)
 
         if (!result.success) {
             return m.reply(`❌ Season reset gagal!\nError: ${result.error}`)
@@ -324,28 +330,43 @@ async function executeSeasonReset(m, conn, usedPrefix) {
         // Build reward report
         let rewardReport = ''
         if (result.actions.rewardsApplied?.length > 0) {
-            rewardReport = result.actions.rewardsApplied.map(r => 
-                `🏅 *#${r.rank}* ${r.playerName}\n   └─ ${Object.entries(r.reward).map(([k, v]) => `${v}x ${k}`).join(', ')}`
-            ).join('\n')
+            rewardReport = result.actions.rewardsApplied
+                .filter(r => r.reward)
+                .map(r =>
+                    `${r.reward.tierTitle} *#${r.rank}* ${r.name}\n   └─ ${Object.entries(r.reward.items).map(([k, v]) => `${v.toLocaleString('id-ID')}x ${k}`).join(', ')}`
+                ).join('\n')
         }
 
-        // Broadcast season reset announcement to all groups
+        // Broadcast to all groups
         const groups = Object.entries(conn.chats)
             .filter(([jid, chat]) => jid.endsWith('@g.us') && chat.isChats && !chat.metadata?.read_only && !chat.metadata?.announce)
             .map(v => v[0])
 
+        // Format top 3 for announcement
+        const top3 = (result.actions.rewardsApplied || []).slice(0, 3)
+        let top3Text = top3.map(r =>
+            `${r.reward?.tierTitle || ''} *${r.name}* — ${r.reward?.seasonTitle || ''}`
+        ).join('\n')
+
         const announcement = `
 🔄 *SEASON ${result.season} TELAH BERAKHIR!*
 
-🎊 Selamat kepada top players!
+━━━━━━━━━━━━━━━━━━━━━━━━
 
-${rewardReport || '_Tidak ada rewards_'}
+🏆 *TOP 3 PLAYER SEASON ${result.season}:*
+${top3Text || '_Tidak ada data_'}
 
-🆕 *Season ${result.actions.newSeason} dimulai sekarang!*
-Semua leaderboard seasonal telah direset.
-Ayo mainkan RPG dan raih peringkat tertinggi! 🏆
+━━━━━━━━━━━━━━━━━━━━━━━━
 
-_Good luck, adventurers!_ ⚔️
+📊 *Total ${result.actions.wipedPlayers} pemain* telah di-reset.
+🎁 *${result.actions.rewardsApplied?.length || 0} pemain* mendapat season rewards!
+
+🆕 *Season ${result.actions.newSeason} dimulai SEKARANG!*
+
+⚔️ Semua data RPG telah direset.
+Mulai dari awal dan buktikan siapa yang terbaik!
+
+_Grind, battle, dan raih peringkat tertinggi!_ 💪
 `.trim()
 
         for (const id of groups) {
@@ -356,14 +377,13 @@ _Good luck, adventurers!_ ⚔️
         }
 
         return m.reply(`
-✅ *SEASON RESET BERHASIL!*
+✅ *SEASON ${result.season} RESET BERHASIL!*
 
 📊 *Report:*
-├─ Old Season: ${result.season}
-├─ New Season: ${result.actions.newSeason}
-├─ Rewards Distributed: ${result.actions.rewardsApplied?.length || 0} players
+├─ Season: ${result.season} → ${result.actions.newSeason}
+├─ Players Wiped: ${result.actions.wipedPlayers}
+├─ Rewards Given: ${result.actions.rewardsApplied?.length || 0} players (top 50)
 ├─ Leaderboards Reset: ${result.actions.resetLeaderboards?.join(', ') || 'none'}
-├─ Missions Reset: ${result.actions.missionsReset || 0} players
 └─ Broadcast: ${groups.length} groups
 
 ${rewardReport ? `\n🏆 *Rewarded Players:*\n${rewardReport}` : ''}

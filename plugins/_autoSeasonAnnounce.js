@@ -54,19 +54,32 @@ export async function all(m, { conn }) {
     const resetDate = new Date(rpgAdmin.settings.lastSeasonReset + rpgAdmin.settings.seasonResetInterval)
     const resetDateStr = resetDate.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
-    // Get top 3 players for preview
+    // Get top 5 players from actual user data using rpgAdmin
     let topPlayersText = '_Belum ada data_'
+    let rewardTableShort = ''
     try {
-        const leaderboardData = Object.values(global.db.data.leaderboards?.alltime || {})
-            .sort((a, b) => b.exp - a.exp)
-            .slice(0, 3)
+        const users = global.db.data.users || {}
+        const ranking = rpgAdmin.buildRanking(users).slice(0, 5)
         
-        if (leaderboardData.length > 0) {
-            const medals = ['🥇', '🥈', '🥉']
-            topPlayersText = leaderboardData.map((p, i) => 
-                `${medals[i]} *${p.name || 'Unknown'}* — Level ${p.level || 1} | EXP: ${(p.exp || 0).toLocaleString('id-ID')}`
-            ).join('\n')
+        if (ranking.length > 0) {
+            const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣']
+            topPlayersText = ranking.map((p, i) => {
+                const tier = rpgAdmin.getRewardTier(i + 1)
+                const tierInfo = rpgAdmin.seasonalRewards.tiers[tier]
+                return `${medals[i]} *${p.name}* — Lvl ${p.level} | 💎${p.diamond}\n   └─ Reward: ${tierInfo?.title || '-'}`
+            }).join('\n')
         }
+
+        // Short reward table for announcements
+        const tiers = rpgAdmin.seasonalRewards.tiers
+        rewardTableShort = `
+🏆 *Season Rewards (MLBB Style):*
+🥇 *#1 ${tiers.rank1.title}*: ${tiers.rank1.diamond}💎 + ${tiers.rank1.emerald} Emerald + ${(tiers.rank1.money/1e6)}M Money
+🥈 *#2 ${tiers.rank2.title}*: ${tiers.rank2.diamond}💎 + ${tiers.rank2.emerald} Emerald + ${(tiers.rank2.money/1e6)}M Money
+🥉 *#3 ${tiers.rank3.title}*: ${tiers.rank3.diamond}💎 + ${tiers.rank3.emerald} Emerald + ${(tiers.rank3.money/1e5)}K Money
+⭐ *Top 10 ${tiers.top10.title}*: ${tiers.top10.diamond}💎 + ${(tiers.top10.money/1e6)}M Money
+⭐ *Top 25 ${tiers.top25.title}*: ${tiers.top25.diamond}💎 + ${(tiers.top25.money/1e3)}K Money
+⭐ *Top 50 ${tiers.top50.title}*: ${tiers.top50.diamond}💎 + ${(tiers.top50.money/1e3)}K Money`.trim()
     } catch (_) {}
 
     const announcements = {
@@ -81,8 +94,9 @@ Season ${season} akan berakhir dalam *~4 minggu* lagi!
 🏆 *Top Players Saat Ini:*
 ${topPlayersText}
 
-Masih ada waktu untuk naik peringkat!
-Mainkan RPG sekarang dan raih *rewards eksklusif* di akhir season 🎁
+🚨 *FULL WIPE saat season reset!*
+Semua data RPG akan di-reset dari awal.
+Raih peringkat tinggi untuk *rewards eksklusif*! 🎁
 
 _~Jangan sampai ketinggalan~_
 `.trim(),
@@ -98,10 +112,7 @@ _~Jangan sampai ketinggalan~_
 🏆 *Klasemen Sementara:*
 ${topPlayersText}
 
-💡 Top 3 players akan mendapatkan:
-🥇 100 Diamond + 50 Emerald + 5 Legendary
-🥈 50 Diamond + 25 Emerald + 3 Legendary
-🥉 25 Diamond + 10 Emerald + 1 Legendary
+${rewardTableShort}
 
 _Kejar terus rankingmu!_ 🔥
 `.trim(),
@@ -123,6 +134,8 @@ ${topPlayersText}
 • Open crates untuk bonus EXP
 • Ikuti dungeon dan boss raid
 
+${rewardTableShort}
+
 _Pertarungan semakin sengit!_ ⚡
 `.trim(),
 
@@ -137,10 +150,7 @@ _Pertarungan semakin sengit!_ ⚡
 🏆 *KLASEMEN FINAL:*
 ${topPlayersText}
 
-🎁 *Rewards Season End:*
-🥇 100💎 + 50 Emerald + 500 Gold + 5 Legendary
-🥈 50💎 + 25 Emerald + 250 Gold + 3 Legendary  
-🥉 25💎 + 10 Emerald + 100 Gold + 1 Legendary
+${rewardTableShort}
 
 ⚔️ _Ini kesempatan terakhirmu!_
 _Grind habis-habisan sebelum season berakhir!_ 💪
