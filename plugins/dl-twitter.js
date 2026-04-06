@@ -1,34 +1,34 @@
-import fetch from 'node-fetch'
+import { binzuDownload } from '../lib/binzu-api.js';
 
-var handler = async (m, {
-	conn,
-	args,
-	usedPrefix,
-	command
-}) => {
-if (!args[0]) throw `Masukkan URL!`;
-if (!args[0].match(/https?:\/\/(www\.)?(twitter\.com|x\.com)/gi)) throw "URL Tidak Ditemukan!";
-    m.reply(wait);
+let handler = async (m, { conn, args, usedPrefix, command }) => {
+    if (!args[0]) throw `*Contoh:* ${usedPrefix}${command} https://twitter.com/user/status/xxxxx`
+    await m.reply('🔍 Sedang memproses...')
     try {
-         const data = await( await fetch(`https://api.botcahx.eu.org/api/download/twitter2?url=${args[0]}&apikey=${btc}`)).json()
-         let x = data.result.mediaURLs;
-         for(const maze of x) {
-         await new Promise((resolve) => {
-            setTimeout(async () => {
-               conn.sendFile(m.chat, maze, null, wm, m)
-            resolve();
-            }, 5000);
-         }
-    );
-         }        
-    } catch (e) {
-        console.log(e)
-        m.reply(`Creator account is private`);
-    }
-};
-handler.command = /^(twitterdl|twitter|xdl|x)$/i
-handler.help = ['twitter'].map(v => v + ' <url>');
-handler.tags = ['downloader'];
-handler.limit = true;
+        const data = await binzuDownload('twitter', args[0])
+        const r = data.result
+        const mediaURLs = r?.mediaURLs || r?.media || r?.videos || r?.images || []
+        const caption = r?.text || r?.caption || r?.title || ''
 
-export default handler;
+        if (Array.isArray(mediaURLs) && mediaURLs.length > 0) {
+            for (let i = 0; i < Math.min(5, mediaURLs.length); i++) {
+                const url = typeof mediaURLs[i] === 'string' ? mediaURLs[i] : mediaURLs[i]?.url
+                if (url) {
+                    if (i > 0) await new Promise(r => setTimeout(r, 1000))
+                    await conn.sendFile(m.chat, url, null, i === 0 ? caption : '', m)
+                }
+            }
+        } else {
+            const url = r?.url || r?.video || r?.download
+            if (!url) throw 'Media tidak ditemukan'
+            await conn.sendFile(m.chat, url, null, caption, m)
+        }
+    } catch (e) {
+        m.reply(`❌ Gagal: ${e.message}`)
+    }
+}
+
+handler.help = ['twitter']
+handler.tags = ['downloader']
+handler.command = /^(twitterdl|twitter|xdl|x)$/i
+handler.limit = true
+export default handler

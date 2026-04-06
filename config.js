@@ -23,13 +23,12 @@ global.xmaze = [global.info.nomorown, '6285387071079']
 
 /*============== API ==============*/
 global.APIs = {
-      TioXD: 'https://api.botcahx.eu.org',
-    btc: 'https://api.botcahx.eu.org'
+    TioXD: 'https://ravaja.my.id',
+    btc: 'https://ravaja.my.id'
 } 
 
 global.APIKeys = {
-  'https://api.botcahx.eu.org': global.btc,
-  'https://api.botcahx.eu.org': 'ravaja'
+  'https://ravaja.my.id': global.btc,
 }
 
 /*============== WATERMARK ==============*/

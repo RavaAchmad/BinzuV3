@@ -1,33 +1,21 @@
-import axios from "axios"
+import axios from 'axios';
 
-let handler = async (m, { args }) => {
-  if (!args[0]) throw " please provide place or location name"
-  try {
-    const response = axios.get(
-      `https://api.openweathermap.org/data/2.5/weather?q=${args}&units=metric&appid=060a6bcfa19809c2cd4d97a212b19273`
-    )
-    const res = await response
-    const name = res.data.name
-    const Country = res.data.sys.country
-    const Weather = res.data.weather[0].description
-    const Temperature = res.data.main.temp + "°C"
-    const Minimum_Temperature = res.data.main.temp_min + "°C"
-    const Maximum_Temperature = res.data.main.temp_max + "°C"
-    const Humidity = res.data.main.humidity + "%"
-    const Wind = res.data.wind.speed + "km/h"
-    const wea = `「 📍 」 Place: ${name}\n「 🗺️ 」 Country: ${Country}\n「 🌤️ 」 Weather: ${Weather}\n「 🌡️ 」Temperature: ${Temperature}\n「 💠 」 Minimum Temperature: ${Minimum_Temperature}\n「 📛 」 Maximum Temperature: ${Maximum_Temperature}\n「 💦 」 Humidity: ${Humidity}\n「 🌬️ 」 Wind: ${Wind}
-  `
-
-    m.reply(wea)
-  } catch (e) {
-    return "Error location not found!!!"
-  }
+let handler = async (m, { args, usedPrefix, command }) => {
+    if (!args[0]) throw `*Contoh:* ${usedPrefix}${command} Jakarta`
+    try {
+        const response = await axios.get(`https://api.openweathermap.org/data/2.5/weather?q=${args.join(' ')}&units=metric&appid=060a6bcfa19809c2cd4d97a212b19273`)
+        const r = response.data
+        const wea = `「 📍 」 Place: ${r.name}\n「 🗺️ 」 Country: ${r.sys.country}\n「 🌤️ 」 Weather: ${r.weather[0].description}\n「 🌡️ 」 Temperature: ${r.main.temp}°C\n「 💠 」 Min Temp: ${r.main.temp_min}°C\n「 📛 」 Max Temp: ${r.main.temp_max}°C\n「 💦 」 Humidity: ${r.main.humidity}%\n「 🌬️ 」 Wind: ${r.wind.speed} km/h`
+        m.reply(wea)
+    } catch (e) {
+        m.reply('❌ Lokasi tidak ditemukan!')
+    }
 }
 
-handler.help = ['weather']
+handler.help = ['weather <location>']
 handler.tags = ['tools']
-handler.command = /^(weather)$/i
-handler.limit = true;
-handler.register = true;
+handler.command = /^(weather|cuaca)$/i
+handler.limit = true
+handler.register = true
 
-export default handler;
+export default handler

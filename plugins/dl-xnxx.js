@@ -1,20 +1,23 @@
-import api from "api-dylux";
+import { binzuApiSingle } from '../lib/binzu-api.js';
 
-let handler = async (m, { conn, text, command, usedPrefix }) => {
-    let chat = db.data.chats[m.chat]
-    if (!text) throw `url nya mana?\n\ncontoh:\n${usedPrefix + command} https://www.xnxx.com/video-wdsipd3/jealous_mother_blows_son_uncensored`
-    if (!/^https?:\/\/(www\.)?xnxx\.com/.test(text)) throw `url salah!\n\ncontoh:\n${usedPrefix + command} https://www.xnxx.com/video-wdsipd3/jealous_mother_blows_son_uncensored`
-    let res = await api.xnxxdl(text)
-     m.reply(wait)
-    let capt = `*INFO DATA*
-    
-Judul: ${res.title}
-Durasi: ${res.duration}
-Kualitas: ${res.quality}
-Ukuran: ${res.size}`
-    conn.sendFile(m.chat, res.url_dl, "mtype.mp4", capt, m)
+let handler = async (m, { conn, text, usedPrefix, command }) => {
+    let chat = global.db?.data?.chats?.[m.chat]
+    if (!text) throw `URL nya mana?\n\nContoh:\n${usedPrefix + command} https://www.xnxx.com/video-xxxxx/title`
+    if (!/^https?:\/\/(www\.)?xnxx\.com/.test(text)) throw `URL salah!\n\nContoh:\n${usedPrefix + command} https://www.xnxx.com/video-xxxxx/title`
+    await m.reply('🔍 Sedang memproses...')
+    try {
+        const data = await binzuApiSingle('nsfw/xnxx', { url: text })
+        const r = data.result || data
+        const dlUrl = r?.url_dl || r?.url || r?.video || r?.download
+        if (!dlUrl) throw 'Link download tidak ditemukan'
+        let capt = `*INFO DATA*\n\nJudul: ${r?.title || '-'}\nDurasi: ${r?.duration || '-'}\nKualitas: ${r?.quality || '-'}\nUkuran: ${r?.size || '-'}`
+        await conn.sendFile(m.chat, dlUrl, 'video.mp4', capt, m)
+    } catch (e) {
+        m.reply(`❌ Gagal: ${e.message}`)
+    }
 }
-handler.help = ['xnxx'].map(v => v + ' <url>')
+
+handler.help = ['xnxx <url>']
 handler.tags = ['nsfw', 'downloader']
 handler.command = /^(xnxx)$/i
 handler.nsfw = true
