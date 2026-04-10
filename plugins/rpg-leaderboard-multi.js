@@ -1,5 +1,6 @@
 import leaderboardManager from '../lib/leaderboard.js'
 import { getDungeonRank } from '../lib/rpg-ranks.js'
+import { quickButtons, listMenu } from '../lib/buttons.js'
 
 let handler = async (m, { conn, args, usedPrefix }) => {
     const db = global.db.data
@@ -104,13 +105,20 @@ let handler = async (m, { conn, args, usedPrefix }) => {
                               timeframe === 'seasonal' ? '⏰ Reset: Setiap 6 bulan' : '⏰ Permanent Records'
         
         text += `\n\n${timeframeInfo}`
-        text += `\n\n💡 Gunakan: ${usedPrefix}leaderboard [timeframe] [category]\n`
-        text += `📌 Categories: dungeonwins, dungeonruns, exp, money, bosskills, achievements`
 
         await conn.sendMessage(m.chat, {
             text: text,
             edit: statusMsg.key
         })
+
+        // Send interactive buttons for quick navigation
+        const otherTimeframes = ['daily', 'weekly', 'seasonal', 'allTime'].filter(t => t !== timeframe)
+        await quickButtons(conn, m.chat, `📌 *Lihat Leaderboard Lain:*`, categoryName, [
+            ...otherTimeframes.slice(0, 3).map(t => ({
+                id: `${usedPrefix}leaderboard ${t} ${Object.keys(categories).find(k => categories[k] === selectedCategory) || 'dungeonwins'}`,
+                text: `📊 ${t.charAt(0).toUpperCase() + t.slice(1)}`
+            }))
+        ])
 
     } catch (error) {
         console.error('Error in leaderboard:', error)

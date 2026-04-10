@@ -1,22 +1,37 @@
 const FEED_COOLDOWN = 300000 // 5 menit
 const PET_TYPES = ['fox', 'cat', 'dog', 'horse', 'robo']
 const PET_EMOJIS = { fox: '🦊', cat: '🐈', dog: '🐕', horse: '🐴', robo: '🤖' }
+import { quickButtons } from '../lib/buttons.js'
 
 let handler = async (m, { conn, args, usedPrefix }) => {
-	let info = `
-乂 List Pet:
-🐈 • Cᴀᴛ
-🐕 • Dᴏɢ
-🐎 • Hᴏʀsᴇ
-🦊 • Fᴏx
-🤖 • Rᴏʙᴏ
-
-*➠ Example:* ${usedPrefix}feed cat
-*➠ Feed All:* ${usedPrefix}feed all
-`.trim()
     let pesan = pickRandom(['ɴʏᴜᴍᴍᴍ~', 'ᴛʜᴀɴᴋs', 'ᴛʜᴀɴᴋʏᴏᴜ ^-^', '...', 'ᴛʜᴀɴᴋ ʏᴏᴜ~', 'ᴀʀɪɢᴀᴛᴏᴜ ^-^'])
     let type = (args[0] || '').toLowerCase()
     let user = global.db.data.users[m.sender]
+
+    if (!type || (!PET_TYPES.includes(type) && type !== 'all')) {
+        // Interactive pet selection
+        let ownedPets = PET_TYPES.filter(p => user[p] > 0)
+        let btns = ownedPets.filter(p => user[p] < 10).map(p => ({
+            id: `${usedPrefix}feed ${p}`,
+            text: `${PET_EMOJIS[p]} ${p.capitalize()} Lv.${user[p]}`
+        }))
+        if (ownedPets.filter(p => user[p] < 10).length > 1) {
+            btns.unshift({ id: `${usedPrefix}feed all`, text: '🍖 Feed All' })
+        }
+
+        let info = `🐾 *PET FEED MENU*\n\n`
+        PET_TYPES.forEach(p => {
+            let lvl = user[p] || 0
+            let status = lvl === 0 ? '🔒 Belum punya' : lvl >= 10 ? '⭐ MAX' : `Lv.${lvl}`
+            info += `${PET_EMOJIS[p]} *${p.capitalize()}* — ${status}\n`
+        })
+        info += `\n📦 Pet Food: *${user.petfood || 0}*`
+
+        if (btns.length > 0) {
+            return await quickButtons(conn, m.chat, info, `Cooldown: 5 menit`, btns, m)
+        }
+        return m.reply(info + `\n\n_Kamu belum punya pet / semua sudah MAX!_`)
+    }
 
     if (type === 'all') {
         // Feed ALL pets at once

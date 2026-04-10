@@ -1,5 +1,6 @@
 import { RPGHandler } from '../lib/rpg-handler.js'
 import { SKILL_DATABASE } from '../lib/rpg-core-engine.js'
+import { listMenu, quickButtons, interactiveMsg } from '../lib/buttons.js'
 
 let handler = async (m, { conn, text, args, usedPrefix }) => {
   try {
@@ -34,24 +35,63 @@ Customize with skills for unique playstyle.
 ✨ *COMBAT:*
   !dungeon NORMAL - Start 1v1 dungeon
   !attack slash - Attack in combat
-  (Harder difficulty = bigger rewards)
 
 📈 *PROGRESSION:*
   !stats - Full profile & character sheet
   !selectskill [name] - Pick a skill
   !rpg skills - List all skills
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 💡 *FOR BEGINNERS:*
 1. Do !hunt a few times (gain exp+money)
 2. Check !stats to see progress
 3. Try !dungeon normal when ready
 4. Win = get double XP!
+`.trim()
 
-For details: !rpg detailed
-`
-        m.reply(menu)
+        await interactiveMsg(conn, m.chat, {
+          text: menu,
+          footer: `Level ${user.level} | ${user.exp?.toLocaleString('id-ID') || 0} EXP`,
+          interactiveButtons: [
+            { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '⚔️ Hunt', id: `${usedPrefix}hunt` }) },
+            { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '📊 Stats', id: `${usedPrefix}stats` }) },
+            { name: 'single_select', buttonParamsJson: JSON.stringify({
+              title: '📋 Menu Lengkap',
+              sections: [
+                {
+                  title: '🎮 Activities',
+                  rows: [
+                    { id: `${usedPrefix}hunt`, title: '⚔️ Hunt', description: 'Berburu monster, dapat EXP + Money' },
+                    { id: `${usedPrefix}fish`, title: '🎣 Fish', description: 'Memancing, relaxed EXP' },
+                    { id: `${usedPrefix}mine`, title: '⛏️ Mine', description: 'Tambang ore, best money' },
+                    { id: `${usedPrefix}kerja`, title: '👷 Kerja', description: 'Kerja harian, steady income' },
+                    { id: `${usedPrefix}adventure`, title: '🗺️ Adventure', description: 'Petualangan, big rewards' },
+                    { id: `${usedPrefix}explore`, title: '⛰️ Explore', description: 'Jelajahi area, lawan monster' },
+                  ]
+                },
+                {
+                  title: '📊 Info & Progress',
+                  rows: [
+                    { id: `${usedPrefix}stats`, title: '📊 Stats', description: 'Lihat profil & character sheet' },
+                    { id: `${usedPrefix}rpg skills`, title: '🔮 Skills', description: 'Panduan skill selection' },
+                    { id: `${usedPrefix}rpg detailed`, title: '📖 Guide', description: 'Panduan bermain lengkap' },
+                    { id: `${usedPrefix}leaderboard`, title: '🏆 Leaderboard', description: 'Peringkat pemain' },
+                    { id: `${usedPrefix}rpg balance`, title: '⚖️ Balance Info', description: 'Info balancing game' },
+                  ]
+                },
+                {
+                  title: '🎁 Items & Pet',
+                  rows: [
+                    { id: `${usedPrefix}daily`, title: '🔖 Daily Reward', description: 'Klaim hadiah harian' },
+                    { id: `${usedPrefix}open`, title: '📦 Open Crate', description: 'Buka crate gacha' },
+                    { id: `${usedPrefix}feed`, title: '🐾 Feed Pet', description: 'Kasih makan pet' },
+                    { id: `${usedPrefix}transfer`, title: '📨 Transfer', description: 'Kirim item ke player lain' },
+                    { id: `${usedPrefix}paskah`, title: '🥚 Easter Event', description: 'Tukar telur paskah' },
+                  ]
+                }
+              ]
+            })}
+          ]
+        })
         break
       }
 

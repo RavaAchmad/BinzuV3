@@ -1,7 +1,8 @@
 import { ExploreSystem, EXPLORE_AREAS, RARE_ITEMS } from '../lib/explore-system-v2.js'
 import { RPGHandler } from '../lib/rpg-handler.js'
+import { listMenu, quickButtons } from '../lib/buttons.js'
 
-let handler = async (m, { conn, args, command }) => {
+let handler = async (m, { conn, args, command, usedPrefix }) => {
   try {
     const userId = m.sender
     const userName = await conn.getName(userId)
@@ -9,23 +10,37 @@ let handler = async (m, { conn, args, command }) => {
 
     if (command === 'explore' || command === 'explorenew' || command === 'exploreadvanced') {
       if (!args[0]) {
-        // Show available areas
+        // Show available areas with interactive list
         const areas = ExploreSystem.getAvailableAreas(user.level)
+        const maxAreaByLevel = Math.floor(user.level / 4)
 
         let text = `╔═══════════════════════════════╗\n`
         text += `║      🗺️ EXPLORE AREAS 🗺️     ║\n`
         text += `╚═══════════════════════════════╝\n\n`
+        text += `📊 Level: ${user.level} | Area terbuka: 1-${maxAreaByLevel}\n\n`
 
-        for (const area of areas) {
-          const areaInfo = EXPLORE_AREAS[area.number]
-          text += `${area.emoji} **Area ${area.number}: ${area.name}**\n`
-          text += `Lv. ${area.minLevel}-${area.maxLevel}\n`
-          text += `Items: ${area.rareDropRate * 100}% drop rate\n\n`
+        for (const area of areas.slice(-6)) {
+          text += `${area.emoji} *Area ${area.number}: ${area.name}* (Lv.${area.minLevel}+)\n`
+          text += `   Monsters: ${area.monsters.map(m => m.name).join(', ')}\n`
+          text += `   Drop: ${(area.rareDropRate * 100).toFixed(0)}% | 🥚 25%\n\n`
         }
 
-        text += `_Use !explorenew <area_number>_`
+        // Build sections for interactive list
+        const sections = []
+        const chunk = 8
+        for (let i = 0; i < areas.length; i += chunk) {
+          const batch = areas.slice(i, i + chunk)
+          sections.push({
+            title: `Area ${batch[0].number}-${batch[batch.length - 1].number}`,
+            rows: batch.map(a => ({
+              id: `${usedPrefix}explore ${a.number}`,
+              title: `${a.emoji} Area ${a.number}: ${a.name}`,
+              description: `Lv.${a.minLevel}+ | ${a.monsters.map(m => m.name).join(', ')}`
+            }))
+          })
+        }
 
-        await conn.sendMessage(m.chat, { text: text }, { quoted: m })
+        await listMenu(conn, m.chat, text.trim(), `${areas.length} area terbuka | Pilih area di bawah`, '⛰️ Pilih Area', sections)
       } else if (args[0].toLowerCase() === 'list') {
         // Show all areas with progression
         let text = `╔═══════════════════════════════╗\n`

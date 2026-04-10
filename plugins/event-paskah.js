@@ -5,6 +5,7 @@
  * 
  * Exchange rates adjusted to bot economy
  */
+import { listMenu } from '../lib/buttons.js'
 
 const EASTER_SHOP = {
   // Money & Chip exchanges
@@ -34,10 +35,20 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
       text += `${item.emoji} *${key}* — ${item.desc} (${item.cost} 🥚)${owned}\n`
     }
 
-    text += `\n*Cara tukar:* ${usedPrefix}paskah [item] [jumlah]`
-    text += `\n*Contoh:* ${usedPrefix}paskah money 2`
-    text += `\n\n_Dapatkan telur dari .explore (25% chance)_`
-    return m.reply(text)
+    // Interactive list
+    const rows = Object.entries(EASTER_SHOP).map(([key, item]) => {
+      let owned = (item.oneTime && user.easterRedeemed?.[key]) ? ' ✅' : ''
+      return {
+        id: `${usedPrefix}paskah ${key}`,
+        title: `${item.emoji} ${key}${owned}`,
+        description: `${item.desc} — ${item.cost} 🥚`
+      }
+    })
+
+    return await listMenu(conn, m.chat, text.trim(), `Dapatkan telur dari .explore (25%)`, '🥚 Pilih Item', [{
+      title: 'Easter Shop',
+      rows
+    }])
   }
 
   const itemKey = args[0].toLowerCase()
