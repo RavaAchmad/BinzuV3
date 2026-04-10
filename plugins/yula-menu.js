@@ -186,6 +186,41 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
         }),
         after
       ]
+    } else if (menuType === 'rpg') {
+      // Dedicated RPG guide when using: .menu rpg
+      const rpgGuide = [
+        '*RPG MENU GUIDE*',
+        '',
+        'Konsep:',
+        '- Naik level dari aktivitas harian',
+        '- Semakin tinggi level, hadiah makin bagus',
+        '- Pilih skill sesuai gaya main',
+        '',
+        'Aktivitas utama (CD 5 menit):',
+        `- ${usedPrefix}hunt`,
+        `- ${usedPrefix}fish`,
+        `- ${usedPrefix}mine`,
+        `- ${usedPrefix}work`,
+        `- ${usedPrefix}adventure`,
+        '',
+        'Progress & info:',
+        `- ${usedPrefix}stats`,
+        `- ${usedPrefix}rpg skills`,
+        `- ${usedPrefix}rpg detailed`,
+        `- ${usedPrefix}rpg balance`,
+        '',
+        'Combat cepat:',
+        `- ${usedPrefix}dungeon normal`,
+        `- ${usedPrefix}attack slash`,
+        '',
+        `Tip: untuk menu interaktif gunakan ${usedPrefix}rpg`
+      ].join('\n')
+
+      menuText = [
+        before,
+        rpgGuide,
+        `\n` + after
+      ]
     } else if (tags[menuType]) {
       // Show specific menu when valid tag is specified
       menuText = [

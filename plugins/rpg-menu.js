@@ -14,32 +14,30 @@ let handler = async (m, { conn, text, args, usedPrefix }) => {
       case 'menu':
       case 'main': {
         const menu = `
-╔═════════════════════════════════════╗
-║   ⚔️ RPG GAME - HOW TO PLAY ⚔️      ║
-╚═════════════════════════════════════╝
+*⚔️ RPG GAME - HOW TO PLAY*
 
 📚 *GAME CONCEPT:*
 Gain experience through activities to level up.
-More levels = Better dungeons & rewards.
+More levels = better dungeon rewards.
 Customize with skills for unique playstyle.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+------------------------------
 
 🎮 *MAIN ACTIVITIES (5 min cooldown):*
-  !hunt - Combat hunting, fair rewards
-  !fish - Relaxed fishing, quick exp
-  !mine - Mining ore, best money
-  !work - Job work, steady income
-  !adventure - Long quest, big rewards
+!hunt - Combat hunting, fair rewards
+!fish - Relaxed fishing, quick EXP
+!mine - Mining ore, best money
+!work - Job work, steady income
+!adventure - Long quest, big rewards
 
 ✨ *COMBAT:*
-  !dungeon NORMAL - Start 1v1 dungeon
-  !attack slash - Attack in combat
+!dungeon normal - Start 1v1 dungeon
+!attack slash - Attack in combat
 
 📈 *PROGRESSION:*
-  !stats - Full profile & character sheet
-  !selectskill [name] - Pick a skill
-  !rpg skills - List all skills
+!stats - Full profile & character sheet
+!selectskill [name] - Pick a skill
+!rpg skills - List all skills
 
 💡 *FOR BEGINNERS:*
 1. Do !hunt a few times (gain exp+money)
@@ -97,43 +95,41 @@ Customize with skills for unique playstyle.
 
       case 'detailed': {
         const detailed = `
-╔═════════════════════════════════════╗
-║       📖 DETAILED GAME GUIDE        ║
-╚═════════════════════════════════════╝
+*📖 DETAILED GAME GUIDE*
 
 *1. PROGRESSION SYSTEM*
-├─ Start Level 1 with 0 exp
-├─ Gain exp from activities or dungeons
-├─ 1000 exp = Level 2
-├─ 1120 exp = Level 3 (grows ~12% per level)
-└─ Rinse, repeat → Eventually level 300!
+- Start Level 1 with 0 EXP
+- Gain EXP from activities or dungeons
+- 1000 EXP = Level 2
+- 1120 EXP = Level 3 (~12% growth/level)
+- Repeat until high level (max 300)
 
 *2. STATS & ATTRIBUTES*
-├─ STR (Strength): Physical damage
-├─ AGI (Agility): Attack speed & dodge
-├─ DEF (Defense): Damage reduction
-├─ MAG (Magic): Spell power & mana
-├─ CRIT: Chance to deal 1.5x damage
-└─ LUCK: Item drop rate multiplier
+- STR: Physical damage
+- AGI: Attack speed and dodge
+- DEF: Damage reduction
+- MAG: Spell power and mana
+- CRIT: Chance to deal 1.5x damage
+- LUCK: Item drop multiplier
 
 Stats increase from:
-  • Leveling up (+1-2 per level)
-  • Skill levels (+bonus per skill level)
-  • Equipment bonuses
+- Leveling up (+1 to +2 per level)
+- Skill levels (extra bonuses)
+- Equipment bonuses
 
 *3. SKILLS (Pick ONE to start)*
-├─ Swordmaster ⚔️: Best for hunters
-├─ Archer 🏹: Best for speed
-├─ Mage 🧙: Best for magic damage
-├─ Necromancer 💀: Life steal + damage
-└─ Paladin ⛑️: Tank + healing
+- Swordmaster ⚔️: Best for hunters
+- Archer 🏹: Best for speed
+- Mage 🧙: Best for magic damage
+- Necromancer 💀: Life steal + damage
+- Paladin ⛑️: Tank + healing
 
 Each skill adds unique stat bonuses.
-Level skill up by doing activities.
+Level up skill by doing activities.
 Available at:
-  - Level 1: Buy skill essence
-  - Equip skill essence
-  - Start gaining skill exp
+- Level 1: Buy skill essence
+- Equip skill essence
+- Start gaining skill EXP
 
 *4. ACTIVITY COOLDOWNS*
 Hunt: 5 minutes, 150 exp, 100 money
@@ -142,14 +138,14 @@ Mine: 5 minutes, 140 exp, 150 money
 Work: 5 minutes, 100 exp, 150 money
 
 Skills boost rewards by ~20%
-Higher levels don't affect cooldown
+Higher levels do not reduce cooldown
 (Fair for all!)
 
 *5. DUNGEON COMBAT*
-├─ 1v1 turn-based batte
-├─ You attack → Enemy counters
-├─ Repeat until one dies
-└─ Winner: Get exp + money
+- 1v1 turn-based battle
+- You attack, enemy counters
+- Repeat until one dies
+- Winner gets EXP + money
 
 Difficulties:
 EASY: 0.7x (for practice)
@@ -160,17 +156,17 @@ INFERNO: 5x (hardcore only)
 
 *6. ECONOMY*
 Get money from:
-  • Hunt/Mine/Work/Fish
-  • Dungeon victories
-  • Completing quests
+- Hunt/Mine/Work/Fish
+- Dungeon victories
+- Completing quests
 
 Spend money on:
-  • Equipment upgrades
-  • Item purchases
-  • Special rewards
+- Equipment upgrades
+- Item purchases
+- Special rewards
 
 Emeralds for top-tier upgrades
-(Don't worry, get free ones too)
+(free sources are available too)
 
 *7. MECHANICS*
 - Cooldowns are global (one per activity)
@@ -178,53 +174,46 @@ Emeralds for top-tier upgrades
 - Combat is FAIR (no pay-to-win)
 - Leaderboards reset weekly
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Want skill list? !rpg skills
-Want balance info? !rpg balance
-`
+------------------------------
+Need skill list? !rpg skills
+Need balance info? !rpg balance
+`.trim()
         m.reply(detailed)
         break
       }
 
       case 'skills': {
         let skillText = `
-╔═════════════════════════════════════╗
-║     🔮 SKILL SELECTION GUIDE       ║
-╚═════════════════════════════════════╝
+*🔮 SKILL SELECTION GUIDE*
 
 Choose ONE to start! Can change later.
 
 ⚔️ *SWORDMASTER*
-  Emoji: ⚔️
-  Best for: Hunt + Dungeon
-  Bonus: +STR (physical damage)
-  Playstyle: Full damage dealer
+- Best for: Hunt + Dungeon
+- Bonus: +STR (physical damage)
+- Playstyle: Full damage dealer
 
 🏹 *ARCHER*
-  Emoji: 🏹
-  Best for: Speed runners
-  Bonus: +AGI (attack speed)
-  Playstyle: Hit fast, dodge attacks
+- Best for: Speed runners
+- Bonus: +AGI (attack speed)
+- Playstyle: Hit fast, dodge attacks
 
 🧙 *MAGE*
-  Emoji: 🧙
-  Best for: Spell lovers
-  Bonus: +MAG (magic damage)
-  Playstyle: Spell burst damage
+- Best for: Spell lovers
+- Bonus: +MAG (magic damage)
+- Playstyle: Spell burst damage
 
 💀 *NECROMANCER*
-  Emoji: 💀
-  Best for: Advanced
-  Bonus: +MAG + Life steal
-  Playstyle: Drain enemies to heal
+- Best for: Advanced
+- Bonus: +MAG + Life steal
+- Playstyle: Drain enemies to heal
 
 ⛑️ *PALADIN*
-  Emoji: ⛑️
-  Best for: Tank playstyle
-  Bonus: +DEF + Healing
-  Playstyle: Tank damage, support
+- Best for: Tank playstyle
+- Bonus: +DEF + Healing
+- Playstyle: Tank damage, support
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+------------------------------
 
 To select:
 !selectskill swordmaster
@@ -232,16 +221,14 @@ To select:
 !selectskill mage
 !selectskill necromancer
 !selectskill paladin
-`
+`.trim()
         m.reply(skillText)
         break
       }
 
       case 'balance': {
         m.reply(`
-╔═════════════════════════════════════╗
-║       ⚖️ BALANCE INFORMATION       ║
-╚═════════════════════════════════════╝
+*⚖️ BALANCE INFORMATION*
 
 *DIFFICULTY MULTIPLIERS:*
 EASY:       0.7x exp, 0.7x money
@@ -271,9 +258,9 @@ Stats matter (no RNG BS)
 Higher levels = stronger enemies
 Fair difficulty progression
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+------------------------------
 Design: Fair, Fun, Not Grindy ✓
-`)
+`.trim())
         break
       }
 

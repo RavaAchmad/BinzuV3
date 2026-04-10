@@ -1,124 +1,128 @@
 import leaderboardManager from '../lib/leaderboard.js'
-import { getDungeonRank } from '../lib/rpg-ranks.js'
 import { quickButtons, listMenu } from '../lib/buttons.js'
+
+const CATEGORIES = leaderboardManager.CATEGORIES
+const fmtNum = n => (n || 0).toLocaleString('id-ID')
 
 let handler = async (m, { conn, args, usedPrefix }) => {
     const db = global.db.data
-    
+
     let statusMsg = await conn.sendMessage(m.chat, { text: '⏳ Loading leaderboard...' }, { quoted: m })
 
     try {
-        await conn.sendMessage(m.chat, {
-            text: '⏳ Initializing data...',
-            edit: statusMsg.key
-        })
+        const category = (args[0] || 'wealth').toLowerCase()
 
-        leaderboardManager.initLeaderboard(db)
-        leaderboardManager.checkResetNeeded(db)
+        if (!CATEGORIES[category]) {
+            // Tampilkan daftar kategori yang tersedia
+            let helpText = `📊 *LEADERBOARD CATEGORIES*\n\n`
+            helpText += `Gunakan: *${usedPrefix}lb <kategori>*\n\n`
+            for (const [key, cat] of Object.entries(CATEGORIES)) {
+                helpText += `${cat.icon} *${key}* — ${cat.desc}\n`
+            }
+            helpText += `\n_Contoh: ${usedPrefix}lb wealth_`
 
-        const timeframe = (args[0] || 'daily').toLowerCase()
-        const category = (args[1] || 'dungeonWins').toLowerCase()
-        
-        const validTimeframes = ['daily', 'weekly', 'seasonal', 'allTime']
-        const categories = {
-            'dungeonwins': 'dungeonWins',
-            'dungeonruns': 'dungeonRuns',
-            'exp': 'expGained',
-            'money': 'moneyGained',
-            'bosskills': 'bossKills',
-            'achievements': 'achievements'
-        }
+            await conn.sendMessage(m.chat, { text: helpText, edit: statusMsg.key })
 
-        if (!validTimeframes.includes(timeframe)) {
-            await conn.sendMessage(m.chat, {
-                text: '❌ Invalid timeframe',
-                edit: statusMsg.key
-            })
+            // Interactive category picker
+            const sections = [{
+                title: '📊 Pilih Kategori',
+                rows: Object.entries(CATEGORIES).map(([key, cat]) => ({
+                    title: `${cat.icon} ${cat.name}`,
+                    description: cat.desc,
+                    id: `${usedPrefix}lb ${key}`
+                }))
+            }]
+            await listMenu(conn, m.chat, '📊 *Pilih kategori leaderboard:*', 'Leaderboard', '📋 Lihat Kategori', sections)
             return
         }
 
-        await conn.sendMessage(m.chat, {
-            text: '⏳ Fetching player data...',
-            edit: statusMsg.key
-        })
+        await conn.sendMessage(m.chat, { text: '⏳ Menghitung ranking...', edit: statusMsg.key })
 
-        const selectedCategory = categories[category] || 'dungeonWins'
-        const categoryName = selectedCategory === 'dungeonWins' ? '🏆 Dungeon Wins' :
-                             selectedCategory === 'dungeonRuns' ? '⚔️ Dungeon Runs' :
-                             selectedCategory === 'expGained' ? '✨ Exp Gained' :
-                             selectedCategory === 'moneyGained' ? '💹 Money Gained' :
-                             selectedCategory === 'bossKills' ? '💀 Boss Kills' : '🎖️ Achievements'
+        const catInfo = CATEGORIES[category]
+        const leaderboard = leaderboardManager.getLeaderboard(db, category, 15)
 
-        const leaderboard = leaderboardManager.getLeaderboard(db, timeframe, selectedCategory, 15)
-        
         if (leaderboard.length === 0) {
             await conn.sendMessage(m.chat, {
-                text: `📊 Tidak ada data ${timeframe} leaderboard untuk ${categoryName}`,
+                text: `📊 Belum ada data untuk ${catInfo.name}`,
                 edit: statusMsg.key
             })
             return
         }
 
-        await conn.sendMessage(m.chat, {
-            text: '⏳ Formatting rankings...',
-            edit: statusMsg.key
-        })
+        let text = `╭━━━━━━━━━━━━━ 🏆 ━━━━━━━━━━━━━╮
+┃      ${catInfo.name}
+┃      *LEADERBOARD*
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n`
 
-        let text = `
-╭━━━━━━━━━━━━━ 🏆 ━━━━━━━━━━━━━╮
-┃      ${categoryName}
-┃      *${timeframe.toUpperCase()} LEADERBOARD*
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-
-`
-
-        leaderboard.forEach((entry, i) => {
+        for (const entry of leaderboard) {
             const medals = ['🥇', '🥈', '🥉']
-            const medal = i < 3 ? medals[i] : `#${i + 1} ⭐`
-            const user = global.db.data.users[entry.userId]
-            const level = user?.level || 0
-            const rank = getDungeonRank(level)
+            const medal = entry.rank <= 3 ? medals[entry.rank - 1] : `#${entry.rank} ⭐`
+            const name = conn.getName(entry.userId) || entry.userId.split('@')[0]
 
-            let value = entry[selectedCategory] || 0
-            if (selectedCategory === 'moneyGained' || selectedCategory === 'expGained') {
-                value = value.toLocaleString('id-ID')
+            text += `${medal} *${name}*\n`
+
+            // Detail berbeda per kategori
+            switch (category) {
+                case 'wealth':
+                    text += `   ├─ 💰 Total: ${fmtNum(entry.value)}\n`
+                    text += `   ├─ 💵 Money: ${fmtNum(entry.money)}\n`
+                    text += `   ├─ 💎 Diamond: ${fmtNum(entry.diamond)}\n`
+                    text += `   └─ ⭐ Lv.${entry.level}\n\n`
+                    break
+                case 'level':
+                    text += `   ├─ ⭐ Level ${fmtNum(entry.level)}\n`
+                    text += `   ├─ ✨ EXP: ${fmtNum(entry.exp)}\n`
+                    text += `   └─ 💰 Wealth: ${fmtNum(entry.wealth)}\n\n`
+                    break
+                case 'money':
+                    text += `   ├─ 💵 Total: ${fmtNum(entry.value)}\n`
+                    text += `   ├─ 💎 Diamond: ${fmtNum(entry.diamond)}\n`
+                    text += `   └─ ⭐ Lv.${entry.level}\n\n`
+                    break
+                case 'diamond':
+                    text += `   ├─ 💎 Diamond: ${fmtNum(entry.value)}\n`
+                    text += `   ├─ 🟢 Emerald: ${fmtNum(entry.emerald)}\n`
+                    text += `   └─ ⭐ Lv.${entry.level}\n\n`
+                    break
+                case 'emerald':
+                    text += `   ├─ 🟢 Emerald: ${fmtNum(entry.value)}\n`
+                    text += `   ├─ 💎 Diamond: ${fmtNum(entry.diamond)}\n`
+                    text += `   └─ ⭐ Lv.${entry.level}\n\n`
+                    break
+                case 'pets':
+                    text += `   ├─ 🐾 Pet: ${entry.value} jenis\n`
+                    text += `   ├─ ⭐ Lv.${entry.level}\n`
+                    text += `   └─ 💰 Wealth: ${fmtNum(entry.wealth)}\n\n`
+                    break
+                case 'exp':
+                    text += `   ├─ ✨ EXP: ${fmtNum(entry.value)}\n`
+                    text += `   ├─ ⭐ Level ${entry.level}\n`
+                    text += `   └─ 💰 Money: ${fmtNum(entry.money)}\n\n`
+                    break
             }
+        }
 
-            text += `${medal} *${(entry.name || conn.getName(entry.userId) || 'Unknown')}*\n`
-            text += `   ├─ ${selectedCategory === 'dungeonWins' ? '✅' : '⚔️'} ${value}\n`
-            text += `   ├─ 📊 Lvl ${level} - ${rank.name}\n`
-            text += `   └─ ✨ ${(user?.exp || 0).toLocaleString('id-ID')} Exp\n\n`
-        })
-
-        const yourRank = leaderboardManager.getPlayerRank(db, m.sender, timeframe, selectedCategory)
-        const yourData = db.leaderboards[timeframe].data[m.sender]
-        
-        if (yourRank) {
+        // Posisi player sendiri
+        const myRank = leaderboardManager.getPlayerRank(db, m.sender, category)
+        if (myRank) {
             text += `╭━━━━━━━━━━━━━ 👤 ━━━━━━━━━━━━━╮\n`
-            text += `┃ Posisi Anda: #${yourRank}\n`
-            text += `┃ Score: ${(yourData[selectedCategory] || 0).toLocaleString('id-ID')}\n`
+            text += `┃ Posisi Anda: #${myRank.rank} dari ${myRank.total}\n`
+            text += `┃ ${catInfo.icon} Score: ${fmtNum(myRank.value)}\n`
             text += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯`
         }
 
-        const timeframeInfo = timeframe === 'daily' ? '⏰ Reset: Setiap 24 jam' :
-                              timeframe === 'weekly' ? '⏰ Reset: Setiap 7 hari' :
-                              timeframe === 'seasonal' ? '⏰ Reset: Setiap 6 bulan' : '⏰ Permanent Records'
-        
-        text += `\n\n${timeframeInfo}`
+        text += `\n\n📌 _Gunakan ${usedPrefix}lb <kategori> untuk lihat yang lain_`
 
-        await conn.sendMessage(m.chat, {
-            text: text,
-            edit: statusMsg.key
-        })
+        await conn.sendMessage(m.chat, { text, edit: statusMsg.key })
 
-        // Send interactive buttons for quick navigation
-        const otherTimeframes = ['daily', 'weekly', 'seasonal', 'allTime'].filter(t => t !== timeframe)
-        await quickButtons(conn, m.chat, `📌 *Lihat Leaderboard Lain:*`, categoryName, [
-            ...otherTimeframes.slice(0, 3).map(t => ({
-                id: `${usedPrefix}leaderboard ${t} ${Object.keys(categories).find(k => categories[k] === selectedCategory) || 'dungeonwins'}`,
-                text: `📊 ${t.charAt(0).toUpperCase() + t.slice(1)}`
+        // Quick buttons untuk kategori lain
+        const otherCats = Object.entries(CATEGORIES).filter(([k]) => k !== category).slice(0, 4)
+        await quickButtons(conn, m.chat, `📊 *Lihat Kategori Lain:*`, catInfo.name, 
+            otherCats.map(([key, cat]) => ({
+                id: `${usedPrefix}lb ${key}`,
+                text: `${cat.icon} ${cat.name}`
             }))
-        ])
+        )
 
     } catch (error) {
         console.error('Error in leaderboard:', error)
@@ -129,7 +133,7 @@ let handler = async (m, { conn, args, usedPrefix }) => {
     }
 }
 
-handler.help = ['leaderboard [timeframe] [category]']
+handler.help = ['leaderboard [kategori]', 'lb wealth/level/money/diamond/emerald/pets/exp']
 handler.tags = ['rpg', 'leaderboard']
 handler.command = /^(leaderboard|lb)$/i
 handler.register = true
