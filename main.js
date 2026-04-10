@@ -33,7 +33,7 @@ import {
   handlePairing,
   messageTemplates
 } from "./lib/connection.js";
-import { setupBadMacHandler } from './lib/bad-mac-handler.js';
+import { setupBadMacHandler, resetErrorTracking } from './lib/bad-mac-handler.js';
 import { startCryptoTicker } from './plugins/crypto-ticker.js';
 
 const app = express();
@@ -167,64 +167,20 @@ conn._lastMessageTime = Date.now();
 conn._disconnectCount = 0;
 conn._isReconnecting = false;
 
-// Health check setiap 60 detik
+// Health check setiap 90 detik - send presence to keep alive
 setInterval(() => {
-  if (conn.user) {
+  if (conn?.user && !conn._isReconnecting) {
     const timeSinceLastMessage = Date.now() - conn._lastMessageTime;
-    if (timeSinceLastMessage > 300000) { // 5 menit tanpa aktivitas
-      console.log(chalk.yellow('[!] No activity detected. Sending keep-alive ping...'));
-      try {
-        conn.sendPresenceUpdate('available', conn.user.id);
-      } catch (e) {
-        console.log(chalk.red('[!] Keep-alive failed, attempting reconnect...'));
-      }
+    if (timeSinceLastMessage > 180000) { // 3 menit tanpa aktivitas
+      console.log(chalk.gray('[~] Sending keep-alive ping...'));
+      conn.sendPresenceUpdate('available').catch(() => {});
     }
   }
-}, 60000);
+}, 90000);
 
-// Socket error listener untuk detect disconnect lebih cepat
-if (conn.ws) {
-  conn.ws.on('close', () => {
-    console.log(chalk.red('[!] WebSocket closed unexpectedly'));
-    if (!conn._isReconnecting) {
-      conn._isReconnecting = true;
-      setTimeout(() => {
-        console.log(chalk.cyan('[~] Initiating emergency reconnect...'));
-        global.reloadHandler(true).finally(() => {
-          conn._isReconnecting = false;
-        });
-      }, 3000);
-    }
-  });
-
-  conn.ws.on('error', (err) => {
-    console.log(chalk.red('[!] WebSocket error:'), err.message || err);
-    if (!conn._isReconnecting) {
-      conn._isReconnecting = true;
-      setTimeout(() => {
-        console.log(chalk.cyan('[~] Recovering from socket error...'));
-        global.reloadHandler(true).finally(() => {
-          conn._isReconnecting = false;
-        });
-      }, 3000);
-    }
-  });
-}
-
-// Track last message time untuk keep-alive
+// Track last message time
 conn.ev.on('messages.upsert', () => {
   conn._lastMessageTime = Date.now();
-});
-
-// Track credentials update untuk MAC address consistency
-let lastCredsCheck = Date.now();
-conn.ev.on('creds.update', () => {
-  const now = Date.now();
-  // Only log updates yang tidak frequent (prevent spam)
-  if (now - lastCredsCheck > 10000) {
-    console.log(chalk.gray('[~] Session credentials updated'));
-    lastCredsCheck = now;
-  }
 });
 
 // ========== END KEEP-ALIVE ==========
@@ -267,44 +223,50 @@ global.reloadHandler = async function reloadHandler(restartConn, attempt = 1) {
     try {
       reconnectAttempts++;
       const currentChats = global.conn?.chats || {};
-      try {
-        global.conn?.ws?.close();
-      } catch {}
       
-      conn?.ev?.removeAllListeners();
+      // Clean up old connection
+      try { conn?.ev?.removeAllListeners(); } catch {}
+      try { global.conn?.ws?.close(); } catch {}
       
       console.log(chalk.cyan(`[~] Restarting connection (attempt ${reconnectAttempts})...`));
-      global.conn = makeWASocket(connectionOptions, { chats: currentChats });
       
-      // Reset reconnect attempts on success
-      if (global.conn) {
-        await new Promise(resolve => {
-          const timeout = setTimeout(() => resolve(), 15000);
-          // Listen for successful connection
-          const connListener = (update) => {
-            if (update.connection === 'open') {
-              clearTimeout(timeout);
-              global.conn.ev.off('connection.update', connListener);
-              reconnectAttempts = 0; // Reset on success
-              resolve();
-            }
-          };
-          global.conn.ev.on('connection.update', connListener);
-        });
-      }
+      // Reset error tracking on new connection
+      resetErrorTracking();
+      
+      global.conn = makeWASocket(connectionOptions, { chats: currentChats });
+      conn._disconnectCount = reconnectAttempts;
+      conn._isReconnecting = false;
+      conn._lastMessageTime = Date.now();
+      
+      // Re-apply bad MAC handler to new connection
+      setupBadMacHandler(conn);
+      
+      // Wait for connection to establish
+      await new Promise((resolve) => {
+        const timeout = setTimeout(() => resolve(), 20000);
+        const connListener = (update) => {
+          if (update.connection === 'open') {
+            clearTimeout(timeout);
+            conn.ev.off('connection.update', connListener);
+            reconnectAttempts = 0;
+            resolve();
+          }
+        };
+        conn.ev.on('connection.update', connListener);
+      });
       
       isHandlerInitializing = true;
     } catch (error) {
       console.error(chalk.red('[!] Error restarting connection:'), error.message);
       
-      // Retry dengan delay exponential
       if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
         const delayMs = Math.min(5000 * Math.pow(2, attempt - 1), 30000);
-        console.log(chalk.yellow(`[!] Retrying in ${delayMs}ms...`));
+        console.log(chalk.yellow(`[!] Retrying in ${delayMs / 1000}s...`));
         await new Promise(resolve => setTimeout(resolve, delayMs));
         return global.reloadHandler(true, attempt + 1);
       } else {
-        console.log(chalk.red('[!] Max reconnect attempts reached. Keeping process alive.'));
+        console.log(chalk.red('[!] Max reconnect attempts reached. Resetting counter, will retry on next event.'));
+        reconnectAttempts = 0; // Reset so future disconnects can still try
       }
     }
   }
@@ -342,36 +304,26 @@ global.reloadHandler = async function reloadHandler(restartConn, attempt = 1) {
 };
 
 // ========== ADDITIONAL SAFEGUARDS ==========
-// Aggressive presence update setiap 2 menit untuk keep bot active
-const presenceUpdateInterval = setInterval(async () => {
+// Watchdog: detect zombie connections (connected but not receiving messages)
+const watchdogInterval = setInterval(async () => {
   try {
-    if (conn && conn.user && !conn._isReconnecting) {
-      const botJid = conn.user.id;
-      await conn.sendPresenceUpdate('available', botJid).catch(() => {
-        // Silently handle if this fails
-      });
-    }
-  } catch (error) {
-    console.log(chalk.gray('[~] Presence update request (normal, dapat diabaikan)'));
-  }
-}, 120000); // 2 minutes
-
-// Session integrity check setiap 10 menit
-const sessionCheckInterval = setInterval(async () => {
-  try {
-    if (conn && conn.user && conn.authState?.creds) {
-      // Verify session still valid
-      const sessionValid = conn.authState.creds?.me?.id;
-      if (sessionValid) {
-        console.log(chalk.gray('[✓] Session integrity check passed'));
-      } else {
-        console.log(chalk.yellow('[!] Session appears invalid, consider re-authenticating'));
+    if (conn?.user && !conn._isReconnecting) {
+      const timeSinceLastMsg = Date.now() - (conn._lastMessageTime || Date.now());
+      
+      // If 10+ minutes with no messages and connection appears open, send presence
+      if (timeSinceLastMsg > 600000) {
+        console.log(chalk.yellow('[WATCHDOG] No messages for 10+ min. Checking connection...'));
+        try {
+          await conn.sendPresenceUpdate('available');
+          conn._lastMessageTime = Date.now(); // Reset timer
+        } catch (e) {
+          console.log(chalk.red('[WATCHDOG] Connection appears dead. Forcing reconnect...'));
+          await global.reloadHandler(true).catch(() => {});
+        }
       }
     }
-  } catch (error) {
-    console.log(chalk.gray('[~] Session check error (dapat diabaikan)'));
-  }
-}, 600000); // 10 minutes
+  } catch {}
+}, 300000); // Check every 5 minutes
 
 // Graceful shutdown handlers untuk prevent hanging
 let isShuttingDown = false;
@@ -384,8 +336,7 @@ async function gracefulShutdown(signal) {
   
   try {
     // Stop accepting new requests
-    clearInterval(presenceUpdateInterval);
-    clearInterval(sessionCheckInterval);
+    clearInterval(watchdogInterval);
     
     // Save database
     if (global.db?.write) {
