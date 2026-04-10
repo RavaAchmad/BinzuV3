@@ -22,9 +22,9 @@ let handler = async (m, { conn, command }) => {
     } else m.reply(`Silahkan Menunggu ${timers} Untuk ${command} Lagi`)
 }
 
-handler.help = ['korupsi']
+handler.help = ['korupsi', 'korup']
 handler.tags = ['rpg']
-handler.command = /^(bansos|korupsi)$/i
+handler.command = /^(korupsi|korup)$/i
 handler.register = true
 handler.group = true
 handler.rpg = true

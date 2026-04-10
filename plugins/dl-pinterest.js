@@ -1,32 +1,71 @@
-import { binzuDownload, binzuSearch } from '../lib/binzu-api.js';
+import fetch from 'node-fetch';
+import { scrapePinterest } from '../lib/scrape.js';
 
-let handler = async (m, { conn, args, usedPrefix, command, text }) => {
-    if (!text) throw `*Contoh:* ${usedPrefix}${command} https://pinterest.com/pin/xxxxx atau ${usedPrefix}${command} anime girl`
-    await m.reply('🔍 Sedang memproses...')
-    try {
-        if (text.includes('pinterest.com') || text.includes('pin.it')) {
-            const data = await binzuDownload('pinterest', text)
-            const r = data.result
-            const url = r?.url || r?.image || r?.video || r?.download
-            if (!url) throw 'Media tidak ditemukan'
-            await conn.sendFile(m.chat, url, null, r?.title || '', m)
-        } else {
-            const data = await binzuSearch('pinterest', text)
-            const r = data.result
-            const results = Array.isArray(r) ? r : r?.images || r?.pins || []
-            if (results.length === 0) throw 'Tidak ditemukan'
-            const pick = results[Math.floor(Math.random() * Math.min(20, results.length))]
-            const url = typeof pick === 'string' ? pick : pick?.url || pick?.image || pick?.src
-            if (!url) throw 'Gambar tidak ditemukan'
-            await conn.sendFile(m.chat, url, 'pinterest.jpg', '', m)
-        }
-    } catch (e) {
-        m.reply(`❌ Gagal: ${e.message}`)
+let handler = async (m, { conn, args, usedPrefix, command }) => {
+  if (!args[0]) {
+    throw `Masukkan URL atau keyword!\n\ncontoh:\n${usedPrefix}${command} https://pin.it/4CVodSq\natau\n${usedPrefix}${command} aesthetic landscape\natau\n${usedPrefix}${command} aesthetic landscape --video`;
+  }
+  try {
+    m.reply('⏳ Sedang mencari...');
+    
+    // Check for --video flag
+    const hasVideoFlag = args.some(arg => arg === '--video');
+    const query = args.filter(arg => arg !== '--video').join(' ');
+    
+    let results;
+    
+    // Get Pinterest content (returns array)
+    results = await scrapePinterest(query);
+
+    if (!results || results.length === 0) {
+      return m.reply('❌ Tidak ditemukan konten Pinterest. Coba keyword lain.');
     }
-}
 
-handler.help = ['pinterestdownload']
+    // Filter by type based on flag
+    let filtered = results;
+    if (hasVideoFlag) {
+      filtered = results.filter(r => r.type === 'video');
+      if (filtered.length === 0) {
+        return m.reply('❌ Tidak ditemukan video. Coba keyword lain atau hapus flag --video untuk mencari gambar.');
+      }
+    } else {
+      filtered = results.filter(r => r.type === 'image');
+      if (filtered.length === 0) {
+        return m.reply('❌ Tidak ditemukan gambar. Coba gunakan flag --video untuk mencari video.');
+      }
+    }
+
+    // Pick random result
+    const result = filtered[Math.floor(Math.random() * filtered.length)];
+    const { type, title, url, likes, comments, link } = result;
+    
+    let caption = `*✨ Pinterest ${type.toUpperCase()} ✨*\n\n`;
+    caption += `*📌 Judul:* ${title || '-'}\n`;
+    caption += `*❤️ Likes:* ${likes || 0}\n`;
+    caption += `*💬 Komentar:* ${comments || 0}\n`;
+    if (link) caption += `*🔗 Link:* ${link}\n`;
+
+    if (type === 'video') {
+      const { duration } = result;
+      if (duration) caption += `*⏱️ Durasi:* ${duration}\n`;
+      
+      await conn.sendMessage(m.chat, { 
+        video: { url }, 
+        caption 
+      }, { quoted: m });
+    } else {
+      await conn.sendFile(m.chat, url, 'pinterest.jpg', caption, m);
+    }
+  } catch (e) {
+    console.log(e);
+    m.reply('❌ Gagal mengunduh dari Pinterest. Coba lagi nanti.');
+  }
+};
+
+handler.help = ['pinterestdownload'].map(v => v + ' <url/keyword>')
 handler.tags = ['downloader']
-handler.command = /^(pinterest|pin)$/i
+handler.command = /^(pinterest|pinterest|pin)$/i
+handler.register = false
 handler.limit = true
+
 export default handler

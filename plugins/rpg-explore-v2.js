@@ -7,7 +7,7 @@ let handler = async (m, { conn, args, command }) => {
     const userName = await conn.getName(userId)
     const user = await RPGHandler.initializeUser(global.db, userId, userName)
 
-    if (command === 'explorenew' || command === 'exploreadvanced') {
+    if (command === 'explore' || command === 'explorenew' || command === 'exploreadvanced') {
       if (!args[0]) {
         // Show available areas
         const areas = ExploreSystem.getAvailableAreas(user.level)
@@ -46,9 +46,16 @@ let handler = async (m, { conn, args, command }) => {
         await conn.sendMessage(m.chat, { text: text }, { quoted: m })
       } else {
         const areaNumber = parseInt(args[0])
+        const maxArea = Object.keys(EXPLORE_AREAS).length
+        const maxAreaByLevel = Math.floor(user.level / 4)
 
-        if (isNaN(areaNumber) || areaNumber < 1 || areaNumber > 18) {
-          await conn.sendMessage(m.chat, { text: '❌ Area tidak valid (1-18)' }, { quoted: m })
+        if (isNaN(areaNumber) || areaNumber < 1 || !EXPLORE_AREAS[areaNumber]) {
+          await conn.sendMessage(m.chat, { text: `❌ Area tidak valid (1-${maxArea})` }, { quoted: m })
+          return
+        }
+
+        if (areaNumber > maxAreaByLevel) {
+          await conn.sendMessage(m.chat, { text: `🔒 Area ${areaNumber} belum terbuka!\nLevel kamu: ${user.level} (buka sampai area ${maxAreaByLevel})\nButuh level *${areaNumber * 4}* untuk area ${areaNumber}` }, { quoted: m })
           return
         }
 
@@ -78,6 +85,11 @@ let handler = async (m, { conn, args, command }) => {
           text += `\n💎 *Rare Drop:* ${encounter.rareDrop.emoji} ${encounter.rareDrop.name}`
         }
 
+        if (encounter.easterEggs > 0) {
+          text += `\n🥚 *Easter Eggs:* +${encounter.easterEggs} Telur Paskah!`
+          user.paskah = (user.paskah || 0) + encounter.easterEggs
+        }
+
         text += `\n\n_Use !fight in battle context_`
 
         await conn.sendMessage(m.chat, { text: text }, { quoted: m })
@@ -94,8 +106,8 @@ let handler = async (m, { conn, args, command }) => {
   }
 }
 
-handler.help = ['explorenew', 'exploreadvanced']
+handler.help = ['explore', 'explorenew', 'exploreadvanced']
 handler.tags = ['rpg']
-handler.command = /^(explorenew|exploreadvanced)(?: (.+))?$/i
+handler.command = /^(explore|explorenew|exploreadvanced)(?: (.+))?$/i
 
 export default handler

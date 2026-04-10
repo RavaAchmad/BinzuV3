@@ -1,3 +1,7 @@
+const FEED_COOLDOWN = 300000 // 5 menit
+const PET_TYPES = ['fox', 'cat', 'dog', 'horse', 'robo']
+const PET_EMOJIS = { fox: '🦊', cat: '🐈', dog: '🐕', horse: '🐴', robo: '🤖' }
+
 let handler = async (m, { conn, args, usedPrefix }) => {
 	let info = `
 乂 List Pet:
@@ -8,135 +12,75 @@ let handler = async (m, { conn, args, usedPrefix }) => {
 🤖 • Rᴏʙᴏ
 
 *➠ Example:* ${usedPrefix}feed cat
+*➠ Feed All:* ${usedPrefix}feed all
 `.trim()
-let pesan = pickRandom(['ɴʏᴜᴍᴍᴍ~', 'ᴛʜᴀɴᴋs', 'ᴛʜᴀɴᴋʏᴏᴜ ^-^', '...', 'ᴛʜᴀɴᴋ ʏᴏᴜ~', 'ᴀʀɪɢᴀᴛᴏᴜ ^-^'])
+    let pesan = pickRandom(['ɴʏᴜᴍᴍᴍ~', 'ᴛʜᴀɴᴋs', 'ᴛʜᴀɴᴋʏᴏᴜ ^-^', '...', 'ᴛʜᴀɴᴋ ʏᴏᴜ~', 'ᴀʀɪɢᴀᴛᴏᴜ ^-^'])
     let type = (args[0] || '').toLowerCase()
-    let emo = (type == 'fox' ? '🦊':'' || type == 'cat' ? '🐈':'' || type == 'dog' ? '🐕':'' || type == 'horse' ? '🐴':'' || type == 'robo'? '🤖':'' ) 
     let user = global.db.data.users[m.sender]
-    let rubah = global.db.data.users[m.sender].fox
-    let kuda = global.db.data.users[m.sender].horse
-    let kucing = global.db.data.users[m.sender].cat
-    let anjing = global.db.data.users[m.sender].dog
-    let robot = global.db.data.users[m.sender].robo
-    switch (type) {
-        case 'fox':
-            if (rubah == 0) return m.reply('ʏᴏᴜ ᴅᴏɴ\'ᴛ ʜᴀᴠᴇ ᴛʜɪs ᴘᴇᴛ ʏᴇᴛ!')
-            if (rubah == 10) return m.reply('ʏᴏᴜʀ ᴘᴇᴛ ɪs ᴍᴀx ʟᴇᴠᴇʟ !')
-            let __waktur = (new Date - user.foxlastfeed)
-            let _waktur = (180000 - __waktur)
-            let waktur = clockString(_waktur)
-            if (new Date - user.foxlastfeed > 180000) {
-                if (user.petfood > 0) {
-                    user.petfood -= 1
-                    user.foxexp += 20
-                    user.foxlastfeed = new Date * 1
-                    m.reply(`ғᴇᴇᴅɪɴɢ *${type}*...\n*${emo} ${type.capitalize()}:* ${pesan}`)
-                    if (rubah > 0) {
-                        let naiklvl = ((rubah * 100) - 1)
-                        if (user.foxexp > naiklvl) {
-                            user.fox += 1
-                            user.foxexp -= (rubah * 100)
-                            m.reply(`*ᴄᴏɴɢʀᴀᴛs!* , ʏᴏᴜʀ ᴘᴇᴛ ʟᴇᴠᴇʟᴜᴘ`)
-                        }
-                    }
-                } else m.reply(`ʏᴏᴜʀ ᴘᴇᴛ ғᴏᴏᴅ ɴᴏᴛ ᴇɴᴏᴜɢʜ`)
-            } else m.reply(`ʏᴏᴜʀ ᴘᴇᴛ ɪs ғᴜʟʟ, ᴛʀʏ ғᴇᴇᴅɪɴɢ ɪᴛ ᴀɢᴀɪɴ ɪɴ\n➞ *${waktur}*`)
-            break
-        case 'cat':
-            if (kucing == 0) return m.reply('ʏᴏᴜ ᴅᴏɴ\'ᴛ ʜᴀᴠᴇ ᴛʜɪs ᴘᴇᴛ ʏᴇᴛ!')
-            if (kucing == 10) return m.reply('ʏᴏᴜʀ ᴘᴇᴛ ɪs ᴍᴀx ʟᴇᴠᴇʟ !')
-            let __waktuc = (new Date - user.catlastfeed)
-            let _waktuc = (180000 - __waktuc)
-            let waktuc = clockString(_waktuc)
-            if (new Date - user.catlastfeed > 180000) {
-                if (user.petfood > 0) {
-                    user.petfood -= 1
-                    user.catexp += 20
-                    user.catlastfeed = new Date * 1
-                    m.reply(`ғᴇᴇᴅɪɴɢ *${type}*...\n*${emo} ${type.capitalize()}:* ${pesan}`)
-            
-                    if (kucing > 0) {
-                        let naiklvl = ((kucing * 100) - 1)
-                        if (user.catexp > naiklvl) {
-                            user.cat += 1
-                            user.catexp -= (kucing * 100)
-                            m.reply(`*ᴄᴏɴɢʀᴀᴛs!* , ʏᴏᴜʀ ᴘᴇᴛ ʟᴇᴠᴇʟᴜᴘ`)
-                        }
-                    }
-                } else m.reply(`ʏᴏᴜʀ ᴘᴇᴛ ғᴏᴏᴅ ɴᴏᴛ ᴇɴᴏᴜɢʜ`)
-            } else m.reply(`ʏᴏᴜʀ ᴘᴇᴛ ɪs ғᴜʟʟ, ᴛʀʏ ғᴇᴇᴅɪɴɢ ɪᴛ ᴀɢᴀɪɴ ɪɴ\n➞ *${waktuc}*`)
-            break
-        case 'dog':
-            if (anjing == 0) return m.reply('ʏᴏᴜ ᴅᴏɴ\'ᴛ ʜᴀᴠᴇ ᴛʜɪs ᴘᴇᴛ ʏᴇᴛ!')
-            if (anjing == 10) return m.reply('ʏᴏᴜʀ ᴘᴇᴛ ɪs ᴍᴀx ʟᴇᴠᴇʟ !')
-            let __waktua = (new Date - user.doglastfeed)
-            let _waktua = (180000 - __waktua)
-            let waktua = clockString(_waktua)
-            if (new Date - user.doglastfeed > 180000) {
-                if (user.petfood > 0) {
-                    user.petfood -= 1
-                    user.dogexp += 20
-                    user.doglastfeed = new Date * 1
-                    m.reply(`ғᴇᴇᴅɪɴɢ *${type}*...\n*${emo} ${type.capitalize()}:* ${pesan}`)
-                    if (anjing > 0) {
-                        let naiklvl = ((anjing * 100) - 1)
-                        if (user.dogexp > naiklvl) {
-                            user.dog += 1
-                            user.dogexp -= (anjing * 100)
-                            m.reply(`*ᴄᴏɴɢʀᴀᴛs!* , ʏᴏᴜʀ ᴘᴇᴛ ʟᴇᴠᴇʟᴜᴘ`)
-                        }
-                    }
-                } else m.reply(`ʏᴏᴜʀ ᴘᴇᴛ ғᴏᴏᴅ ɴᴏᴛ ᴇɴᴏᴜɢʜ`)
-            } else m.reply(`ʏᴏᴜʀ ᴘᴇᴛ ɪs ғᴜʟʟ, ᴛʀʏ ғᴇᴇᴅɪɴɢ ɪᴛ ᴀɢᴀɪɴ ɪɴ\n➞ *${waktua}*`)
-            break
-        case 'horse':
-            if (kuda == 0) return m.reply('ʏᴏᴜ ᴅᴏɴ\'ᴛ ʜᴀᴠᴇ ᴛʜɪs ᴘᴇᴛ ʏᴇᴛ!')
-            if (kuda == 10) return m.reply('ʏᴏᴜʀ ᴘᴇᴛ ɪs ᴍᴀx ʟᴇᴠᴇʟ !')
-            let __waktuk = (new Date - user.horselastfeed)
-            let _waktuk = (180000 - __waktuk)
-            let waktuk = clockString(_waktuk)
-            if (new Date - user.horselastfeed > 180000) {
-                if (user.petfood > 0) {
-                    user.petfood -= 1
-                    user.horseexp += 20
-                    user.horselastfeed = new Date * 1
-                    m.reply(`ғᴇᴇᴅɪɴɢ *${type}*...\n*${emo} ${type.capitalize()}:* ${pesan}`)
-                    if (kuda > 0) {
-                        let naiklvl = ((kuda * 100) - 1)
-                        if (user.horseexp > naiklvl) {
-                            user.horse += 1
-                            user.horseexp -= (kuda * 100)
-                            m.reply(`*ᴄᴏɴɢʀᴀᴛs!* , ʏᴏᴜʀ ᴘᴇᴛ ʟᴇᴠᴇʟᴜᴘ`)
-                        }
-                    }
-                } else m.reply(`ʏᴏᴜʀ ᴘᴇᴛ ғᴏᴏᴅ ɴᴏᴛ ᴇɴᴏᴜɢʜ`)
-            } else m.reply(`ʏᴏᴜʀ ᴘᴇᴛ ɪs ғᴜʟʟ, ᴛʀʏ ғᴇᴇᴅɪɴɢ ɪᴛ ᴀɢᴀɪɴ ɪɴ\n➞ *${waktuk}*`)
-            break
-            case 'robo':
-            if (robot == 0) return m.reply('ʏᴏᴜ ᴅᴏɴ\'ᴛ ʜᴀᴠᴇ ᴛʜɪs ᴘᴇᴛ ʏᴇᴛ!')
-            if (robot == 10) return m.reply('ʏᴏᴜʀ ᴘᴇᴛ ɪs ᴍᴀx ʟᴇᴠᴇʟ !')
-            let __wakturb = (new Date - user.robolastfeed)
-            let _wakturb = (180000 - __wakturb)
-            let wakturb = clockString(_wakturb)
-            if (new Date - user.robolastfeed > 180000) {
-                if (user.petfood > 0) {
-                    user.petfood -= 1
-                    user.roboexp += 20
-                    user.robolastfeed = new Date * 1
-                    m.reply(`ғᴇᴇᴅɪɴɢ *${type}*...\n*${emo} ${type.capitalize()}:* ${pesan}`)
-                    if (robot > 0) {
-                        let naiklvl = ((robot * 100) - 1)
-                        if (user.roboexp > naiklvl) {
-                            user.robo += 1
-                            user.roboexp -= (robot * 100)
-                            m.reply(`*ᴄᴏɴɢʀᴀᴛs!* , ʏᴏᴜʀ ᴘᴇᴛ ʟᴇᴠᴇʟᴜᴘ`)
-                        }
-                    }
-                } else m.reply(`ʏᴏᴜʀ ᴘᴇᴛ ғᴏᴏᴅ ɴᴏᴛ ᴇɴᴏᴜɢʜ`)
-            } else m.reply(`ʏᴏᴜʀ ᴘᴇᴛ ɪs ғᴜʟʟ, ᴛʀʏ ғᴇᴇᴅɪɴɢ ɪᴛ ᴀɢᴀɪɴ ɪɴ\n➞ *${wakturb}*`)
-            break
-        default:
-            return m.reply(info)
+
+    if (type === 'all') {
+        // Feed ALL pets at once
+        let __waktuAll = (new Date - (user.feedalllast || 0))
+        let _waktuAll = (FEED_COOLDOWN - __waktuAll)
+        if (_waktuAll > 0) {
+            return m.reply(`ᴘᴇᴛs ᴍᴀsɪʜ ᴋᴇɴʏᴀɴɢ, ᴛᴜɴɢɢᴜ:\n➞ *${clockString(_waktuAll)}*`)
+        }
+
+        let ownedPets = PET_TYPES.filter(p => user[p] > 0 && user[p] < 10)
+        if (ownedPets.length === 0) return m.reply('ᴋᴀᴍᴜ ᴛɪᴅᴀᴋ ᴘᴜɴʏᴀ ᴘᴇᴛ ʏᴀɴɢ ʙɪsᴀ ᴅɪ-ғᴇᴇᴅ!')
+
+        let needed = ownedPets.length
+        if (user.petfood < needed) return m.reply(`ᴘᴇᴛ ғᴏᴏᴅ ᴋᴜʀᴀɴɢ! Butuh *${needed}*, punya *${user.petfood}*`)
+
+        let results = []
+        for (let pet of ownedPets) {
+            user.petfood -= 1
+            user[pet + 'exp'] = (user[pet + 'exp'] || 0) + 20
+            let lvl = user[pet]
+            let naiklvl = (lvl * 100) - 1
+            let leveledUp = false
+            if (user[pet + 'exp'] > naiklvl) {
+                user[pet] += 1
+                user[pet + 'exp'] -= (lvl * 100)
+                leveledUp = true
+            }
+            user[pet + 'lastfeed'] = new Date * 1
+            results.push(`${PET_EMOJIS[pet]} *${pet.capitalize()}* Lv.${user[pet]}${leveledUp ? ' ⬆️ LEVEL UP!' : ''} — ${pickRandom(['ɴʏᴜᴍᴍᴍ~', 'ᴛʜᴀɴᴋs!', '^-^'])}`)
+        }
+
+        user.feedalllast = new Date * 1
+        return m.reply(`🍖 *FEED ALL PETS*\n\n${results.join('\n')}\n\n📦 Pet Food: ${user.petfood} remaining`)
+    }
+
+    // Single pet feed
+    let emo = PET_EMOJIS[type] || ''
+    if (!PET_TYPES.includes(type)) return m.reply(info)
+
+    let petLevel = user[type]
+    if (petLevel == 0) return m.reply('ʏᴏᴜ ᴅᴏɴ\'ᴛ ʜᴀᴠᴇ ᴛʜɪs ᴘᴇᴛ ʏᴇᴛ!')
+    if (petLevel == 10) return m.reply('ʏᴏᴜʀ ᴘᴇᴛ ɪs ᴍᴀx ʟᴇᴠᴇʟ !')
+
+    let __waktu = (new Date - (user[type + 'lastfeed'] || 0))
+    let _waktu = (FEED_COOLDOWN - __waktu)
+    if (_waktu > 0) {
+        return m.reply(`ʏᴏᴜʀ ᴘᴇᴛ ɪs ғᴜʟʟ, ᴛʀʏ ғᴇᴇᴅɪɴɢ ɪᴛ ᴀɢᴀɪɴ ɪɴ\n➞ *${clockString(_waktu)}*`)
+    }
+
+    if (user.petfood <= 0) return m.reply('ʏᴏᴜʀ ᴘᴇᴛ ғᴏᴏᴅ ɴᴏᴛ ᴇɴᴏᴜɢʜ')
+
+    user.petfood -= 1
+    user[type + 'exp'] = (user[type + 'exp'] || 0) + 20
+    user[type + 'lastfeed'] = new Date * 1
+
+    m.reply(`ғᴇᴇᴅɪɴɢ *${type}*...\n*${emo} ${type.capitalize()}:* ${pesan}`)
+
+    if (petLevel > 0) {
+        let naiklvl = (petLevel * 100) - 1
+        if (user[type + 'exp'] > naiklvl) {
+            user[type] += 1
+            user[type + 'exp'] -= (petLevel * 100)
+            m.reply('*ᴄᴏɴɢʀᴀᴛs!* , ʏᴏᴜʀ ᴘᴇᴛ ʟᴇᴠᴇʟᴜᴘ')
+        }
     }
 }
 handler.help = ['feed [pet type]']

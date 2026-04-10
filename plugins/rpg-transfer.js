@@ -5,6 +5,7 @@ const items = [
     'uncommon', 'mythic', 'legendary', 'pet', 'chip', 
     'anggur', 'apel', 'jeruk', 'mangga', 'pisang', 
     'bibitanggur', 'bibitapel', 'bibitjeruk', 'bibitmangga', 'bibitpisang',
+    'shard',
 ]
 let handler = async (m, { conn, args, usedPrefix, command }) => {
     let user = global.db.data.users[m.sender]
