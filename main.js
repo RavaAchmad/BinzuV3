@@ -31,7 +31,9 @@ import {
   connectionUpdate, 
   createConnection,
   handlePairing,
-  messageTemplates
+  messageTemplates,
+  getConnectionState,
+  stopHealthMonitoring
 } from "./lib/connection.js";
 import { setupBadMacHandler, resetErrorTracking } from './lib/bad-mac-handler.js';
 import { startCryptoTicker } from './plugins/crypto-ticker.js';
@@ -162,28 +164,11 @@ setupBadMacHandler(conn);
 console.log(chalk.cyan('[~] Bad MAC error handler initialized'));
 // ========== END BAD MAC HANDLING ==========
 
-// ========== KEEP-ALIVE & PROTECTION MECHANISM ==========
-conn._lastMessageTime = Date.now();
+// ========== CONNECTION STATE ==========
 conn._disconnectCount = 0;
 conn._isReconnecting = false;
-
-// Health check setiap 90 detik - send presence to keep alive
-setInterval(() => {
-  if (conn?.user && !conn._isReconnecting) {
-    const timeSinceLastMessage = Date.now() - conn._lastMessageTime;
-    if (timeSinceLastMessage > 180000) { // 3 menit tanpa aktivitas
-      console.log(chalk.gray('[~] Sending keep-alive ping...'));
-      conn.sendPresenceUpdate('available').catch(() => {});
-    }
-  }
-}, 90000);
-
-// Track last message time
-conn.ev.on('messages.upsert', () => {
-  conn._lastMessageTime = Date.now();
-});
-
-// ========== END KEEP-ALIVE ==========
+// Health monitoring (keep-alive, zombie detection) is now handled by connection.js
+// ========== END CONNECTION STATE ==========
 
 if (!opts.test) {
   setInterval(async () => {
@@ -224,8 +209,11 @@ global.reloadHandler = async function reloadHandler(restartConn, attempt = 1) {
       reconnectAttempts++;
       const currentChats = global.conn?.chats || {};
       
-      // Clean up old connection
-      try { conn?.ev?.removeAllListeners(); } catch {}
+      // Clean up old connection properly
+      try { 
+        stopHealthMonitoring();
+        conn?.ev?.removeAllListeners(); 
+      } catch {}
       try { global.conn?.ws?.close(); } catch {}
       
       console.log(chalk.cyan(`[~] Restarting connection (attempt ${reconnectAttempts})...`));
@@ -236,14 +224,16 @@ global.reloadHandler = async function reloadHandler(restartConn, attempt = 1) {
       global.conn = makeWASocket(connectionOptions, { chats: currentChats });
       conn._disconnectCount = reconnectAttempts;
       conn._isReconnecting = false;
-      conn._lastMessageTime = Date.now();
       
       // Re-apply bad MAC handler to new connection
       setupBadMacHandler(conn);
       
-      // Wait for connection to establish
+      // Wait for connection to establish with proper timeout
       await new Promise((resolve) => {
-        const timeout = setTimeout(() => resolve(), 20000);
+        const timeout = setTimeout(() => {
+          console.log(chalk.yellow('[~] Connection timeout — akan dicoba ulang oleh connection handler'));
+          resolve();
+        }, 30000);
         const connListener = (update) => {
           if (update.connection === 'open') {
             clearTimeout(timeout);
@@ -304,26 +294,7 @@ global.reloadHandler = async function reloadHandler(restartConn, attempt = 1) {
 };
 
 // ========== ADDITIONAL SAFEGUARDS ==========
-// Watchdog: detect zombie connections (connected but not receiving messages)
-const watchdogInterval = setInterval(async () => {
-  try {
-    if (conn?.user && !conn._isReconnecting) {
-      const timeSinceLastMsg = Date.now() - (conn._lastMessageTime || Date.now());
-      
-      // If 10+ minutes with no messages and connection appears open, send presence
-      if (timeSinceLastMsg > 600000) {
-        console.log(chalk.yellow('[WATCHDOG] No messages for 10+ min. Checking connection...'));
-        try {
-          await conn.sendPresenceUpdate('available');
-          conn._lastMessageTime = Date.now(); // Reset timer
-        } catch (e) {
-          console.log(chalk.red('[WATCHDOG] Connection appears dead. Forcing reconnect...'));
-          await global.reloadHandler(true).catch(() => {});
-        }
-      }
-    }
-  } catch {}
-}, 300000); // Check every 5 minutes
+// Zombie detection & keep-alive now handled by connection.js health monitoring
 
 // Graceful shutdown handlers untuk prevent hanging
 let isShuttingDown = false;
@@ -335,8 +306,8 @@ async function gracefulShutdown(signal) {
   console.log(chalk.yellow(`[!] ${signal} received, graceful shutdown...`));
   
   try {
-    // Stop accepting new requests
-    clearInterval(watchdogInterval);
+    // Stop health monitoring
+    stopHealthMonitoring();
     
     // Save database
     if (global.db?.write) {
