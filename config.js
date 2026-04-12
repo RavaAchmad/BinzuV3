@@ -9,7 +9,7 @@ global.info = {
     nomorown: '6281212035575',
     namebot: 'ʙɪɴᴢᴜ Bot',
     nameown: 'RV',
-    channel: '120363218308835731@newsletter',
+    channel: '120363406567158177@newsletter',
     namechannel: 'ʙɪɴᴢᴜ | Whatsapp Bots'
 }
 global.adminRG = ["6281212035575@s.whatsapp.net", "628987029543@s.whatsapp.net", "6281268629687@s.whatsapp.net", "120370938015880@lid", "244431001268468@lid", "217333968683183@lid"]
