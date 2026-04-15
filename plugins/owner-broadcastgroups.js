@@ -1,81 +1,103 @@
-/*let handler = async (m, { conn, text, usedPrefix, command, participants }) => {
-	let chats = Object.entries(conn.chats).filter(([jid, chat]) => jid.endsWith('@g.us') && chat.isChats && !chat.metadata?.read_only && !chat.metadata?.announce).map(v => v[0])
-	let img, q = m.quoted ? m.quoted : m
-	let mime = (q.msg || q).mimetype || q.mediaType || q.mtype || ''
-	if (!text) throw `teks nya mana ?`
-	if (mime) img = await q.download?.()
-	conn.reply(m.chat, `_Mengirim pesan broadcast ke ${chats.length} chat_`, m)
-	let teks = command.includes('meme') ? `${text}` : `${text}`
-	for (let id of chats) {
-		try {
-			if (/image|video|viewOnce/g.test(mime)) {
-				if (command.includes('meme')) await conn.sendFile(id, img, '', teks)
-				else await conn.sendFile(id, img, '', teks)
-			} else await conn.sendMessage(id, teks)
-		} catch (e) {
-			console.log(e)
-		}
-		await delay(3000)
-	}
-	await m.reply('Selesai Broadcast All Group Chat :)')
-}*/
+import { interactiveMsg, sendInteractiveMessage } from '../lib/buttons.js'
+import { createRequire } from 'module'
+const require = createRequire(import.meta.url)
 
+let handler = async (m, { conn, text, usedPrefix }) => {
+  if (!text && !m.quoted) throw '❌ Teksnya mana? Tulis pesan atau reply pesan yang mau di-broadcast'
 
-import { quickButtons } from '../lib/buttons.js'
+  let groups = Object.entries(conn.chats)
+    .filter(([jid, chat]) => jid.endsWith('@g.us') && chat.isChats && !chat.metadata?.read_only && !chat.metadata?.announce)
+    .map(v => v[0])
 
-let handler = async (m, { conn, text, usedPrefix, command }) => {
-	let groups = Object.entries(conn.chats).filter(([jid, chat]) => jid.endsWith('@g.us') && chat.isChats && !chat.metadata?.read_only && !chat.metadata?.announce).map(v => v[0])
-	let cc = text ? m : m.quoted ? await m.getQuotedObj() : false || m
-	let teks = text ? text : cc.text
-	let img, mime = (cc.msg || cc).mimetype || cc.mediaType || cc.mtype || ''
-	if (/image|video|viewOnce/g.test(mime)) img = await cc.download?.()
+  // Detect image from quoted or attached
+  let q = m.quoted ? m.quoted : m
+  let mime = (q.msg || q).mimetype || q.mediaType || q.mtype || ''
+  let img = /image/i.test(mime) ? await q.download?.() : null
+  let teks = text || q.text || ''
 
-	// Channel & thumb from config
-	const channelId = global.info?.channel || ''
-	const channelName = global.info?.namechannel || 'Channel'
-	const thumb = global.thum || null
-	const channelUrl = `https://wa.me/${channelId.replace(/@.*/, '')}?text=Halo` // fallback if not newsletter
-	const channelLink = channelId.endsWith('@newsletter') ? `https://whatsapp.com/channel/${channelId.replace('@newsletter','')}` : channelUrl
+  if (!teks && !img) throw '❌ Tidak ada teks atau gambar untuk broadcast'
 
-	// Buttons
-	const buttons = [
-		{ id: usedPrefix + 'menu', text: '📋 Menu' },
-		{ id: usedPrefix + 'sewa', text: '💎 Sewa Bot' },
-		{ id: channelLink, text: '🌐 Channel', url: true }
-	]
+  // Config data
+  const channelId = global.info?.channel || ''
+  const channelName = global.info?.namechannel || 'ʙɪɴᴢᴜ Bot'
+  const botName = global.info?.namebot || 'ʙɪɴᴢᴜ Bot'
+  const thumbUrl = global.thum || ''
+  const channelLink = `https://whatsapp.com/channel/${channelId.replace('@newsletter', '')}`
 
-	// Footer
-	const footer = `Official Channel: ${channelName}\n${channelLink}`
+  // Newsletter context — shows channel badge on message
+  const contextInfo = {
+    mentionedJid: [],
+    forwardingScore: 1,
+    isForwarded: true,
+    forwardedNewsletterMessageInfo: {
+      newsletterJid: channelId,
+      newsletterName: channelName,
+      serverMessageId: -1
+    }
+  }
 
-	// Compose message
-	let sendToGroup = async (id) => {
-		try {
-			if (img) {
-				// Send image with caption, thumb, and buttons
-				await conn.sendMessage(id, {
-					image: img,
-					caption: teks,
-					jpegThumbnail: thumb,
-					footer,
-					buttons: [
-						{ buttonId: usedPrefix + 'menu', buttonText: { displayText: '📋 Menu' }, type: 1 },
-						{ buttonId: usedPrefix + 'sewa', buttonText: { displayText: '💎 Sewa Bot' }, type: 1 },
-						{ buttonId: channelLink, buttonText: { displayText: '🌐 Channel' }, type: 1, urlButton: true }
-					]
-				})
-			} else {
-				// Use quickButtons (baileys_helper) if available, fallback to text
-				await quickButtons(conn, id, teks, footer, buttons)
-			}
-		} catch (e) {
-			console.log(e)
-		}
-		await delay(2000)
-	}
+  // Interactive buttons: .menu (command), channel (link), .sewa (command)
+  const interactiveButtons = [
+    {
+      name: 'quick_reply',
+      buttonParamsJson: JSON.stringify({ display_text: '📋 Menu', id: `${usedPrefix}menu` })
+    },
+    {
+      name: 'cta_url',
+      buttonParamsJson: JSON.stringify({ display_text: `🔔 ${channelName}`, url: channelLink })
+    },
+    {
+      name: 'quick_reply',
+      buttonParamsJson: JSON.stringify({ display_text: '💎 Sewa Bot', id: `${usedPrefix}sewa` })
+    }
+  ]
 
-	conn.reply(m.chat, `_Mengirim pesan broadcast ke ${groups.length} grup_`, m)
-	for (let id of groups) await sendToGroup(id)
-	m.reply('Selesai Broadcast All Group :)')
+  const footer = `${botName} • Follow channel kami!`
+
+  conn.reply(m.chat, `⏳ _Mengirim broadcast ke *${groups.length}* grup..._`, m)
+
+  let success = 0, fail = 0
+
+  for (let id of groups) {
+    try {
+      if (sendInteractiveMessage) {
+        // Use baileys_helper interactive message
+        let content = {
+          text: teks,
+          footer,
+          contextInfo,
+          interactiveButtons
+        }
+        // If image, add as header
+        if (img) content.image = img
+        // If no image but thumb available, use thumb as header  
+        else if (thumbUrl) content.image = { url: thumbUrl }
+
+        await sendInteractiveMessage(conn, id, content)
+      } else {
+        // Fallback: plain message with channel context
+        if (img) {
+          await conn.sendMessage(id, {
+            image: img,
+            caption: `${teks}\n\n_${footer}_\n🔔 ${channelLink}`,
+            contextInfo
+          })
+        } else {
+          await conn.sendMessage(id, {
+            text: `${teks}\n\n_${footer}_\n🔔 ${channelLink}`,
+            contextInfo
+          })
+        }
+      }
+      success++
+    } catch (e) {
+      fail++
+      console.log(`[BC] Gagal kirim ke ${id}:`, e.message || e)
+    }
+    await delay(2000)
+  }
+
+  m.reply(`✅ *Broadcast Selesai!*\n\n📤 Berhasil: ${success} grup\n❌ Gagal: ${fail} grup\n📊 Total: ${groups.length} grup`)
 }
 
 handler.menuowner = ['bcgroup']
@@ -86,6 +108,6 @@ handler.owner = true
 
 export default handler
 
-async function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
