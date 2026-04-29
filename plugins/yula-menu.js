@@ -289,13 +289,21 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
     const isAllMenu = menuType === 'all'
 
     if (!isAllMenu) {
-      await interactiveMsg(conn, m.chat, {
+      await conn.sendMessage(m.chat, {
         text: textToSend,
-        footer: 'Pilih lewat tombol/list di bawah.',
-        contextInfo,
-        image: cachedThumbnail,
-        interactiveButtons: buildMenuButtons(usedPrefix, command, menuType, help)
-      }, m)
+        contextInfo
+      }, { quoted: m })
+
+      try {
+        await interactiveMsg(conn, m.chat, {
+          text: 'Pilih kategori atau aksi cepat di bawah.',
+          footer: `${global.info?.namebot || 'Binzu'} Menu`,
+          contextInfo,
+          interactiveButtons: buildMenuButtons(usedPrefix, command, menuType, help)
+        }, m)
+      } catch (e) {
+        console.warn('[menu] interactive menu skipped:', e?.message || e)
+      }
     } else if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
       if (!db.data.settings[conn.user.jid].thumbnail) {
         conn.sendMessage(m.chat, {
