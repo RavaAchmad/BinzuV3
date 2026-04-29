@@ -11,7 +11,7 @@ import fs from 'fs'
 import { displayUpdateNotification } from './bot-updates.js'
 import { toAudio } from '../lib/converter.js'
 import path from 'path'
-import { interactiveMsg } from '../lib/buttons.js'
+import { getButtonsDebugInfo, interactiveMsg } from '../lib/buttons.js'
 let cachedThumbnail = null
 let tags = {
   // 🧭 CORE / WAJIB (Tier 1)
@@ -156,7 +156,61 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
     let after = conn.menu.after || (conn.user.jid == global.conn.user.jid ? '' : `Powered by wa.me/${global.info.nomorown}\n`) + defaultMenu.after
     
     // Handle menu type based on text input
-    let menuType = text ? text.toLowerCase() : ''
+    let menuType = text ? text.trim().toLowerCase() : ''
+    const isDebugMenu = command === 'menudebug' || ['debug', 'dbg', 'diagnostic', 'diagnostics'].includes(menuType)
+
+    if (isDebugMenu) {
+      const debugInfo = await buildMenuDebugInfo({
+        conn,
+        m,
+        usedPrefix,
+        command,
+        menuType,
+        help,
+        tags,
+        uptime,
+        platform,
+        mode
+      })
+
+      await conn.sendMessage(m.chat, {
+        text: debugInfo.text,
+        contextInfo: { mentionedJid: [m.sender] }
+      }, { quoted: m })
+
+      try {
+        await interactiveMsg(conn, m.chat, {
+          text: 'Menu debug interactive test',
+          footer: 'Kalau tombol ini muncul, native interactive bisa dirender.',
+          mentions: [m.sender],
+          interactiveButtons: [
+            {
+              name: 'quick_reply',
+              buttonParamsJson: JSON.stringify({ display_text: 'Test OK', id: `${usedPrefix}menu` })
+            },
+            {
+              name: 'single_select',
+              buttonParamsJson: JSON.stringify({
+                title: 'Debug List',
+                sections: [{
+                  title: 'Menu',
+                  rows: [
+                    { id: `${usedPrefix}menu`, title: 'Menu utama', description: 'Buka menu biasa' },
+                    { id: `${usedPrefix}menu all`, title: 'Semua menu', description: 'Buka semua command' }
+                  ]
+                }]
+              })
+            }
+          ]
+        }, m)
+      } catch (e) {
+        await conn.sendMessage(m.chat, {
+          text: `Interactive debug gagal:\n${e?.stack || e?.message || e}`
+        }, { quoted: m })
+      }
+      return
+    }
+
     let menuText = []
     
     if (!menuType) {
@@ -269,18 +323,8 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
     }
     textToSend = textToSend.replace(new RegExp(`%(${Object.keys(replace).sort((a, b) => b.length - a.length).join`|`})`, 'g'), (_, name) => '' + replace[name])
     
-    let xm4ze = await( await fetch(xmenus)).json()
-    let thumb = xm4ze[Math.floor(Math.random() * xm4ze.length)]
     if (!cachedThumbnail) {
-      try {
-        cachedThumbnail = await fetch(global.thum ? global.thum : thumb)
-          .then(res => res.arrayBuffer())
-          .then(ab => Buffer.from(ab))
-      } catch {
-        cachedThumbnail = await fetch('https://g.top4top.io/p_353640c0q1.png')
-          .then(res => res.arrayBuffer())
-          .then(ab => Buffer.from(ab))
-      }
+      cachedThumbnail = await loadMenuThumbnail()
     }
 
     let fkon = { key: { fromMe: false, participant: `0@s.whatsapp.net`, ...(m.chat ? { remoteJid: '0@s.whatsapp.net' } : {}) }, message: { contactMessage: { displayName: `${botName}`, vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;a,;;;\nFN:${botName}\nitem1.TEL;waid=${m.sender.split('@')[0]}:${m.sender.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`}}}
@@ -500,7 +544,150 @@ function limitText(text, max) {
   return text.length > max ? text.slice(0, max - 1) + '…' : text
 }
 
-handler.command = /^(menu|help|perintah)$/i
+async function buildMenuDebugInfo({ conn, m, usedPrefix, command, menuType, help, tags, uptime, platform, mode }) {
+  const startedAt = Date.now()
+  const buttons = getButtonsDebugInfo()
+  const settings = global.db.data.settings?.[conn.user.jid] || {}
+  const tagCounts = Object.keys(tags).map(tag => [tag, countCommandsByTag(help, tag)])
+  const nonEmptyTags = tagCounts.filter(([, count]) => count > 0)
+  const emptyTags = tagCounts.filter(([, count]) => count === 0).map(([tag]) => tag)
+  const sampleSections = buildMenuSections(`${usedPrefix}menu`, help)
+  const thumbnail = await probeMenuThumbnail()
+  const device = await getDevice(m.key.id).catch(() => 'unknown')
+
+  const debug = {
+    command,
+    menuType: menuType || '(empty)',
+    chat: m.chat,
+    sender: m.sender,
+    device,
+    mode,
+    platform,
+    uptime,
+    pluginsLoaded: Object.keys(global.plugins || {}).length,
+    helpItems: help.length,
+    tagTotal: Object.keys(tags).length,
+    tagWithCommands: nonEmptyTags.length,
+    emptyTags: emptyTags.slice(0, 12),
+    menuSettings: {
+      hasCustomBefore: Boolean(conn.menu?.before),
+      hasCustomHeader: Boolean(conn.menu?.header),
+      hasCustomBody: Boolean(conn.menu?.body),
+      thumbnailDisabled: Boolean(settings.thumbnail)
+    },
+    buttons,
+    thumbnail,
+    sections: sampleSections.map(section => ({
+      title: section.title,
+      rows: section.rows.length
+    })),
+    elapsedMs: Date.now() - startedAt
+  }
+
+  console.log('[menu-debug]', JSON.stringify(debug, null, 2))
+
+  return {
+    text: [
+      '*MENU DEBUG*',
+      '',
+      `Command: ${debug.command}`,
+      `Arg: ${debug.menuType}`,
+      `Chat: ${debug.chat}`,
+      `Device: ${debug.device}`,
+      `Mode: ${debug.mode}`,
+      `Platform: ${debug.platform}`,
+      '',
+      '*Plugins & Tags*',
+      `Plugins loaded: ${debug.pluginsLoaded}`,
+      `Help items: ${debug.helpItems}`,
+      `Tags total: ${debug.tagTotal}`,
+      `Tags berisi command: ${debug.tagWithCommands}`,
+      `Tags kosong sample: ${debug.emptyTags.join(', ') || 'None'}`,
+      '',
+      '*Interactive*',
+      `Helper loaded: ${debug.buttons.helperLoaded}`,
+      `Helper disabled: ${debug.buttons.helperDisabled}`,
+      `sendButtons: ${debug.buttons.hasSendButtons}`,
+      `sendInteractive: ${debug.buttons.hasSendInteractiveMessage}`,
+      `Fallback: ${debug.buttons.fallbackMode}`,
+      '',
+      '*Thumbnail*',
+      `Cached: ${Boolean(cachedThumbnail)}`,
+      `Probe OK: ${debug.thumbnail.ok}`,
+      `Source: ${debug.thumbnail.source || 'None'}`,
+      `Size: ${debug.thumbnail.size || 0} bytes`,
+      `Error: ${debug.thumbnail.error || 'None'}`,
+      '',
+      '*Sections*',
+      debug.sections.map(section => `- ${section.title}: ${section.rows} row`).join('\n') || 'No sections',
+      '',
+      `Elapsed: ${debug.elapsedMs}ms`,
+      '',
+      `Test: ${usedPrefix}menu | ${usedPrefix}menu all | ${usedPrefix}menu rpg`
+    ].join('\n')
+  }
+}
+
+async function probeMenuThumbnail() {
+  const candidates = await getThumbnailCandidates()
+  for (const source of candidates) {
+    try {
+      const buffer = await fetchBuffer(source)
+      return { ok: true, source, size: buffer.length }
+    } catch (e) {
+      if (source === candidates[candidates.length - 1]) {
+        return { ok: false, source, size: 0, error: e?.message || String(e) }
+      }
+    }
+  }
+  return { ok: false, source: '', size: 0, error: 'No thumbnail candidates' }
+}
+
+async function loadMenuThumbnail() {
+  const candidates = await getThumbnailCandidates()
+  for (const source of candidates) {
+    try {
+      return await fetchBuffer(source)
+    } catch (e) {
+      console.warn('[menu] thumbnail fetch failed:', source, e?.message || e)
+    }
+  }
+  return Buffer.alloc(0)
+}
+
+async function getThumbnailCandidates() {
+  const candidates = []
+  if (global.thum) candidates.push(global.thum)
+
+  try {
+    const menuSource = typeof xmenus !== 'undefined' ? xmenus : global.xmenus
+    if (menuSource) {
+      const list = await fetch(menuSource).then(res => res.json())
+      if (Array.isArray(list) && list.length) {
+        candidates.push(list[Math.floor(Math.random() * list.length)])
+      }
+    }
+  } catch (e) {
+    console.warn('[menu] xmenus fetch failed:', e?.message || e)
+  }
+
+  candidates.push('https://g.top4top.io/p_353640c0q1.png')
+  return [...new Set(candidates.filter(Boolean))]
+}
+
+async function fetchBuffer(source) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 8000)
+  try {
+    const res = await fetch(source, { signal: controller.signal })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return Buffer.from(await res.arrayBuffer())
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+handler.command = /^(menu|help|perintah|menudebug)$/i
 handler.register = true;
 
 export default handler;
