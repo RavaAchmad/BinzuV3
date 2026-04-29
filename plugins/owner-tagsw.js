@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import uploadFile from '../lib/uploadFile.js';
 import uploadImage from '../lib/uploadImage.js';
 import { getParticipantJids } from '../lib/jid-helper.js';
-const baileys = (await import('baileys')).default;
+const { generateWAMessage, STORIES_JID } = await import('baileys');
 
 const commandList = ["upsw"];
 const mimeAudio = 'audio/mpeg';
@@ -20,7 +20,7 @@ const fetchParticipants = async (...jids) => {
 };
 
 async function mentionStatus(jids, content) {
-    const msg = await baileys.generateWAMessage(baileys.STORIES_JID, content, {
+    const msg = await generateWAMessage(STORIES_JID, content, {
         upload: conn.waUploadToServer
     });
 

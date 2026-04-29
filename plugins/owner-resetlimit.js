@@ -1,6 +1,6 @@
 let {
 	proto
-} = (await import('baileys')).default
+} = await import('baileys')
 
 let handler = async (m, { conn, args }) => {
     if (global.xmaze.some(number => m.sender.includes(number))) {
@@ -9,7 +9,7 @@ let handler = async (m, { conn, args }) => {
 	lim = Math.max(1, lim)
 	list.map(([user, data], i) => (Number(data.limit = lim)))
 		conn.reply(m.chat, `*berhasil direset ${lim} / user*`, m)
-		await sendMessage(`*Berhasil mereset setiap limit user menjadi ${lim}*`)
+		await sendMessage(conn, `*Berhasil mereset setiap limit user menjadi ${lim}*`)
 		} else {
     m.reply('This command is for *R-OWNER* Only')
     }
@@ -27,7 +27,7 @@ function isNumber(x = 0) {
   return !isNaN(x) && typeof x == 'number'
 }
 
-function sendMessage(teks) {
+function sendMessage(conn, teks) {
 	const msg = {
 		conversation: teks
 	};

@@ -55,7 +55,7 @@ import { getParticipantJids } from '../lib/jid-helper.js'
 const {
 	getBinaryNodeChild,
 	getBinaryNodeChildren
-} = (await import('baileys')).default
+} = await import('baileys')
 let handler = async (m, {
 	conn,
 	text,

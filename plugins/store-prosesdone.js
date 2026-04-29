@@ -6,7 +6,7 @@
  * Do not remove this watermark!
  */
 
-const { proto } = (await import('baileys')).default
+const { proto } = await import('baileys')
 import moment from 'moment-timezone'
 
 // XM4ZE - XMYULA-MD - github.com/XM4ZE/XMYULA-MD

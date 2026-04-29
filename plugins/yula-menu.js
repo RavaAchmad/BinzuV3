@@ -605,6 +605,7 @@ async function buildMenuDebugInfo({ conn, m, usedPrefix, command, menuType, help
       `Tags kosong sample: ${debug.emptyTags.join(', ') || 'None'}`,
       '',
       '*Interactive*',
+      `Package: ${debug.buttons.helperPackage}`,
       `Helper loaded: ${debug.buttons.helperLoaded}`,
       `Helper disabled: ${debug.buttons.helperDisabled}`,
       `sendButtons: ${debug.buttons.hasSendButtons}`,

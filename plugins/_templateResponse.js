@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 
-const { generateWAMessage, proto, areJidsSameUser } = (await import('baileys')).default;
+const { generateWAMessage, proto, areJidsSameUser } = await import('baileys');
 
 export async function all(m, chatUpdate) {
     if (m.isBaileys) return

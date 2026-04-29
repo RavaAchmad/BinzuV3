@@ -1,21 +1,16 @@
-import pkg from 'baileys_helper';
-const { sendButtons } = pkg;
+import { quickButtons } from '../lib/buttons.js'
 
-let handler = async (m, { usedPrefix, text }) => {
+let handler = async (m, { conn, usedPrefix, text }) => {
     conn.absen = conn.absen ? conn.absen : {}
     let id = m.chat
     if (id in conn.absen) {
         throw `_*Masih ada absen di chat ini!*_\n\n*${usedPrefix}hapusabsen* - untuk menghapus absen`
     }
+
     conn.absen[id] = [
-    await sendButtons(conn, m.chat, {
-        title: 'Absen',            // optional header
-        text: `Berhasil memulai absen!`,    // body
-        footer: 'Made with Love',            // optional footer
-        buttons: [
-            { id: `.absen`, text: 'Absen' }      // legacy simple shape auto‑converted
-        ]
-    }),
+        await quickButtons(conn, m.chat, 'Berhasil memulai absen!', 'Made with Love', [
+            { id: `${usedPrefix}absen`, text: 'Absen' }
+        ], m),
         [],
         text
     ]

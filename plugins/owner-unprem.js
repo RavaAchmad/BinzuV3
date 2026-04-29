@@ -1,4 +1,3 @@
-let { MessageType } = (await import('baileys')).default
 let handler = async (m, { conn, text, usedPrefix }) => {
   if (global.xmaze.some(number => m.sender.includes(number))) {
   function no(number){

@@ -1,6 +1,6 @@
 let {
 	proto
-} = (await import('baileys')).default
+} = await import('baileys')
 
 let handler = async (m, {
 	conn,
@@ -12,7 +12,7 @@ let handler = async (m, {
 	try {
 	if (global.xmaze.some(number => m.sender.includes(number))) {
 		let teks = text ? text : m.quoted && m.quoted.text ? m.quoted.text : m.quoted && m.quoted.caption ? m.quoted.caption : m.quoted && m.quoted.description ? m.quoted.description : ''
-		await sendMessage(teks)
+		await sendMessage(conn, teks)
 		m.reply('Sukses')
 	} else {
         m.reply('This command is for *R-OWNER* Only')
@@ -28,7 +28,7 @@ handler.rowner = true
 
 export default handler
 
-function sendMessage(teks) {
+function sendMessage(conn, teks) {
 	const msg = {
 		conversation: teks
 	};

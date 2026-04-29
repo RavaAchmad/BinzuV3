@@ -1,4 +1,3 @@
-let { MessageType } = (await import('baileys')).default
 import fetch from 'node-fetch'
 import fs from 'fs'
 let handler = async(m, { conn, usedPrefix, command, text }) => {

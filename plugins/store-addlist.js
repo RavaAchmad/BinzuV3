@@ -1,4 +1,4 @@
-const { proto } = (await import('baileys')).default
+const { proto } = await import('baileys')
 
 let handler = async (m, { conn, text, command, usedPrefix }) => {
 	let M = proto.WebMessageInfo;

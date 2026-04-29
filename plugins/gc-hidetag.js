@@ -1,7 +1,5 @@
 import { getParticipantJids } from '../lib/jid-helper.js'
 
-let { generateWAMessageFromContent } = (await import('baileys')).default
-
 let handler = async (m, { conn, text, usedPrefix, command, participants }) => {
 	let q = m.quoted ? m.quoted : m
 	let mime = (q.msg || q).mimetype || q.mediaType || ''
