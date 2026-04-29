@@ -51,6 +51,7 @@ handler.fail = null
 export default handler*/
 
 import fetch from 'node-fetch'
+import { getParticipantJids } from '../lib/jid-helper.js'
 const {
 	getBinaryNodeChild,
 	getBinaryNodeChildren
@@ -63,7 +64,7 @@ let handler = async (m, {
 	let link = await conn.groupInviteCode(m.chat)
 	if (!text) throw 'Masukan nomor telepon di awali 628xxxx'
 	try {
-		let _participants = participants.map(user => user.id)
+		let _participants = getParticipantJids(participants || [], conn)
 		let users = (await Promise.all(
 			text.split(',')
 			.map(v => v.replace(/[^0-9]/g, ''))

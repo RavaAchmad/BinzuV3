@@ -1,4 +1,5 @@
 import { areJidsSameUser } from 'baileys'
+import { getParticipantJid } from '../lib/jid-helper.js'
 
 let handler = async (m, { conn, args, command }) => {
     let group = m.chat
@@ -8,7 +9,7 @@ let handler = async (m, { conn, args, command }) => {
     let groupMetadata = await conn.groupMetadata(group)
     if (!groupMetadata) throw 'groupMetadata is undefined :\\'
     if (!('participants' in groupMetadata)) throw 'participants is not defined :('
-    let me = groupMetadata.participants.find(user => areJidsSameUser(user.id, conn.user.id))
+    let me = groupMetadata.participants.find(user => areJidsSameUser(getParticipantJid(user, conn), conn.user.id))
     if (!me) throw 'Aku tidak ada di grup itu :('
     if (!me.admin) throw 'Aku bukan admin T_T'
     let hasil = 'https://chat.whatsapp.com/' + await conn.groupInviteCode(group)

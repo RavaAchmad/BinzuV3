@@ -1,209 +1,119 @@
-import path from 'path';
-import { tmpdir } from 'os';
 import axios from 'axios';
-import * as cheerio from 'cheerio';
-import fs from 'fs';
 
-// ============================================================
-// ExistDownloader - SolutionExist Scraper
-// ============================================================
+const API_URL = 'https://ravaja.my.id/api/download/facebook/v4';
+const API_KEY = global.btc || 'ravaja';
 
-class ExistDownloader {
-    constructor() {
-        this.baseUrl = 'https://download.solutionexist.com/';
-    }
-
-    prs(html) {
-        const $ = cheerio.load(html);
-        const title = $('h3.uvd-video-title').text().trim() || 'Facebook Video';
-        const thumbEl = $('.uvd-thumbnail img').eq(0);
-        const thumbUrl = thumbEl.attr('src') || thumbEl.attr('data-src') || null;
-        const downloadLinks = $('#uvdDownloadGrid').find('.uvd-download-item a.uvd-download-btn').map((i, el) => {
-            const em = $(el);
-            const link = em.attr('href') || '#';
-            const quality = em.find('span').text().trim() || 'Unknown';
-            const type = link.endsWith('.mp4') ? 'Video (MP4)' : quality.toLowerCase().includes('audio') ? 'Audio' : 'File Lain';
-            return { index: i, quality, url: link, type };
-        }).get();
-        return { title, thumb: thumbUrl, links: downloadLinks };
-    }
-
-    async download(videoUrl) {
-        const reqHeaders = {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'id-ID',
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Origin': this.baseUrl.slice(0, -1),
-            'Referer': this.baseUrl,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        };
-        const postData = `uvd_video_url=${encodeURIComponent(videoUrl)}`;
-        const response = await axios.post(this.baseUrl, postData, {
-            headers: reqHeaders,
-            timeout: 30000
-        });
-        return this.prs(response.data);
-    }
+function getQualityScore(item = {}) {
+    const quality = String(item.quality || '').toLowerCase();
+    const resolution = quality.match(/(\d{3,4})p/);
+    if (resolution) return Number(resolution[1]);
+    if (quality.includes('hd')) return 720;
+    if (quality.includes('sd')) return 360;
+    return 0;
 }
 
-function selectBestLink(links) {
-    if (!links || links.length === 0) return null;
-    const videoLinks = links.filter(l => l.url && l.url !== '#' && l.type === 'Video (MP4)');
-    if (videoLinks.length === 0) return links.find(l => l.url && l.url !== '#') || null;
-    const qualityScore = { '1080p': 100, '720p': 80, 'hd': 70, '480p': 50, '360p': 40, 'sd': 20 };
-    videoLinks.sort((a, b) => {
-        const scoreA = qualityScore[a.quality?.toLowerCase()] || 0;
-        const scoreB = qualityScore[b.quality?.toLowerCase()] || 0;
-        return scoreB - scoreA;
-    });
-    return videoLinks[0];
+function pickBestVideo(downloads = []) {
+    return downloads
+        .filter(item => {
+            const quality = String(item.quality || '').toLowerCase();
+            return item?.link && !quality.includes('mp3') && !quality.includes('audio');
+        })
+        .sort((a, b) => getQualityScore(b) - getQualityScore(a))[0] || null;
 }
 
-// ============================================================
-// DOWNLOAD WITH PROGRESS
-// ============================================================
-
-async function downloadWithProgress(url, outputFile, conn, m, statusMsg, quality) {
-    let lastUpdate = 0;
-
-    const response = await axios({
-        method: 'get',
-        url: url,
-        responseType: 'stream',
-        timeout: 300000,
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': 'https://www.facebook.com/'
-        }
-    });
-
-    const totalLength = response.headers['content-length'];
-    let downloadedLength = 0;
-    const writer = fs.createWriteStream(outputFile);
-
-    response.data.on('data', async (chunk) => {
-        downloadedLength += chunk.length;
-        if (!totalLength) return;
-        const progress = (downloadedLength / totalLength) * 100;
-        if (progress - lastUpdate >= 5) {
-            lastUpdate = Math.floor(progress / 5) * 5;
-            const filled = Math.floor(progress / 5);
-            const empty = 20 - filled;
-            const bar = `[${'█'.repeat(filled)}${'░'.repeat(empty)}]`;
-            try {
-                await conn.sendMessage(m.chat, {
-                    text: `⏬ Downloading...\n\n${bar}\n${progress.toFixed(1)}%\n\n🎬 ${quality}`,
-                    edit: statusMsg.key
-                });
-            } catch (e) {}
-        }
-    });
-
-    response.data.pipe(writer);
-
-    return new Promise((resolve, reject) => {
-        writer.on('finish', resolve);
-        writer.on('error', reject);
-        response.data.on('error', reject);
-    });
+function pickAudio(downloads = []) {
+    return downloads.find(item => {
+        const quality = String(item.quality || '').toLowerCase();
+        return item?.link && (quality.includes('mp3') || quality.includes('audio'));
+    }) || null;
 }
 
-// ============================================================
-// MAIN HANDLER
-// ============================================================
+function trimCaption(text = '') {
+    const normalized = String(text || '').trim();
+    return normalized.length > 1200 ? normalized.slice(0, 1197) + '...' : normalized;
+}
 
-const downloader = new ExistDownloader();
+async function getFacebookMedia(url) {
+    const { data } = await axios.get(API_URL, {
+        params: {
+            apikey: API_KEY,
+            url
+        },
+        timeout: 30000
+    });
+
+    if (data?.status !== 200 || !data?.result) {
+        throw new Error(data?.message || data?.error || 'API tidak mengembalikan result.');
+    }
+
+    return data.result;
+}
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
-    if (!args[0]) throw `Gunakan contoh ${usedPrefix}${command} https://fb.watch/xxx`;
+    const url = args[0];
+    if (!url) throw `Gunakan contoh ${usedPrefix}${command} https://fb.watch/xxx`;
+    if (!/^https?:\/\//i.test(url) || !/(facebook\.com|fb\.watch|fb\.com)/i.test(url)) {
+        throw 'Link Facebook tidak valid.';
+    }
 
     const statusMsg = await conn.sendMessage(m.chat, {
-        text: '🔍 Mencari video...'
-    });
+        text: 'Mencari media Facebook...'
+    }, { quoted: m });
 
     try {
-        await conn.sendMessage(m.chat, {
-            text: '🔍 Memeriksa url valid atau tidak...',
-            edit: statusMsg.key
-        });
+        const result = await getFacebookMedia(url);
+        const downloads = Array.isArray(result.downloads) ? result.downloads : [];
+        const video = pickBestVideo(downloads);
+        const audio = pickAudio(downloads);
 
-        console.log('[FB-DL] Fetching video info...');
-        const result = await downloader.download(args[0]);
-
-        if (!result.links || result.links.length === 0) {
-            throw new Error('Tidak ditemukan link download dari video tersebut.');
+        if (!video && !audio) {
+            throw new Error('Tidak ditemukan link video atau audio dari API.');
         }
 
-        const best = selectBestLink(result.links);
-        if (!best || !best.url || best.url === '#') {
-            throw new Error('Link download tidak valid.');
+        const caption = [
+            '*Facebook Downloader*',
+            '',
+            result.text ? trimCaption(result.text) : 'Tanpa caption',
+            '',
+            video ? `Video: ${video.quality || 'Unknown quality'}` : 'Video: Not found'
+        ].join('\n');
+
+        if (video) {
+            await conn.sendMessage(m.chat, {
+                video: { url: video.link },
+                caption
+            }, { quoted: m });
         }
 
-        console.log('[FB-DL] Best quality:', best.quality);
-
-        await conn.sendMessage(m.chat, {
-            text: `📹 Video ditemukan!\n\n📝 ${result.title}\n🎬 ${best.quality}\n⏬ Downloading...`,
-            edit: statusMsg.key
-        });
-
-        const tempFile = path.join(tmpdir(), `fb_${Date.now()}.mp4`);
-
-        try {
-            await downloadWithProgress(best.url, tempFile, conn, m, statusMsg, best.quality);
-
-            if (!fs.existsSync(tempFile)) {
-                throw new Error('Download failed');
-            }
-
-            const stats = fs.statSync(tempFile);
-            const fileSizeMB = stats.size / (1024 * 1024);
-
-            if (fileSizeMB > 100) {
-                fs.unlinkSync(tempFile);
-                throw new Error(`Video terlalu besar (${fileSizeMB.toFixed(2)} MB)`);
-            }
-
-            if (fileSizeMB < 0.01) {
-                fs.unlinkSync(tempFile);
-                throw new Error(`File corrupt (${fileSizeMB.toFixed(2)} MB)`);
-            }
-
-            const caption = [
-                `*Facebook Downloader*`,
-                ``,
-                `📝 ${result.title}`,
-                `🎬 ${best.quality}`,
-                `📦 ${fileSizeMB.toFixed(2)} MB`,
-                ``,
-                `✨ Success!`
-            ].join('\n');
-
-            await conn.sendFile(m.chat, tempFile, 'facebook_video.mp4', caption, m);
-            await conn.sendMessage(m.chat, { delete: statusMsg.key });
-
-            try { fs.unlinkSync(tempFile); } catch (e) {}
-            return;
-        } catch (downloadErr) {
-            try { if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile); } catch (e) {}
-            throw downloadErr;
+        if (audio) {
+            await conn.sendMessage(m.chat, {
+                audio: { url: audio.link },
+                mimetype: 'audio/mpeg',
+                fileName: 'facebook-audio.mp3'
+            }, { quoted: m });
         }
 
+        await conn.sendMessage(m.chat, { delete: statusMsg.key });
     } catch (error) {
         console.error('[FB-DL Error]', error);
 
-        let errorMessage = '❌ Gagal mengunduh video!\n\n';
-        errorMessage += `${error.message}\n`;
-        errorMessage += '\n💡 Kemungkinan:\n';
-        errorMessage += '• Video private/terhapus\n';
-        errorMessage += '• Link tidak valid\n';
-        errorMessage += '• Downloader sedang maintenance';
+        const errorMessage = [
+            'Gagal mengunduh media Facebook.',
+            '',
+            error?.message || String(error),
+            '',
+            'Kemungkinan:',
+            '- Video private/terhapus',
+            '- Link tidak valid',
+            '- API sedang maintenance'
+        ].join('\n');
 
         try {
             await conn.sendMessage(m.chat, {
                 text: errorMessage,
                 edit: statusMsg.key
             });
-        } catch (e) {
+        } catch {
             m.reply(errorMessage);
         }
     }

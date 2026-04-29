@@ -1,5 +1,6 @@
 import { areJidsSameUser } from 'baileys'
 import fetch from 'node-fetch'
+import { getParticipantJids } from '../lib/jid-helper.js'
 const leaderboards = [
     'level',
     'exp',
@@ -50,17 +51,18 @@ ${usedPrefix}${command} legendary`.trim()
     let page = isNumber(args[1]) ? Math.min(Math.max(parseInt(args[1]), 0), getPage(type)): 0
     let sortedItem = users.map(toNumber(type)).sort(sort(type))
     let userItem = sortedItem.map(enumGetKey)
+    const participantJids = getParticipantJids(participants || [], conn)
     // let len = args[0] && args[0].length > 0 ? Math.min(100, Math.max(parseInt(args[0]), 5)) : Math.min(5, sortedExp.length)
     let text = `
 🏆 ʀᴀɴᴋ: ${userItem.indexOf(m.sender) + 1} ᴏᴜᴛ ᴏғ ${userItem.length}
 
                 *• ${rpg.emoticon(type)} ${type} •*
 
-${sortedItem.slice(page * 0, page * 5 + 5).map((user, i) => `${i + 1}.*﹙${user[type]}﹚*- ${participants.some(p => areJidsSameUser(user.jid, p.id)) ? `${user.registered ? user.name: conn.getName(user.jid)} \nwa.me/`: 'ғʀᴏᴍ ᴏᴛʜᴇʀ ɢʀᴏᴜᴩ\n @'}${user.jid.split`@`[0]}`).join`\n\n`}
+${sortedItem.slice(page * 0, page * 5 + 5).map((user, i) => `${i + 1}.*﹙${user[type]}﹚*- ${participantJids.some(p => areJidsSameUser(user.jid, p)) ? `${user.registered ? user.name: conn.getName(user.jid)} \nwa.me/`: 'ғʀᴏᴍ ᴏᴛʜᴇʀ ɢʀᴏᴜᴩ\n @'}${user.jid.split`@`[0]}`).join`\n\n`}
 `.trim()
     return await conn.reply(m.chat, text, m, {
         contextInfo: {
-            mentionedJid: [...userItem.slice(page * 0, page * 5 + 5)].filter(v => !participants.some(p => areJidsSameUser(v, p.id)))
+            mentionedJid: [...userItem.slice(page * 0, page * 5 + 5)].filter(v => !participantJids.some(p => areJidsSameUser(v, p)))
         }
     })
 }

@@ -1,3 +1,5 @@
+import { getParticipantJids } from '../lib/jid-helper.js'
+
 const handler = async (m, { conn, usedPrefix, text }) => {
   return m.reply('Fitur ini rawan disalahgunakan, jadi dinonaktifkan sementara untuk diperbaiki.')  
   const groupId = m.chat;
@@ -6,7 +8,7 @@ const handler = async (m, { conn, usedPrefix, text }) => {
     const groupMetadata = await conn.groupMetadata(groupId);
     const participants = groupMetadata?.participants || [];
     
-    const mentions = participants.map(participant => participant.id);
+    const mentions = getParticipantJids(participants || [], conn);
     
     conn.sendMessage(
       groupId,

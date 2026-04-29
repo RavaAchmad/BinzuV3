@@ -159,7 +159,7 @@ Type *${usedPrefix}buy ${type} ${count - user[type]}* to buy more
 
     try {
         // Update luck system
-        const luck = crateSystem.updateLuck(m.sender)
+        const luck = crateSystem.updateLuck(m.sender, count)
         const dailyBonus = crateSystem.getDailyBonus(m.sender)
         
         let totalReward = {}

@@ -11,6 +11,7 @@ import fs from 'fs'
 import { displayUpdateNotification } from './bot-updates.js'
 import { toAudio } from '../lib/converter.js'
 import path from 'path'
+import { interactiveMsg } from '../lib/buttons.js'
 let cachedThumbnail = null
 let tags = {
   // 🧭 CORE / WAJIB (Tier 1)
@@ -282,8 +283,19 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
 
     let fkon = { key: { fromMe: false, participant: `0@s.whatsapp.net`, ...(m.chat ? { remoteJid: '0@s.whatsapp.net' } : {}) }, message: { contactMessage: { displayName: `${conn.getName(conn.user.jid)}`, vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;a,;;;\nFN:${conn.getName(conn.user.jid)}\nitem1.TEL;waid=${m.sender.split('@')[0]}:${m.sender.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`}}}
 
-if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
-  if (!db.data.settings[conn.user.jid].thumbnail) {
+    const contextInfo = buildMenuContext(m.sender, year, cachedThumbnail)
+    const isAllMenu = menuType === 'all'
+
+    if (!isAllMenu) {
+      await interactiveMsg(conn, m.chat, {
+        text: textToSend,
+        footer: 'Pilih lewat tombol/list di bawah.',
+        contextInfo,
+        image: cachedThumbnail,
+        interactiveButtons: buildMenuButtons(usedPrefix, command, menuType, help)
+      })
+    } else if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
+      if (!db.data.settings[conn.user.jid].thumbnail) {
         conn.sendMessage(m.chat, {
             text: textToSend,
             contextInfo: {
@@ -304,10 +316,10 @@ if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
                 }
             },
         }, { quoted: m });
-  } else {
+      } else {
       conn.sendMessage(m.chat, { text: textToSend, contextInfo: { mentionedJid: [m.sender] }}, { quoted: m });
-  }
-} else await conn.sendMessage(m.chat, { 
+      }
+    } else await conn.sendMessage(m.chat, { 
           image: { 
              url: "https://files.catbox.moe/morbwn.mp4" 
              }, 
@@ -374,6 +386,108 @@ function displayAds(m, conn) {
   } catch (e) {
     console.error('Error displaying ads:', e)
   }
+}
+
+function buildMenuContext(sender, year, thumbnail) {
+  return {
+    mentionedJid: [sender],
+    forwardedNewsletterMessageInfo: {
+      newsletterJid: global.info.channel,
+      serverMessageId: null,
+      newsletterName: global.info.namechannel,
+    },
+    externalAdReply: {
+      showAdAttribution: false,
+      title: `${global.info.namebot} © ${year}`,
+      body: 'Interactive menu',
+      mediaType: 1,
+      sourceUrl: global.gcbot || '',
+      renderLargerThumbnail: true,
+      thumbnail,
+    }
+  }
+}
+
+function buildMenuButtons(usedPrefix, command, currentTag, help = []) {
+  const base = `${usedPrefix}${command}`
+  const buttons = [
+    {
+      name: 'single_select',
+      buttonParamsJson: JSON.stringify({
+        title: 'Pilih Menu',
+        sections: buildMenuSections(base, help)
+      })
+    },
+    {
+      name: 'quick_reply',
+      buttonParamsJson: JSON.stringify({ display_text: 'Semua Menu', id: `${base} all` })
+    },
+    {
+      name: 'quick_reply',
+      buttonParamsJson: JSON.stringify({ display_text: currentTag === 'rpg' ? 'Tools' : 'RPG', id: `${base} ${currentTag === 'rpg' ? 'tools' : 'rpg'}` })
+    },
+    {
+      name: 'quick_reply',
+      buttonParamsJson: JSON.stringify({ display_text: 'Sewa Bot', id: `${usedPrefix}sewa` })
+    }
+  ]
+
+  if (currentTag) {
+    buttons.splice(1, 0, {
+      name: 'quick_reply',
+      buttonParamsJson: JSON.stringify({ display_text: 'Kategori', id: base })
+    })
+  }
+
+  return buttons
+}
+
+function buildMenuSections(baseCommand, help = []) {
+  const groups = [
+    ['Utama', ['main', 'store', 'digiflazz', 'tools', 'downloader', 'search', 'info', 'ai']],
+    ['Chat & Grup', ['group', 'adminry', 'absen', 'vote', 'xp', 'premium']],
+    ['Hiburan', ['game', 'rpg', 'fun', 'maker', 'sticker', 'audio', 'quotes', 'pacaran']],
+    ['Lainnya', ['anime', 'genshin', 'hsr', 'islamic', 'primbon', 'internet', 'news', 'owner', 'database', 'nsfw']]
+  ]
+  const groupedKeys = new Set(groups.flatMap(([, keys]) => keys))
+
+  const sections = groups
+    .map(([title, keys]) => ({
+      title,
+      rows: keys
+        .filter(key => tags[key])
+        .map(key => ({
+          id: `${baseCommand} ${key}`,
+          title: limitText(tags[key], 24),
+          description: `${countCommandsByTag(help, key)} command`
+        }))
+        .filter(row => row.description !== '0 command' || ['main', 'rpg', 'tools'].some(key => row.id.endsWith(` ${key}`)))
+    }))
+    .filter(section => section.rows.length)
+
+  const extraRows = Object.keys(tags)
+    .filter(key => !groupedKeys.has(key))
+    .map(key => ({
+      id: `${baseCommand} ${key}`,
+      title: limitText(tags[key], 24),
+      description: `${countCommandsByTag(help, key)} command`
+    }))
+    .filter(row => row.description !== '0 command')
+
+  if (extraRows.length) sections.push({ title: 'Tambahan', rows: extraRows.slice(0, 25) })
+
+  return sections
+}
+
+function countCommandsByTag(help = [], tag) {
+  return help
+    .filter(menu => menu.tags && menu.tags.includes(tag) && menu.help)
+    .reduce((total, menu) => total + menu.help.filter(Boolean).length, 0)
+}
+
+function limitText(text, max) {
+  text = String(text || '')
+  return text.length > max ? text.slice(0, max - 1) + '…' : text
 }
 
 handler.command = /^(menu|help|perintah)$/i

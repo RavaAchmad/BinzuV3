@@ -1,9 +1,12 @@
+import { formatMention, getParticipantJid } from '../lib/jid-helper.js'
+
 let handler = async (m, { conn, participants, groupMetadata }) => {
     const pp = await conn.profilePictureUrl(m.chat, 'image').catch(_ => null) || './src/avatar_contact.png'
     const { isBanned, welcome, pembatasan, sWelcome, sBye, sPromote, isDetect, sDemote, antiLinkkick, antiLinkdelete, antiVirtex, antiBadword, antiLinkWa, viewonce, nsfw, rpg, game, delete: del } = global.db.data.chats[m.chat]
     const groupAdmins = participants.filter(p => p.admin)
-    const listAdmin = groupAdmins.map((v, i) => `${i + 1}. @${v.id.split('@')[0]}`).join('\n')
-    const owner = groupMetadata.owner || groupAdmins.find(p => p.admin === 'superadmin')?.id || m.chat.split`-`[0] + '@s.whatsapp.net'
+    const adminJids = groupAdmins.map(v => getParticipantJid(v, conn)).filter(Boolean)
+    const listAdmin = adminJids.map((v, i) => `${i + 1}. ${formatMention(v)}`).join('\n')
+    const owner = getParticipantJid(groupMetadata.owner || groupAdmins.find(p => p.admin === 'superadmin') || m.chat.split`-`[0] + '@s.whatsapp.net', conn)
     let text = `*ID:* 
 ${groupMetadata.id}
 *Name:* 
@@ -13,7 +16,7 @@ ${groupMetadata.desc?.toString() || 'unknown'}
 *Total Members:*
 ${participants.length} Members
 *Group Owner:* 
-@${owner.split('@')[0]}
+${formatMention(owner)}
 *Group Admins:*
 ${listAdmin}
 *Group Settings:*
@@ -37,7 +40,7 @@ Bye: ${sBye}
 Promote: ${sPromote}
 Demote: ${sDemote}
 `.trim()
-    await conn.sendFile(m.chat, pp, null, text, m, null, { mentions: [...groupAdmins.map(v => v.id), owner] })
+    await conn.sendFile(m.chat, pp, null, text, m, null, { mentions: [...adminJids, owner].filter(Boolean) })
 }
 
 handler.help = ['infogrup']

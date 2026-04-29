@@ -1,3 +1,5 @@
+import { getParticipantJids, jidEqual } from '../lib/jid-helper.js'
+
 let handler = async (m, { conn, usedPrefix, participants }) => {
   conn.level = global.db.data.users[m.sender]
   conn.fight = conn.fight ? conn.fight : {}
@@ -5,12 +7,11 @@ let handler = async (m, { conn, usedPrefix, participants }) => {
 
   if (typeof conn.fight[m.sender] != "undefined" && conn.fight[m.sender] == true) return m.reply(`*Tidak bisa melakukan pertarungan lagi karena anda sedang bertarung bro.*`)
 
-  let users = participants.map(u => u.id)
-  var lawan
-  lawan = users[Math.floor(users.length * Math.random())]
-  while (typeof global.db.data.users[lawan] == "undefined" || lawan == m.sender){
-    lawan = users[Math.floor(users.length * Math.random())]
-  }
+  let users = getParticipantJids(participants || [], conn)
+    .filter(u => !jidEqual(u, m.sender, conn) && typeof global.db.data.users[u] !== "undefined")
+  if (!users.length) return m.reply('Belum ada lawan terdaftar yang bisa diajak fighting.')
+
+  var lawan = users[Math.floor(users.length * Math.random())]
 
   let lamaPertarungan = getRandom(5,10)
 

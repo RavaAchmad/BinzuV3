@@ -2,6 +2,7 @@
 import { group } from 'console';
 import { readConfig } from '../json/configManager.js';
 import { EventEmitter } from 'events';
+import { getParticipantJids } from '../lib/jid-helper.js';
 
 // Variabel untuk caching konfigurasi
 let commandCache = null;
@@ -107,7 +108,7 @@ let handler = async (m, { conn, text, command }) => {
     
     const forcedMentions = [];
     const memberList = [];
-    const participantIds = participants.map(p => p.id);
+    const participantIds = getParticipantJids(participants || [], conn);
 
     console.log('[DEBUG] Sample participant IDs:', participantIds.slice(0, 5));
 

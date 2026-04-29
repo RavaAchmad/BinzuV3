@@ -1,3 +1,5 @@
+import { getParticipantJids } from '../lib/jid-helper.js'
+
 let handler = async (m, {
     conn,
     groupMetadata,
@@ -6,7 +8,7 @@ let handler = async (m, {
     command
 }) => {
 if (!text && !m.quoted) return m.reply("Pesannya Sayang?")
-    let get = await groupMetadata.participants.filter(v => v.id.endsWith('.net')).map(v => v.id)
+    let get = getParticipantJids(groupMetadata?.participants || [], conn).filter(v => v.endsWith('@s.whatsapp.net'))
     let count = get.length;
     let sentCount = 0;
     m.reply(wait);

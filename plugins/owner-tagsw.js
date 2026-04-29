@@ -1,6 +1,7 @@
 import fetch from 'node-fetch';
 import uploadFile from '../lib/uploadFile.js';
 import uploadImage from '../lib/uploadImage.js';
+import { getParticipantJids } from '../lib/jid-helper.js';
 const baileys = (await import('baileys')).default;
 
 const commandList = ["upsw"];
@@ -12,7 +13,7 @@ const fetchParticipants = async (...jids) => {
     let results = [];
     for (const jid of jids) {
         let { participants } = await conn.groupMetadata(jid);
-        participants = participants.map(({ id }) => id);
+        participants = getParticipantJids(participants || [], conn);
         results = results.concat(participants);
     }
     return results;

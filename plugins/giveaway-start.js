@@ -1,4 +1,6 @@
-let handler = async (m, { usedPrefix, text, command, participants  }) => {
+import { getParticipantJids } from '../lib/jid-helper.js'
+
+let handler = async (m, { conn, usedPrefix, text, command, participants  }) => {
     conn.giveway = conn.giveway ? conn.giveway : {}
     let id = m.chat
     let q = m.quoted ? m.quoted : m
@@ -10,7 +12,7 @@ let handler = async (m, { usedPrefix, text, command, participants  }) => {
     }
     let capt = `Berhasil memulai giveaway!\n\n*${usedPrefix}ikut* - untuk ikut giveaway\n*${usedPrefix}cekgiveaway* - untuk cek yang ikut\n*${usedPrefix}rollgiveaway* - untuk mencari pemenang\n*${usedPrefix}deletegiveaway* - untuk hapus giveaway\n\n*INFORMASI:*\n\n${text}`
     conn.giveway[id] = [
-        conn.sendMessage(m.chat, { text: capt, mentions: participants.map(a => a.id) }),
+        conn.sendMessage(m.chat, { text: capt, mentions: getParticipantJids(participants || [], conn) }),
                 [],
         text
     ]

@@ -1,19 +1,11 @@
+import { formatMention, getParticipantJids } from '../lib/jid-helper.js'
+
 let handler = async (m, { conn, groupMetadata, command, usedPrefix, text }) => {
     if (!text) throw `Contoh:\n${usedPrefix + command} pengcoli`
 
     const user = db.data.users
 
-    const ps = groupMetadata.participants.map(v => {
-        if (v.phoneNumber) {
-            const pn = v.phoneNumber.includes('@') ? v.phoneNumber : v.phoneNumber + '@s.whatsapp.net'
-            return pn
-        }
-        // Kalau id sudah PN, return langsung
-        if (v.id?.endsWith('@s.whatsapp.net')) return v.id
-        // Coba resolve LID via storeLid cache
-        const resolved = conn.getJid?.(v.id)
-        return (resolved && !resolved.includes('@lid')) ? resolved : v.id
-    }).filter(Boolean)
+    const ps = getParticipantJids(groupMetadata?.participants || [], conn)
 
     if (ps.length < 10) throw `Anggota grup kurang dari 10 orang!`
 
@@ -33,10 +25,10 @@ let handler = async (m, { conn, groupMetadata, command, usedPrefix, text }) => {
         // Fallback ke conn.getName (await karena bisa Promise)
         try {
             const name = await conn.getName(jid)
-            if (name && name !== jid) return name
+            if (typeof name === 'string' && name && name !== jid && name !== '[object Object]') return name
         } catch (_) {}
         // Terakhir: tag nomor mentah
-        return '@' + jid.split('@')[0]
+        return formatMention(jid)
     }
 
     const names = await Promise.all(picked.map(getName))
@@ -58,7 +50,7 @@ let handler = async (m, { conn, groupMetadata, command, usedPrefix, text }) => {
 
     await conn.sendMessage(m.chat, {
         text: top,
-        mentions: picked
+        mentions: picked.filter(Boolean)
     }, { quoted: m })
 }
 

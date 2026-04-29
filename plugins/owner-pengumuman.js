@@ -1,6 +1,8 @@
 import { generateWAMessageFromContent } from 'baileys'
+import { getParticipantJids } from '../lib/jid-helper.js'
+
 let handler = async (m, { conn, text, participants }) => {
-  let users = participants.map(u => conn.decodeJid(u.id))
+  let users = getParticipantJids(participants || [], conn).map(u => conn.decodeJid(u))
   let q = m.quoted ? m.quoted : m
   let c = m.quoted ? m.quoted : m.msg
   const msg = conn.cMod(m.chat,
