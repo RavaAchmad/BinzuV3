@@ -250,10 +250,12 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
     }
     
     let textToSend = menuText.join('\n')
+    const botName = await Promise.resolve(conn.getName(conn.user.jid)).catch(() => global.info?.namebot || 'Bot')
+
     let replace = {
       '%': '%',
       p: usedPrefix, uptime, muptime,
-      me: conn.getName(conn.user.jid),
+      me: botName,
       npmname: _package.name,
       npmdesc: _package.description,
       version: _package.version,
@@ -281,7 +283,7 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
       }
     }
 
-    let fkon = { key: { fromMe: false, participant: `0@s.whatsapp.net`, ...(m.chat ? { remoteJid: '0@s.whatsapp.net' } : {}) }, message: { contactMessage: { displayName: `${conn.getName(conn.user.jid)}`, vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;a,;;;\nFN:${conn.getName(conn.user.jid)}\nitem1.TEL;waid=${m.sender.split('@')[0]}:${m.sender.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`}}}
+    let fkon = { key: { fromMe: false, participant: `0@s.whatsapp.net`, ...(m.chat ? { remoteJid: '0@s.whatsapp.net' } : {}) }, message: { contactMessage: { displayName: `${botName}`, vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;a,;;;\nFN:${botName}\nitem1.TEL;waid=${m.sender.split('@')[0]}:${m.sender.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`}}}
 
     const contextInfo = buildMenuContext(m.sender, year, cachedThumbnail)
     const isAllMenu = menuType === 'all'
@@ -293,7 +295,7 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
         contextInfo,
         image: cachedThumbnail,
         interactiveButtons: buildMenuButtons(usedPrefix, command, menuType, help)
-      })
+      }, m)
     } else if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
       if (!db.data.settings[conn.user.jid].thumbnail) {
         conn.sendMessage(m.chat, {

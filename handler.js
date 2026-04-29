@@ -18,6 +18,7 @@ import chalk from 'chalk'
 import fs from 'fs'
 import fetch from 'node-fetch'
 import moment from 'moment-timezone'
+import { formatMention, getParticipantJid } from './lib/jid-helper.js'
 const printMessage = (await import('./lib/print.js')).default
 /**
  * @type {import('baileys')}
@@ -1487,13 +1488,15 @@ export async function participantsUpdate({
 						}
 					}
 				}
-				for (let user of participants) {
+				for (let participant of participants) {
+					const user = getParticipantJid(participant, this)
+					if (!user) continue
 					let pp = fs.readFileSync('./src/avatar_contact.png')
 					try {
 						pp = await this.profilePictureUrl(user, 'image')
 					} catch (e) { } finally {
 						text = (action === 'add' ? (chat.sWelcome || this.welcome || conn.welcome || 'Welcome, @user!').replace('@subject', await this.getName(id)).replace('@desc', groupMetadata.desc ? String.fromCharCode(8206).repeat(4001) + groupMetadata.desc : '') :
-							(chat.sBye || this.bye || conn.bye || 'Bye, @user!')).replace('@user', '@' + user.split('@')[0])
+							(chat.sBye || this.bye || conn.bye || 'Bye, @user!')).replace('@user', formatMention(user))
 
 						//await this.sendMessage(id, { text: text, contextInfo: { mentionedJid: [user] }}, { quoted: null })
 
@@ -1522,11 +1525,15 @@ export async function participantsUpdate({
 		case 'demote':
 			if (!text)
 				text = (chat.sDemote || this.sdemote || conn.sdemote || '@user ```is no longer Admin```')
-			text = text.replace('@user', '@' + participants[0].split('@')[0])
+			{
+				const user = getParticipantJid(participants[0], this)
+				text = text.replace('@user', formatMention(user))
+				participants = user ? [user] : []
+			}
 			if (chat.detect)
 				this.sendMessage(id, {
 					text,
-					mentions: this.parseMention(text)
+					mentions: participants.length ? participants : this.parseMention(text)
 				})
 			break
 	}

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API_URL = 'https://ravaja.my.id/api/download/facebook/v4';
-const API_KEY = global.btc || 'ravaja';
+const API_KEY = 'ravaja';
 
 function getQualityScore(item = {}) {
     const quality = String(item.quality || '').toLowerCase();
@@ -12,11 +12,15 @@ function getQualityScore(item = {}) {
     return 0;
 }
 
+function getDownloadLink(item = {}) {
+    return item.link || item.url || item.href || item.downloadUrl || item.download_url || '';
+}
+
 function pickBestVideo(downloads = []) {
     return downloads
         .filter(item => {
             const quality = String(item.quality || '').toLowerCase();
-            return item?.link && !quality.includes('mp3') && !quality.includes('audio');
+            return getDownloadLink(item) && !quality.includes('mp3') && !quality.includes('audio');
         })
         .sort((a, b) => getQualityScore(b) - getQualityScore(a))[0] || null;
 }
@@ -24,7 +28,7 @@ function pickBestVideo(downloads = []) {
 function pickAudio(downloads = []) {
     return downloads.find(item => {
         const quality = String(item.quality || '').toLowerCase();
-        return item?.link && (quality.includes('mp3') || quality.includes('audio'));
+        return getDownloadLink(item) && (quality.includes('mp3') || quality.includes('audio'));
     }) || null;
 }
 
@@ -39,14 +43,37 @@ async function getFacebookMedia(url) {
             apikey: API_KEY,
             url
         },
-        timeout: 30000
+        timeout: 30000,
+        validateStatus: status => status >= 200 && status < 500
     });
 
-    if (data?.status !== 200 || !data?.result) {
-        throw new Error(data?.message || data?.error || 'API tidak mengembalikan result.');
+    const result = extractFacebookResult(data);
+    if (!result) {
+        const status = data?.status || data?.code || data?.statusCode || 'unknown';
+        throw new Error(data?.message || data?.error || `API tidak mengembalikan result. Status: ${status}`);
     }
 
-    return data.result;
+    return result;
+}
+
+function extractFacebookResult(data) {
+    const candidates = [
+        data?.result,
+        data?.data?.result,
+        data?.data,
+        data?.response?.result,
+        data?.response,
+        data
+    ];
+
+    for (const item of candidates) {
+        if (!item || typeof item !== 'object') continue;
+        if (Array.isArray(item.downloads)) return item;
+        if (Array.isArray(item.download)) return { ...item, downloads: item.download };
+        if (Array.isArray(item.links)) return { ...item, downloads: item.links };
+    }
+
+    return null;
 }
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
@@ -80,14 +107,14 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
         if (video) {
             await conn.sendMessage(m.chat, {
-                video: { url: video.link },
+                video: { url: getDownloadLink(video) },
                 caption
             }, { quoted: m });
         }
 
         if (audio) {
             await conn.sendMessage(m.chat, {
-                audio: { url: audio.link },
+                audio: { url: getDownloadLink(audio) },
                 mimetype: 'audio/mpeg',
                 fileName: 'facebook-audio.mp3'
             }, { quoted: m });

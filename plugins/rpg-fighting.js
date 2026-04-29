@@ -12,10 +12,12 @@ let handler = async (m, { conn, usedPrefix, participants }) => {
   if (!users.length) return m.reply('Belum ada lawan terdaftar yang bisa diajak fighting.')
 
   var lawan = users[Math.floor(users.length * Math.random())]
+  const senderName = await conn.getName(m.sender)
+  const opponentName = await conn.getName(lawan)
 
   let lamaPertarungan = getRandom(5,10)
 
-  m.reply(`*Kamu* (level ${global.db.data.users[m.sender].level}) menantang *${conn.getName(lawan)}* (level ${global.db.data.users[lawan].level}) dan sedang dalam pertarungan sengit.\n\nTunggu ${lamaPertarungan} menit lagi dan lihat siapa yg menang.`)
+  m.reply(`*Kamu* (level ${global.db.data.users[m.sender].level}) menantang *${opponentName}* (level ${global.db.data.users[lawan].level}) dan sedang dalam pertarungan sengit.\n\nTunggu ${lamaPertarungan} menit lagi dan lihat siapa yg menang.`)
 
   conn.fight[m.sender] = true
 
@@ -40,14 +42,14 @@ let handler = async (m, { conn, usedPrefix, participants }) => {
     let hadiah = (pointPemain - pointLawan) * 10000
     global.db.data.users[m.sender].money += hadiah
     global.db.data.users[m.sender].limit += 1
-    m.reply(`*${conn.getName(m.sender)}* [${pointPemain * 10}] - [${pointLawan * 10}] *${conn.getName(lawan)}*\n\n*Kamu* (level ${global.db.data.users[m.sender].level}) MENANG melawan *${conn.getName(lawan)}* (level ${global.db.data.users[lawan].level}) karena kamu ${alasanMenang[getRandom(0,alasanMenang.length-1)]}\n\nHadiah Rp. ${hadiah.toLocaleString()}\n+1 Limit`)
+    m.reply(`*${senderName}* [${pointPemain * 10}] - [${pointLawan * 10}] *${opponentName}*\n\n*Kamu* (level ${global.db.data.users[m.sender].level}) MENANG melawan *${opponentName}* (level ${global.db.data.users[lawan].level}) karena kamu ${alasanMenang[getRandom(0,alasanMenang.length-1)]}\n\nHadiah Rp. ${hadiah.toLocaleString()}\n+1 Limit`)
   }else if (pointPemain < pointLawan){
     let denda = (pointLawan - pointPemain) * 100000
     global.db.data.users[m.sender].money -= denda
     global.db.data.users[m.sender].limit += 1
-    m.reply(`*${conn.getName(m.sender)}* [${pointPemain * 10}] - [${pointLawan * 10}] *${conn.getName(lawan)}*\n\n*Kamu* (level ${global.db.data.users[m.sender].level}) KALAH melawan *${conn.getName(lawan)}* (level ${global.db.data.users[lawan].level}) karena kamu ${alasanKalah[getRandom(0,alasanKalah.length-1)]}\n\nUang kamu berkurang Rp. ${denda.toLocaleString()}\n+1 Limit`)
+    m.reply(`*${senderName}* [${pointPemain * 10}] - [${pointLawan * 10}] *${opponentName}*\n\n*Kamu* (level ${global.db.data.users[m.sender].level}) KALAH melawan *${opponentName}* (level ${global.db.data.users[lawan].level}) karena kamu ${alasanKalah[getRandom(0,alasanKalah.length-1)]}\n\nUang kamu berkurang Rp. ${denda.toLocaleString()}\n+1 Limit`)
   }else {
-    m.reply(`*${conn.getName(m.sender)}* [${pointPemain * 10}] - [${pointLawan * 10}] *${conn.getName(lawan)}*\n\nHasil imbang kak, ga dapet apa apa 😂`)
+    m.reply(`*${senderName}* [${pointPemain * 10}] - [${pointLawan * 10}] *${opponentName}*\n\nHasil imbang kak, ga dapet apa apa 😂`)
   }
 
   delete conn.fight[m.sender]

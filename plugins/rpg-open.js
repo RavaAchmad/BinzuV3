@@ -105,7 +105,8 @@ let handler = async (m, { command, args, usedPrefix, conn }) => {
         const luck = crateSystem.playerLuck[m.sender]
         const pity = crateSystem.playerPity[m.sender]
         
-        let info = `🧑🏻‍🏫 *${user.registered ? user.name : conn.getName(m.sender)}*
+        const userName = user.registered && typeof user.name === 'string' ? user.name : await conn.getName(m.sender)
+        let info = `🧑🏻‍🏫 *${userName}*
 
 🔖 *CRATE LIST:*
 ${Object.keys(tfinventory.tfcrates).map(v => user[v] && `⮕ ${global.rpg.emoticon(v)} ${v}: ${user[v]}`).filter(v => v).join('\n') || 'Tidak ada crate'}

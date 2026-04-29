@@ -3,13 +3,9 @@ import { formatMention, getParticipantJids } from '../lib/jid-helper.js'
 let handler = async (m, { conn, groupMetadata, command, usedPrefix, text }) => {
     if (!text) throw `Contoh:\n${usedPrefix + command} pengcoli`
 
-    const user = db.data.users
-
     const ps = getParticipantJids(groupMetadata?.participants || [], conn)
-
     if (ps.length < 10) throw `Anggota grup kurang dari 10 orang!`
 
-    // Pilih 10 unik biar ga ada nama muncul 2x
     const picked = []
     const pool = [...ps]
     while (picked.length < 10 && pool.length > 0) {
@@ -17,24 +13,8 @@ let handler = async (m, { conn, groupMetadata, command, usedPrefix, text }) => {
         picked.push(pool.splice(idx, 1)[0])
     }
 
-    // Resolve nama — await karena getName bisa return Promise
-    const getName = async (jid) => {
-        // Cek DB dulu
-        const u = user?.[jid]
-        if (u?.registered && u?.name) return u.name
-        // Fallback ke conn.getName (await karena bisa Promise)
-        try {
-            const name = await conn.getName(jid)
-            if (typeof name === 'string' && name && name !== jid && name !== '[object Object]') return name
-        } catch (_) {}
-        // Terakhir: tag nomor mentah
-        return formatMention(jid)
-    }
-
-    const names = await Promise.all(picked.map(getName))
-
-    const emoji = pickRandom(['😨', '😅', '😂', '😳', '😎', '🥵', '😱', '🐦', '🙄', '🐤', '🗿', '🤨', '🥴', '😐', '👆', '😔', '👀', '👎'])
-
+    const names = picked.map(formatMention)
+    const emoji = pickRandom(['😨', '😅', '😂', '😳', '😎', '🥵', '😱', '🙄', '🗿', '🤨', '🥴', '😐', '👀', '👎'])
     const top = `*${emoji} Top 10 ${text} ${emoji}*
 
 *1.* ${names[0]}
