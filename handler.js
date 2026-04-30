@@ -19,6 +19,9 @@ import fs from 'fs'
 import fetch from 'node-fetch'
 import moment from 'moment-timezone'
 import { formatMention, getParticipantJid } from './lib/jid-helper.js'
+import missionGenerator from './lib/mission-generator.js'
+import { buildRpgPostUseMenu, ensureEngagementState } from './lib/rpg-engagement.js'
+import { interactiveMsg } from './lib/buttons.js'
 const printMessage = (await import('./lib/print.js')).default
 /**
  * @type {import('baileys')}
@@ -29,6 +32,23 @@ const delay = ms => isNumber(ms) && new Promise(resolve => setTimeout(function()
 	clearTimeout(this)
 	resolve()
 }, ms))
+
+const RPG_FOLLOWUP_SKIP = new Set([
+	'rpg-goals.js',
+	'rpg-menu.js',
+	'rpg-notify.js',
+	'rpg-admin.js',
+	'rpg-achievement.js',
+	'rpg-dungeonrank.js',
+	'rpg-inventory.js',
+	'rpg-leaderboard.js',
+	'rpg-leaderboard-multi.js',
+	'rpg-mission.js',
+	'rpg-missions.js',
+	'rpg-roleinfo.js',
+	'rpg-stats.js',
+	'rpg-titles.js'
+])
 
 /**
  * Handle messages upsert
@@ -1329,6 +1349,16 @@ export async function handler(chatUpdate) {
 				}
 				try {
 					await plugin.call(this, m, extra)
+					if (plugin.game && _user) {
+						missionGenerator.trackActivity(_user, 'gamePlayed', 1)
+					}
+					await sendRpgFollowup(this, m, {
+						plugin,
+						pluginName: name,
+						user: _user,
+						chat: global.db.data.chats[m.chat],
+						usedPrefix
+					})
 					if (!isPrems)
 						m.limit = m.limit || plugin.limit || false
 				} catch (e) {
@@ -1432,6 +1462,35 @@ export async function handler(chatUpdate) {
 
 		if (global.db.data.settings[this.user.jid].composing)
 			await this.sendPresenceUpdate('composing', m.chat).catch(() => {})
+	}
+}
+
+async function sendRpgFollowup(conn, m, { plugin, pluginName, user, chat, usedPrefix }) {
+	if (!plugin?.rpg || !m?.isGroup || !user) return
+	if (RPG_FOLLOWUP_SKIP.has(pluginName)) return
+
+	const state = ensureEngagementState(user)
+	const now = Date.now()
+	if (state.notifier === false) return
+	if (state.mutedUntil && state.mutedUntil > now) return
+
+	try {
+		const menu = buildRpgPostUseMenu(user, usedPrefix, { conn, chat, chatId: m.chat })
+		if (!menu.buttons?.length) return
+
+		await interactiveMsg(conn, m.chat, {
+			text: menu.text,
+			footer: 'RPG Director',
+			mentions: [m.sender],
+			interactiveButtons: menu.buttons
+		}, m, { forceNative: true })
+
+		state.lastNotifyAt = now
+		state.lastPromptKey = pluginName
+		state.lastPromptAt = now
+		state.nudgesSent = Number(state.nudgesSent || 0) + 1
+	} catch (error) {
+		console.warn('[rpg followup] skipped:', error?.message || error)
 	}
 }
 

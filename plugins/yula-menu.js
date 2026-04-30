@@ -11,7 +11,7 @@ import fs from 'fs'
 import { displayUpdateNotification } from './bot-updates.js'
 import { toAudio } from '../lib/converter.js'
 import path from 'path'
-import { getButtonsDebugInfo, interactiveMsg } from '../lib/buttons.js'
+import { interactiveMsg } from '../lib/buttons.js'
 let cachedThumbnail = null
 let tags = {
   // 🧭 CORE / WAJIB (Tier 1)
@@ -155,61 +155,7 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
     let footer = conn.menu.footer || defaultMenu.footer
     let after = conn.menu.after || (conn.user.jid == global.conn.user.jid ? '' : `Powered by wa.me/${global.info.nomorown}\n`) + defaultMenu.after
     
-    // Handle menu type based on text input
     let menuType = text ? text.trim().toLowerCase() : ''
-    const isDebugMenu = command === 'menudebug' || ['debug', 'dbg', 'diagnostic', 'diagnostics'].includes(menuType)
-
-    if (isDebugMenu) {
-      const debugInfo = await buildMenuDebugInfo({
-        conn,
-        m,
-        usedPrefix,
-        command,
-        menuType,
-        help,
-        tags,
-        uptime,
-        platform,
-        mode
-      })
-
-      await conn.sendMessage(m.chat, {
-        text: debugInfo.text,
-        contextInfo: { mentionedJid: [m.sender] }
-      }, { quoted: m })
-
-      try {
-        await interactiveMsg(conn, m.chat, {
-          text: 'Menu debug interactive test',
-          footer: 'Kalau tombol ini muncul, native interactive bisa dirender.',
-          mentions: [m.sender],
-          interactiveButtons: [
-            {
-              name: 'quick_reply',
-              buttonParamsJson: JSON.stringify({ display_text: 'Test OK', id: `${usedPrefix}menu` })
-            },
-            {
-              name: 'single_select',
-              buttonParamsJson: JSON.stringify({
-                title: 'Debug List',
-                sections: [{
-                  title: 'Menu',
-                  rows: [
-                    { id: `${usedPrefix}menu`, title: 'Menu utama', description: 'Buka menu biasa' },
-                    { id: `${usedPrefix}menu all`, title: 'Semua menu', description: 'Buka semua command' }
-                  ]
-                }]
-              })
-            }
-          ]
-        }, m)
-      } catch (e) {
-        await conn.sendMessage(m.chat, {
-          text: `Interactive debug gagal:\n${e?.stack || e?.message || e}`
-        }, { quoted: m })
-      }
-      return
-    }
 
     let menuText = []
     
@@ -259,6 +205,8 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
         `- ${usedPrefix}adventure`,
         '',
         'Progress & info:',
+        `- ${usedPrefix}rpggo`,
+        `- ${usedPrefix}rpgnotify on/off`,
         `- ${usedPrefix}stats`,
         `- ${usedPrefix}rpg skills`,
         `- ${usedPrefix}rpg detailed`,
@@ -474,11 +422,12 @@ function buildMenuButtons(usedPrefix, command, currentTag, help = []) {
     },
     {
       name: 'quick_reply',
-      buttonParamsJson: JSON.stringify({ display_text: 'Semua Menu', id: `${base} all` })
-    },
-    {
-      name: 'quick_reply',
       buttonParamsJson: JSON.stringify({ display_text: currentTag === 'rpg' ? 'Tools' : 'RPG', id: `${base} ${currentTag === 'rpg' ? 'tools' : 'rpg'}` })
+    },
+        
+    {
+      name: 'cta_call',
+      buttonParamsJson: JSON.stringify({ display_text: 'Group Bot', url: `https://chat.whatsapp.com/KPqLnY91cX2BGWaZVcXX2D` })
     },
     {
       name: 'quick_reply',
@@ -544,106 +493,6 @@ function limitText(text, max) {
   return text.length > max ? text.slice(0, max - 1) + '…' : text
 }
 
-async function buildMenuDebugInfo({ conn, m, usedPrefix, command, menuType, help, tags, uptime, platform, mode }) {
-  const startedAt = Date.now()
-  const buttons = getButtonsDebugInfo()
-  const settings = global.db.data.settings?.[conn.user.jid] || {}
-  const tagCounts = Object.keys(tags).map(tag => [tag, countCommandsByTag(help, tag)])
-  const nonEmptyTags = tagCounts.filter(([, count]) => count > 0)
-  const emptyTags = tagCounts.filter(([, count]) => count === 0).map(([tag]) => tag)
-  const sampleSections = buildMenuSections(`${usedPrefix}menu`, help)
-  const thumbnail = await probeMenuThumbnail()
-  const device = await getDevice(m.key.id).catch(() => 'unknown')
-
-  const debug = {
-    command,
-    menuType: menuType || '(empty)',
-    chat: m.chat,
-    sender: m.sender,
-    device,
-    mode,
-    platform,
-    uptime,
-    pluginsLoaded: Object.keys(global.plugins || {}).length,
-    helpItems: help.length,
-    tagTotal: Object.keys(tags).length,
-    tagWithCommands: nonEmptyTags.length,
-    emptyTags: emptyTags.slice(0, 12),
-    menuSettings: {
-      hasCustomBefore: Boolean(conn.menu?.before),
-      hasCustomHeader: Boolean(conn.menu?.header),
-      hasCustomBody: Boolean(conn.menu?.body),
-      thumbnailDisabled: Boolean(settings.thumbnail)
-    },
-    buttons,
-    thumbnail,
-    sections: sampleSections.map(section => ({
-      title: section.title,
-      rows: section.rows.length
-    })),
-    elapsedMs: Date.now() - startedAt
-  }
-
-  console.log('[menu-debug]', JSON.stringify(debug, null, 2))
-
-  return {
-    text: [
-      '*MENU DEBUG*',
-      '',
-      `Command: ${debug.command}`,
-      `Arg: ${debug.menuType}`,
-      `Chat: ${debug.chat}`,
-      `Device: ${debug.device}`,
-      `Mode: ${debug.mode}`,
-      `Platform: ${debug.platform}`,
-      '',
-      '*Plugins & Tags*',
-      `Plugins loaded: ${debug.pluginsLoaded}`,
-      `Help items: ${debug.helpItems}`,
-      `Tags total: ${debug.tagTotal}`,
-      `Tags berisi command: ${debug.tagWithCommands}`,
-      `Tags kosong sample: ${debug.emptyTags.join(', ') || 'None'}`,
-      '',
-      '*Interactive*',
-      `Package: ${debug.buttons.helperPackage}`,
-      `Helper loaded: ${debug.buttons.helperLoaded}`,
-      `Helper disabled: ${debug.buttons.helperDisabled}`,
-      `sendButtons: ${debug.buttons.hasSendButtons}`,
-      `sendInteractive: ${debug.buttons.hasSendInteractiveMessage}`,
-      `Fallback: ${debug.buttons.fallbackMode}`,
-      '',
-      '*Thumbnail*',
-      `Cached: ${Boolean(cachedThumbnail)}`,
-      `Probe OK: ${debug.thumbnail.ok}`,
-      `Source: ${debug.thumbnail.source || 'None'}`,
-      `Size: ${debug.thumbnail.size || 0} bytes`,
-      `Error: ${debug.thumbnail.error || 'None'}`,
-      '',
-      '*Sections*',
-      debug.sections.map(section => `- ${section.title}: ${section.rows} row`).join('\n') || 'No sections',
-      '',
-      `Elapsed: ${debug.elapsedMs}ms`,
-      '',
-      `Test: ${usedPrefix}menu | ${usedPrefix}menu all | ${usedPrefix}menu rpg`
-    ].join('\n')
-  }
-}
-
-async function probeMenuThumbnail() {
-  const candidates = await getThumbnailCandidates()
-  for (const source of candidates) {
-    try {
-      const buffer = await fetchBuffer(source)
-      return { ok: true, source, size: buffer.length }
-    } catch (e) {
-      if (source === candidates[candidates.length - 1]) {
-        return { ok: false, source, size: 0, error: e?.message || String(e) }
-      }
-    }
-  }
-  return { ok: false, source: '', size: 0, error: 'No thumbnail candidates' }
-}
-
 async function loadMenuThumbnail() {
   const candidates = await getThumbnailCandidates()
   for (const source of candidates) {
@@ -688,7 +537,7 @@ async function fetchBuffer(source) {
   }
 }
 
-handler.command = /^(menu|help|perintah|menudebug)$/i
+handler.command = /^(menu|help|perintah)$/i
 handler.register = true;
 
 export default handler;

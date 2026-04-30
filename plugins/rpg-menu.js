@@ -44,12 +44,16 @@ Customize with skills for unique playstyle.
 2. Check !stats to see progress
 3. Try !dungeon normal when ready
 4. Win = get double XP!
+
+Need arah main sekarang?
+!rpggo - rekomendasi action, mission, dan game
 `.trim()
 
         await interactiveMsg(conn, m.chat, {
           text: menu,
           footer: `Level ${user.level} | ${user.exp?.toLocaleString('id-ID') || 0} EXP`,
           interactiveButtons: [
+            { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: 'Plan', id: `${usedPrefix}rpggo` }) },
             { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '⚔️ Hunt', id: `${usedPrefix}hunt` }) },
             { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '📊 Stats', id: `${usedPrefix}stats` }) },
             { name: 'single_select', buttonParamsJson: JSON.stringify({
@@ -71,6 +75,7 @@ Customize with skills for unique playstyle.
                   rows: [
                     { id: `${usedPrefix}stats`, title: '📊 Stats', description: 'Lihat profil & character sheet' },
                     { id: `${usedPrefix}rpg skills`, title: '🔮 Skills', description: 'Panduan skill selection' },
+                    { id: `${usedPrefix}rpggo`, title: 'RPG Director', description: 'Rekomendasi action paling masuk akal' },
                     { id: `${usedPrefix}rpg detailed`, title: '📖 Guide', description: 'Panduan bermain lengkap' },
                     { id: `${usedPrefix}leaderboard`, title: '🏆 Leaderboard', description: 'Peringkat pemain' },
                     { id: `${usedPrefix}rpg balance`, title: '⚖️ Balance Info', description: 'Info balancing game' },
