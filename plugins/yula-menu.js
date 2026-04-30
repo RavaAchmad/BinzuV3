@@ -431,7 +431,7 @@ function buildMenuButtons(usedPrefix, command, currentTag, help = []) {
     },
         
     {
-      name: 'cta_call',
+      name: 'cta_url',
       buttonParamsJson: JSON.stringify({ display_text: 'Group Bot', url: `https://chat.whatsapp.com/KPqLnY91cX2BGWaZVcXX2D` })
     },
     {
@@ -452,10 +452,10 @@ function buildMenuButtons(usedPrefix, command, currentTag, help = []) {
 
 function buildMenuSections(baseCommand, help = []) {
   const groups = [
-    ['Utama', ['main', 'store', 'digiflazz', 'tools', 'downloader', 'search', 'info', 'ai']],
+    ['Utama', ['main', 'tools', 'downloader', 'search', 'info', 'ai']],
     ['Chat & Grup', ['group', 'adminry', 'absen', 'vote', 'xp', 'premium']],
     ['Hiburan', ['game', 'rpg', 'fun', 'maker', 'sticker', 'audio', 'quotes', 'pacaran']],
-    ['Lainnya', ['anime', 'genshin', 'hsr', 'islamic', 'primbon', 'internet', 'news', 'owner', 'database', 'nsfw']]
+    ['Lainnya', ['anime', 'genshin', 'hsr', 'islamic', 'primbon', 'internet', 'news', 'owner', 'store', 'digiflazz', 'database', 'nsfw']]
   ]
   const groupedKeys = new Set(groups.flatMap(([, keys]) => keys))
 
