@@ -20,7 +20,7 @@ import fetch from 'node-fetch'
 import moment from 'moment-timezone'
 import { formatMention, getParticipantJid } from './lib/jid-helper.js'
 import missionGenerator from './lib/mission-generator.js'
-import { buildRpgPostUseMenu, ensureEngagementState } from './lib/rpg-engagement.js'
+import { armRpgFollowup, buildRpgPostUseMenu, cancelRpgFollowup, consumeRpgFollowup, ensureEngagementState } from './lib/rpg-engagement.js'
 import { interactiveMsg } from './lib/buttons.js'
 const printMessage = (await import('./lib/print.js')).default
 /**
@@ -1348,6 +1348,8 @@ export async function handler(chatUpdate) {
 					__filename
 				}
 				try {
+					const shouldPulseRpgFollowup = shouldArmRpgFollowup(plugin, name, m, _user)
+					if (shouldPulseRpgFollowup) armRpgFollowup(_user, name)
 					await plugin.call(this, m, extra)
 					if (plugin.game && _user) {
 						missionGenerator.trackActivity(_user, 'gamePlayed', 1)
@@ -1362,6 +1364,7 @@ export async function handler(chatUpdate) {
 					if (!isPrems)
 						m.limit = m.limit || plugin.limit || false
 				} catch (e) {
+					if (_user) cancelRpgFollowup(_user)
 					// Error occured
 					m.error = e
 					console.error(e)
@@ -1471,10 +1474,11 @@ async function sendRpgFollowup(conn, m, { plugin, pluginName, user, chat, usedPr
 
 	const state = ensureEngagementState(user)
 	const now = Date.now()
-	if (state.notifier === false) return
-	if (state.mutedUntil && state.mutedUntil > now) return
+	const pulseReady = state.followup?.armed && (!state.followup.key || state.followup.key === pluginName)
+	if (!pulseReady) return
 
 	try {
+		if (state.mutedUntil && state.mutedUntil > now) return
 		const menu = buildRpgPostUseMenu(user, usedPrefix, { conn, chat, chatId: m.chat })
 		if (!menu.buttons?.length) return
 
@@ -1491,7 +1495,14 @@ async function sendRpgFollowup(conn, m, { plugin, pluginName, user, chat, usedPr
 		state.nudgesSent = Number(state.nudgesSent || 0) + 1
 	} catch (error) {
 		console.warn('[rpg followup] skipped:', error?.message || error)
+	} finally {
+		consumeRpgFollowup(user, pluginName)
 	}
+}
+
+function shouldArmRpgFollowup(plugin, pluginName, m, user) {
+	if (!plugin?.rpg || !m?.isGroup || !user) return false
+	return !RPG_FOLLOWUP_SKIP.has(pluginName)
 }
 
 /**

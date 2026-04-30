@@ -1,14 +1,18 @@
 import { RPGHandler } from '../lib/rpg-handler.js'
 import { SKILL_DATABASE } from '../lib/rpg-core-engine.js'
 import { listMenu, quickButtons, interactiveMsg } from '../lib/buttons.js'
+import { handleTextRpgCommand, isTextRpgSubcommand } from '../lib/text-rpg/index.js'
 
 let handler = async (m, { conn, text, args, usedPrefix }) => {
   try {
     const userId = m.sender
     const userName = await conn.getName(userId)
-    const user = await RPGHandler.initializeUser(global.db, userId, userName)
-
     const subcommand = (args[0] || 'menu').toLowerCase()
+    if (isTextRpgSubcommand(args)) {
+      return handleTextRpgCommand(m, { conn, text, args, usedPrefix })
+    }
+
+    const user = await RPGHandler.initializeUser(global.db, userId, userName)
 
     switch (subcommand) {
       case 'menu':

@@ -17,14 +17,19 @@ let handler = async (m, { args, usedPrefix }) => {
 
   if (action === 'pause') {
     const hours = Math.min(72, Math.max(1, Number(args[1]) || 6))
+    state.notifier = true
     state.mutedUntil = Date.now() + hours * 60 * 60 * 1000
     return m.reply(`RPG follow-up dipause ${hours} jam.`)
   }
 
-  const status = state.notifier === false ? 'OFF' : state.mutedUntil > Date.now() ? 'PAUSED' : 'ON'
+  const status = state.mutedUntil > Date.now()
+    ? state.notifier === false ? 'OFF' : 'PAUSED'
+    : 'ON'
+  const pulse = state.followup?.armed ? 'ARMED ONCE' : 'IDLE'
   return m.reply([
     '*RPG Follow-up*',
     `Status: ${status}`,
+    `Pulse: ${pulse}`,
     `Follow-up terkirim: ${state.nudgesSent || 0}`,
     '',
     `Atur: ${usedPrefix}rpgnotify on`,
