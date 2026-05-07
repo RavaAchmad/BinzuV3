@@ -93,5 +93,11 @@
     },
     "optionalDependencies": {
         "wa-sticker-formatter": "^4.3.2"
+    },
+    "overrides": {
+        "@cacheable/node-cache": "1.7.6",
+        "cacheable": "2.3.4",
+        "@cacheable/memory": "2.0.8",
+        "@cacheable/utils": "2.4.1"
     }
 }
