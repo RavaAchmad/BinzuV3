@@ -7,15 +7,19 @@ export async function all(m, chatUpdate) {
     if (!m.message) return 
     if (!(m.message.buttonsResponseMessage || m.message.templateButtonReplyMessage || m.message.listResponseMessage || m.message.interactiveResponseMessage)) return
     
-    let id = m.message.buttonsResponseMessage?.selectedButtonId || m.message.templateButtonReplyMessage?.selectedId || m.message.listResponseMessage?.singleSelectReply.selectedRowId
+    let id = m.message.buttonsResponseMessage?.selectedButtonId || m.message.templateButtonReplyMessage?.selectedId || m.message.listResponseMessage?.singleSelectReply?.selectedRowId
     let text = m.message.buttonsResponseMessage?.selectedDisplayText || m.message.templateButtonReplyMessage?.selectedDisplayText || m.message.listResponseMessage?.description        
     
     // interactiveResponseMessage Cina Ireng
     if (m.mtype == 'interactiveResponseMessage') {
         let msg = m.message[m.mtype] || m.msg
-        text = JSON.parse(msg.nativeFlowResponseMessage.paramsJson).id
+        const params = safeJson(msg?.nativeFlowResponseMessage?.paramsJson)
+        id = params.id || params.selectedRowId || params.rowId || id
+        text = params.display_text || params.title || params.text || id || text
         console.log(' -interactiveResponseMessage -')
     }
+    if (!id && !text) return
+    if (!id) id = text
     
     let isIdMessage = false, usedPrefix
     for (let name in global.plugins) {
@@ -77,4 +81,12 @@ export async function all(m, chatUpdate) {
         type: 'append'
     }
     this.ev.emit('messages.upsert', msg)
+}
+
+function safeJson(value) {
+    try {
+        return JSON.parse(value || '{}')
+    } catch {
+        return {}
+    }
 }
