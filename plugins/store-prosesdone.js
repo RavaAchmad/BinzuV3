@@ -8,17 +8,18 @@
 
 const { proto } = await import('baileys')
 import moment from 'moment-timezone'
+import { getParticipantByJid, isParticipantAdmin } from '../lib/jid-helper.js'
 
 // XM4ZE - XMYULA-MD - github.com/XM4ZE/XMYULA-MD
-const handler = async (m, { conn, usedPrefix, command, groupMetadata }) => {
+const handler = async (m, { conn, usedPrefix, command, groupMetadata, isAdmin }) => {
   /* XM4ZE - github.com/XM4ZE/XMYULA-MD */
   conn.orders = conn.orders ? conn.orders : {}
   // XM4ZE Watermark - Do not remove!
-  const isAdmin = async () => {
+  const isGroupAdmin = async () => {
     if (!m.isGroup) return false
     const participants = groupMetadata.participants || []
-    const user = participants.find(p => p.id === m.sender)
-    return user && (user.admin === 'admin' || user.admin === 'superadmin')
+    const user = getParticipantByJid(participants, m.sender, conn)
+    return Boolean(isAdmin || isParticipantAdmin(user))
   }
 
   /* 
@@ -37,10 +38,8 @@ const handler = async (m, { conn, usedPrefix, command, groupMetadata }) => {
       for (const groupId of groupIds) {
         const metadata = await conn.groupMetadata(groupId).catch(() => null)
         if (metadata) {
-          const adminParticipants = metadata.participants.filter(p => 
-            p.admin === 'admin' || p.admin === 'superadmin'
-          )
-          if (adminParticipants.some(p => p.id === m.sender)) {
+          const user = getParticipantByJid(metadata.participants || [], m.sender, conn)
+          if (isParticipantAdmin(user)) {
             isUserAdmin = true
             break
           }
@@ -133,7 +132,7 @@ const handler = async (m, { conn, usedPrefix, command, groupMetadata }) => {
   }
 
   // XM4ZE - Do not remove this watermark!
-  if (!await isAdmin()) {
+  if (!await isGroupAdmin()) {
     return m.reply('❌ Hanya admin group yang bisa menggunakan perintah ini!')
   }
 

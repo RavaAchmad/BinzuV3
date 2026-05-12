@@ -1,4 +1,4 @@
-import { formatMention, getParticipantJid, getParticipantJids } from '../lib/jid-helper.js'
+import { formatMention, getParticipantByJid, getParticipantJids, isParticipantAdmin } from '../lib/jid-helper.js'
 
 let handler = async (m, { conn, text, groupMetadata }) => {
     const lama = 86400000 * 7
@@ -13,9 +13,9 @@ let handler = async (m, { conn, text, groupMetadata }) => {
     const sider = []
 
     for (const jid of member) {
-        const participant = participants.find(u => getParticipantJid(u, conn) == jid) || {}
+        const participant = getParticipantByJid(participants, jid, conn) || {}
         const user = global.db.data.users[jid]
-        const isAdmin = participant.isAdmin || participant.isSuperAdmin || participant.admin
+        const isAdmin = isParticipantAdmin(participant)
         const isInactive = typeof user == 'undefined' || milliseconds - user.lastseen > lama
 
         if (!isInactive || isAdmin) continue

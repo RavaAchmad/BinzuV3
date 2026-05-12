@@ -18,7 +18,14 @@ import chalk from 'chalk'
 import fs from 'fs'
 import fetch from 'node-fetch'
 import moment from 'moment-timezone'
-import { formatMention, getParticipantJid } from './lib/jid-helper.js'
+import {
+	formatMention,
+	getParticipantByJid,
+	getParticipantJid,
+	isJidInList,
+	isParticipantAdmin,
+	isParticipantSuperAdmin
+} from './lib/jid-helper.js'
 import missionGenerator from './lib/mission-generator.js'
 import { armRpgFollowup, buildRpgPostUseMenu, cancelRpgFollowup, consumeRpgFollowup, ensureEngagementState } from './lib/rpg-engagement.js'
 import { interactiveMsg } from './lib/buttons.js'
@@ -32,6 +39,7 @@ const delay = ms => isNumber(ms) && new Promise(resolve => setTimeout(function()
 	clearTimeout(this)
 	resolve()
 }, ms))
+const arrayify = value => Array.isArray(value) ? value : (value ? [value] : [])
 
 const RPG_FOLLOWUP_SKIP = new Set([
 	'rpg-goals.js',
@@ -1106,11 +1114,29 @@ export async function handler(chatUpdate) {
 		if (typeof m.text !== 'string')
 			m.text = ''
 
-		//const isROwner = [global.conn.user.jid, ...global.owner].map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender)
-		const isROwner = [global.conn.user.jid, ...global.owner, ...global.xmaze].map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender)
+		const groupMetadata = (m.isGroup ? (await this.groupMetadata(m.chat).catch(_ => null) || (conn.chats[m.chat] || {}).metadata) : {}) || {}
+		if (m.isGroup && groupMetadata?.participants) {
+			const chatCache = conn.chats[m.chat] || (conn.chats[m.chat] = { id: m.chat })
+			chatCache.metadata = groupMetadata
+		}
+		const participants = (m.isGroup ? groupMetadata.participants : []) || []
+		const botJid = this.user?.jid || this.user?.id || global.conn?.user?.jid
+		const user = (m.isGroup ? getParticipantByJid(participants, m.sender, conn) : {}) || {}
+		const bot = (m.isGroup ? getParticipantByJid(participants, botJid, conn) : {}) || {}
+		const senderJids = [m.sender, getParticipantJid(user, conn)].filter(Boolean)
+		const ownerJids = [
+			global.conn?.user?.jid,
+			this.user?.jid,
+			this.user?.id,
+			...arrayify(global.owner),
+			...arrayify(global.xmaze)
+		]
+		const modJids = [...ownerJids, ...arrayify(global.mods)]
+		const isROwner = senderJids.some(jid => isJidInList(jid, ownerJids, conn))
 		const isOwner = isROwner
-		const isMods = isOwner || m.fromMe || global.mods.map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender)
-		const isPrems = isROwner || isMods || (db.data.users[m.sender].premiumTime > 0 || db.data.users[m.sender].premium)
+		const isMods = isOwner || m.fromMe || senderJids.some(jid => isJidInList(jid, modJids, conn))
+		const senderUser = db.data.users[m.sender] || {}
+		const isPrems = isROwner || isMods || (senderUser.premiumTime > 0 || senderUser.premium)
 
 		if (opts['queque'] && m.text && !(isMods || isPrems)) {
 			let queque = this.msgqueque,
@@ -1130,15 +1156,22 @@ export async function handler(chatUpdate) {
 		let usedPrefix
 		let _user = global.db.data && global.db.data.users && global.db.data.users[m.sender]
 
-		const groupMetadata = (m.isGroup ? ((conn.chats[m.chat] || {}).metadata || await this.groupMetadata(m.chat).catch(_ => null)) : {}) || {}
-		const participants = (m.isGroup ? groupMetadata.participants : []) || []
-		/*const user = (m.isGroup ? participants.find(u => conn.decodeJid(u.id) === m.sender) : {}) || {} // User Data
-		const bot = (m.isGroup ? participants.find(u => conn.decodeJid(u.id) == this.user.jid) : {}) || {} // Your Data*/
-		const user = (m.isGroup ? participants.find(u => conn.decodeJid(u.jid) === m.sender) : {}) || {};
-        const bot = (m.isGroup ? participants.find(u => conn.decodeJid(u.jid) == this.user.jid) : {}) || {};
-		const isRAdmin = user?.admin == 'superadmin' || [global.conn.user.jid, ...global.owner, ...global.xmaze].map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender) || false
-		const isAdmin = isRAdmin || user?.admin == 'admin' || [global.conn.user.jid, ...global.owner, ...global.xmaze].map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net').includes(m.sender) || false // Is User Admin?
-		const isBotAdmin = bot?.admin || false // Are you Admin?
+		const isRAdmin = isParticipantSuperAdmin(user) || isOwner
+		const isAdmin = isRAdmin || isParticipantAdmin(user) || isOwner // Is User Admin?
+		const isBotAdmin = isParticipantAdmin(bot) // Are you Admin?
+		const isGroupAnnounce = Boolean(m.isGroup && (groupMetadata.announce || groupMetadata.read_only))
+		const canSendMessages = !m.isGroup || !isGroupAnnounce || isBotAdmin
+		Object.assign(m, {
+			isROwner,
+			isOwner,
+			isMods,
+			isPrems,
+			isRAdmin,
+			isAdmin,
+			isBotAdmin,
+			isGroupAnnounce,
+			canSendMessages
+		})
 
 		const ___dirname = path.join(path.dirname(fileURLToPath(import.meta.url)), './plugins')
 		for (let name in global.plugins) {
@@ -1202,9 +1235,12 @@ export async function handler(chatUpdate) {
 						bot,
 						isROwner,
 						isOwner,
+						isMods,
 						isRAdmin,
 						isAdmin,
 						isBotAdmin,
+						isGroupAnnounce,
+						canSendMessages,
 						isPrems,
 						chatUpdate,
 						__dirname: ___dirname,
@@ -1339,9 +1375,12 @@ export async function handler(chatUpdate) {
 					bot,
 					isROwner,
 					isOwner,
+					isMods,
 					isRAdmin,
 					isAdmin,
 					isBotAdmin,
+					isGroupAnnounce,
+					canSendMessages,
 					isPrems,
 					chatUpdate,
 					__dirname: ___dirname,
@@ -1689,6 +1728,7 @@ global.dfail = (type, m, conn) => {
 		restrict: '*FITUR DIMATIKAN OLEH OWNER*',
 		unreg: '*Silakan mendaftar terlebih dahulu dengan menulis \`#daftar name.age\`*\n\n* *Setelah Anda terdaftar, maka Anda dapat menggunakan perintah ini.*\n\n*Contoh pendaftaran:*\n\n\`#daftar Maximus.25\`\n\n*Catatan:*\n- Gunakan nama asli dan umur yang benar\n- Jika sudah mendaftar maka kamu tidak perlu mendaftar lagi'
 	} [type]
+	if (msg && m?.canSendMessages === false) return
 
 	if (msg) return conn.sendMessage(m.chat, { text: `*Hi @${m.sender.split('@')[0]} 👋🏻*\n\n` + msg, contextInfo: { mentionedJid: [m.sender] }})
 }

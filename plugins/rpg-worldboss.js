@@ -1,7 +1,7 @@
 import { WorldBossSystem, WORLD_BOSSES, RARE_DROPS } from '../lib/world-boss-system.js'
 import { RPGHandler } from '../lib/rpg-handler.js'
 
-let handler = async (m, { conn, args, command }) => {
+let handler = async (m, { conn, args, command, isAdmin, isOwner }) => {
   try {
     const userId = m.sender
     const userName = await conn.getName(userId)
@@ -53,7 +53,7 @@ let handler = async (m, { conn, args, command }) => {
 
         await conn.sendMessage(m.chat, { text: text }, { quoted: m })
       } else if (args[0].toLowerCase() === 'spawn') {
-        if (!m.isAdmin && m.sender !== m.isOwner) {
+        if (!(isAdmin || isOwner || m.isAdmin || m.isOwner)) {
           await conn.sendMessage(m.chat, { text: '❌ Admin only' }, { quoted: m })
           return
         }

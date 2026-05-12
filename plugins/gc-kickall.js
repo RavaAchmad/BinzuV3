@@ -1,10 +1,11 @@
-import { areJidsSameUser } from "baileys"; 
+import { getParticipantJid, isParticipantAdmin, jidEqual } from "../lib/jid-helper.js"
  let handler = async (m, { conn, participants }) => { 
-   let users = participants.filter((u) => !areJidsSameUser(u.id, conn.user.id)); 
+   let users = participants.filter((u) => !jidEqual(getParticipantJid(u, conn), conn.user.id, conn));
    let kickedUser = []; 
    for (let user of users) { 
-     if (user.id.endsWith("@s.whatsapp.net") && !user.admin) { 
-       await kickedUser.push(user.id); 
+     const jid = getParticipantJid(user, conn)
+     if (jid && !isParticipantAdmin(user)) {
+       kickedUser.push(jid);
        await delay(1 * 1000); 
      } 
    } 
