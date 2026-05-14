@@ -1,7 +1,7 @@
 {
-    "name": "XMCodes",
-    "version": "6.0.0",
-    "description": "Script Free By Maximus | XM4ZE",
+    "name": "binzu-v3",
+    "version": "6.1.0",
+    "description": "BinzuV3 WhatsApp commerce automation bot with plugin, RPG, media, and webhook modules.",
     "main": "index.js",
     "type": "module",
     "directories": {
@@ -13,16 +13,27 @@
         "start": "node index.js",
         "test": "node test.js"
     },
-    "homepage": "https://github.com/XM4ZE/XMYULA-MD",
+    "homepage": "https://github.com/RavaAchmad/BinzuV3",
+    "keywords": [
+        "whatsapp-bot",
+        "baileys",
+        "commerce",
+        "payment",
+        "rpg",
+        "webhook"
+    ],
     "author": {
-        "name": "XM4ZE"
+        "name": "RavaAchmad"
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/XM4ZE/XMYULA-MD.git"
+        "url": "git+https://github.com/RavaAchmad/BinzuV3.git"
     },
     "bugs": {
-        "url": "https://github.com/XM4ZE/XMYULA-MD/issues"
+        "url": "https://github.com/RavaAchmad/BinzuV3/issues"
+    },
+    "engines": {
+        "node": ">=20"
     },
     "license": "MIT",
     "dependencies": {

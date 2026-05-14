@@ -1,214 +1,130 @@
-# XMYULA-MD WhatsApp Bot
+# BinzuV3
 
-<div align="center">
-  <img src="https://github.com/XM4ZE/DATABASE/blob/master/wallpaper/eula-genshin.gif?raw=true" width="300" height="300" alt="XMYULA-MD Bot"/>
-  
-  <h3>🤖 Advanced WhatsApp Bot with Multi-Authentication Support</h3>
-  
-  ![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)
-  ![Baileys](https://img.shields.io/badge/Baileys-Latest-blue.svg)
-  ![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)
-  
-</div>
+BinzuV3 adalah WhatsApp bot berbasis Baileys untuk operasional chat, grup, konten, RPG, downloader, sticker, dan automasi commerce. Update utama proyek ini diarahkan ke jalur commerce: order, deposit, payment, premium, store flow, dan webhook promosi.
 
----
+## Status Produk
 
-## 📌 **Information**
+- Fokus utama: commerce bot untuk order/deposit/payment di WhatsApp.
+- Fokus pendukung: stabilitas plugin, menu, webhook, dan debug operasional.
+- Fokus tambahan: RPG/chat retention tetap dipertahankan sebagai fitur retensi, bukan arah utama rilis.
 
-- 🔐 Multi-auth session support
-- 📱 Built with the latest Baileys
-- 🔧 Fix Lid ~> Jid
-- 📢 Stay updated via WhatsApp Newsletter
+## Tech Stack
 
----
+- Runtime: Node.js 20+ dengan ESM.
+- WhatsApp socket: `@whiskeysockets/baileys@7.0.0-rc10`.
+- HTTP server: Express.
+- Database default: LowDB JSON file (`database.json`).
+- Database opsional: MongoDB atau remote cloud DB adapter lewat `--db`.
+- Media tooling: FFmpeg, ImageMagick/GraphicsMagick, canvas/webp tooling.
+- Monitoring: PM2 metrics dan health endpoint.
 
-## 🚀 **Quick Start**
+## Core Capabilities
+
+- WhatsApp bot dengan pairing code authentication.
+- Dynamic plugin loader untuk command di folder `plugins/`.
+- Webhook HTTP untuk pengiriman pesan promo.
+- Group management, owner tools, downloader, sticker, tools, fun/game, info, dan internet commands.
+- Commerce primitives: premium/sewa, store list, QRIS/media payment reference, crypto minigame economy, deposit/withdraw command family.
+- RPG/chat retention: legacy RPG inventory, dungeon, mission, leaderboard, text-RPG modular service.
+- Health and debug: `/health`, `webhook-tester.js`, PM2 metric registered users.
+
+## Quick Start
 
 ```bash
-npm start
-```
-
----
-
-## ✨ **Features**
-
-<div align="center">
-
-| 🤖 **AI & Intelligence** | 🎮 **Entertainment** | 🛠️ **Utilities** |
-|:---:|:---:|:---:|
-| AI Menu | Anime Menu | Download Menu |
-| Islamic Menu | Fun Menu | Tools Menu |
-| Main Menu | Game Menu | Maker Menu |
-
-| 👥 **Social & Management** | 💎 **Premium** | 📊 **Information** |
-|:---:|:---:|:---:|
-| Group Menu | Premium Menu | Info Menu |
-| Sticker Menu | Owner Menu | Internet Menu |
-| RPG Menu | Quotes Menu | - |
-
-</div>
-
----
-
-## 💳 **Script Versions**
-
-<div align="center">
-
-<table>
-<tr>
-<td align="center" width="300" style="border: 2px solid #dc3545; border-radius: 10px; padding: 15px;">
-
-### 🆓 **Free Version**
-
-❌ VIP Plugins  
-❌ Simple code  
-❌ Full Support  
-
-**Price: FREE**
-
-[![ Star Repo](https://img.shields.io/badge/⭐_Star_Repo-blue?style=for-the-badge)](https://github.com/XM4ZE/XMYULA-MD)
-
-</td>
-<td align="center" width="300" style="border: 2px solid #28a745; border-radius: 10px; padding: 15px;">
-
-### 💎 **Premium Version**
-
-✅ VIP Plugins  
-✅ Simple code  
-✅ Full Support  
-
-**Price: 150K IDR**
-
-[![🚀 Get Premium](https://img.shields.io/badge/🚀_Get_Premium-success?style=for-the-badge)](https://wa.me/6281283516246)
-
-</td>
-</tr>
-</table>
-
-</div>
-
----
-
-## ⚙️ **Configuration**
-
-Edit `config.js`:
-
-```javascript
-global.info = {
-  nomorbot: '62882257504889',
-  nomorown: '6281283516246',
-  namebot: 'Assisten YuLa',
-  nameown: 'Maximus Store',
-  channel: '120363241570452835@newsletter',
-  namechannel: 'XM4ZE | Whatsapp Bots'
-}
-```
-
----
-
-## 🔑 **Required API**
-
-Get key at [Botcahx API](https://botcahx.eu.org) then add to `config.js`:
-
-```javascript
-global.btc = 'YOUR_API_KEY'
-```
-
----
-
-## 🖥️ **Installation**
-
-### **For Windows/VPS/RDP:**
-
-**1. Install Required Software:**
-- [Git](https://git-scm.com/)
-- [Node.js](https://nodejs.org/) (v20+)
-- [ImageMagick](https://imagemagick.org/)
-- [FFmpeg](https://ffmpeg.org/) (Add to PATH)
-
-**2. Deploy Bot:**
-```bash
-git clone https://github.com/XM4ZE/XMYULA-MD
-cd XMYULA-MD
 npm install
 npm start
 ```
 
----
+Saat pertama dijalankan, bot akan meminta nomor WhatsApp dan menampilkan pairing code. Session disimpan di folder `sessions/`.
 
-## 📦 **XMPanels Hosting Pterodactyl Pricelist**
+## Configuration
 
-Quality Hosting at XMPanels! Click this button to buy and get a special price. Speed, security, and 24/7 support! [Buy Now](https://xmpanels.xmaze.my.id)
+Konfigurasi utama ada di `config.js`.
 
-## 🛠️ **Included Software**
+Bagian yang paling sering diubah:
 
+```js
+global.info = {
+  nomorbot: '62895325866441',
+  nomorown: '6281212035575',
+  namebot: 'Binzu Bot',
+  nameown: 'RV',
+  channel: '120363406567158177@newsletter',
+  namechannel: 'Binzu | WhatsApp Bots'
+}
+
+global.APIs = {
+  btc: 'https://ravaja.my.id'
+}
 ```
-✅ yarn          ✅ ffmpeg         ✅ imagemagick
-✅ PHP           ✅ Golang         ✅ python3
-✅ python3-PIP   ✅ PM2            ✅ PNPM
-✅ speedtest-CLI ✅ nodemon        ✅ puppeteer
+
+Environment yang didukung:
+
+- `PORT`: port Express server, default `5000`.
+- `BAILEYS_SYNC_FULL_HISTORY` / `WA_SYNC_FULL_HISTORY`: aktifkan full history sync jika diperlukan.
+- `BOT_PORT` / `BOT_HOST`: dipakai oleh `webhook-tester.js`.
+
+## HTTP Endpoints
+
+```text
+GET  /health
+POST /webhook/send-promo
 ```
 
-## 📝 **Terms & Conditions**
+Contoh payload promo:
 
-- ⏰ Duration: 30 Days
-- 🛡️ 30-Day Warranty (void if rules violated)
-- 🔄 Renewal prices apply only to active servers
+```json
+{
+  "number": "6281234567890",
+  "message": "Promo BinzuV3"
+}
+```
 
----
+## Product Direction
 
-## 📞 **Contact & Support**
+Jalur yang dipilih untuk BinzuV3 adalah commerce.
 
-<div align="center">
+Prioritas berikutnya:
 
-[![WhatsApp](https://img.shields.io/badge/WhatsApp-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://wa.me/6281283516246)
-[![Group Chat](https://img.shields.io/badge/Group_Chat-0088CC?style=for-the-badge&logo=whatsapp&logoColor=white)](https://chat.whatsapp.com/B8cELUFmR7mLdF7wxP8EsA)
-[![Donate](https://img.shields.io/badge/☕_Buy_Me_Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://telegra.ph/file/89f3b942c79acd4a5880b.jpg)
+1. Rapikan order flow: command order, validasi produk, invoice, status, dan riwayat order.
+2. Rapikan deposit/payment: QRIS, manual confirmation, saldo, callback/webhook jika provider tersedia.
+3. Satukan premium/store: premium, sewa, limit, store list, dan broadcast promo dalam satu alur.
+4. Tambahkan dashboard/debug ringan untuk melihat health, antrean order, dan error plugin.
 
-</div>
+## Technical Notes
 
----"baileys": "^6.7.21",
+Lihat [CHANGELOG.md](./CHANGELOG.md) untuk catatan migrasi Baileys rc10, perubahan interactive buttons, dan compatibility notes.
 
-## 👥 **Contributors**
+Peta sistem utama tersedia di [SYSTEM_MAP.md](./SYSTEM_MAP.md).
 
-<div align="center">
-  <table>
-    <tr>
-      <td align="center">
-        <a href="https://github.com/BOTCAHX">
-          <img src="https://github.com/BOTCAHX.png?size=100" width="100" style="border-radius:50%">
-          <br>
-          <strong>Tio</strong>
-          <br>
-          <sub>API Developer</sub>
-        </a>
-      </td>
-      <td align="center">
-        <a href="https://github.com/BochilGaming">
-          <img src="https://github.com/BochilGaming.png?size=100" width="100" style="border-radius:50%">
-          <br>
-          <strong>Bochil</strong>
-          <br>
-          <sub>Module Creator</sub>
-        </a>
-      </td>
-      <td align="center">
-        <a href="https://github.com/Nurutomo">
-          <img src="https://github.com/Nurutomo.png?size=100" width="100" style="border-radius:50%">
-          <br>
-          <strong>Nurutomo</strong>
-          <br>
-          <sub>Base Framework</sub>
-        </a>
-      </td>
-    </tr>
-  </table>
-</div>
+## Development Commands
 
----
+```bash
+npm start
+npm test
+node webhook-tester.js
+node bot-monitor.js
+```
 
-<div align="center">
+## Runtime Data
 
-### ⭐ **If you find this project helpful, please give it a star!**
+- `sessions/`: kredensial WhatsApp multi-file auth.
+- `database.json`: database default LowDB.
+- `bot-status.json`: status monitor jika health monitor menulis file.
+- `bot-health.log`: log monitor jika tersedia.
+- `tmp/`: temporary media/runtime artifacts.
 
-</div>
+## Compatibility
+
+- Gunakan Node.js 20+.
+- Baileys saat ini memakai rc10, jadi perilaku pairing, LID/PN mapping, dan interactive message bisa berubah antar rilis.
+- FFmpeg diperlukan untuk video/audio/sticker.
+- ImageMagick atau GraphicsMagick diperlukan untuk sebagian fitur image/sticker.
+- Jika memakai MongoDB, jalankan dengan argumen `--db mongodb://...`.
+
+## Repository
+
+- GitHub: https://github.com/RavaAchmad/BinzuV3
+- Main entrypoint: `index.js`
+- Bot bootstrap: `main.js`
+- Message dispatcher: `handler.js`
