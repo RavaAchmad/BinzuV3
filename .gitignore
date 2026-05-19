@@ -3,3 +3,4 @@ README.md
 .continue
 SYSTEM_MAP*
 node_modules/
+.env.example
