@@ -63,12 +63,15 @@ Environment yang didukung:
 - `PORT`: port Express server, default `5000`.
 - `BAILEYS_SYNC_FULL_HISTORY` / `WA_SYNC_FULL_HISTORY`: aktifkan full history sync jika diperlukan.
 - `BOT_PORT` / `BOT_HOST`: dipakai oleh `webhook-tester.js`.
+- `BINZU_INTERNAL_API_KEY`: API key rahasia untuk menerima webhook internal Ravion.
+- `RAVION_API_BASE_URL`: base URL backend Ravion untuk integrasi command/status berikutnya.
 
 ## HTTP Endpoints
 
 ```text
 GET  /health
 POST /webhook/send-promo
+POST /webhook/ravion-notify
 ```
 
 Contoh payload promo:
@@ -79,6 +82,31 @@ Contoh payload promo:
   "message": "Promo BinzuV3"
 }
 ```
+
+Endpoint Ravion wajib memakai header `x-ravion-key` yang cocok dengan `BINZU_INTERNAL_API_KEY`.
+Field `number` wajib memakai format `62` tanpa `+`, spasi, atau awalan `0`, contoh `6281234567890`.
+
+Contoh payload Ravion:
+
+```json
+{
+  "event": "PAYMENT_RECEIVED",
+  "number": "6281234567890",
+  "payload": {
+    "customerName": "Rava",
+    "orderId": "RVN-12345678",
+    "productName": "Ravion Comet",
+    "amount": 10000
+  }
+}
+```
+
+Event Ravion yang didukung:
+
+- `PAYMENT_RECEIVED`
+- `ORDER_PROVISIONING`
+- `ORDER_PROVISIONED`
+- `ORDER_FAILED`
 
 ## Product Direction
 

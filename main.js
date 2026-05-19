@@ -37,6 +37,10 @@ import {
 } from "./lib/connection.js";
 import { setupBadMacHandler, resetErrorTracking } from './lib/bad-mac-handler.js';
 import { startCryptoTicker } from './plugins/crypto-ticker.js';
+import {
+  buildRavionNotificationMessage,
+  validateRavionNotificationBody
+} from './lib/ravion-notification.js';
 
 const app = express();
 app.use(express.json());
@@ -559,6 +563,83 @@ async function sendMessageWithRetry(jid, message, maxRetries = 3) {
 }
 
 /**
+ * Webhook: Ravion internal order notifications
+ */
+app.post("/webhook/ravion-notify", async (req, res) => {
+  try {
+    const expectedKey = process.env.BINZU_INTERNAL_API_KEY;
+    const requestKey = req.get("x-ravion-key");
+
+    if (!expectedKey) {
+      console.log(chalk.red('[!] Ravion webhook rejected: BINZU_INTERNAL_API_KEY is not configured'));
+      return res.status(503).json({
+        error: 'BINZU_INTERNAL_API_KEY is not configured',
+        statusCode: 503
+      });
+    }
+
+    if (!requestKey || requestKey !== expectedKey) {
+      console.log(chalk.red('[!] Ravion webhook rejected: unauthorized request'));
+      return res.status(401).json({
+        error: 'Unauthorized',
+        statusCode: 401
+      });
+    }
+
+    const validation = validateRavionNotificationBody(req.body);
+    if (!validation.ok) {
+      console.log(chalk.red(`[!] Ravion webhook validation error: ${validation.error}`));
+      return res.status(400).json({
+        error: validation.error,
+        required: validation.required,
+        statusCode: 400
+      });
+    }
+
+    if (!isBotReady()) {
+      console.log(chalk.yellow('[!] Ravion webhook delayed: bot not ready'));
+      return res.status(503).json({
+        error: 'Bot not ready (still connecting)',
+        statusCode: 503,
+        retryAfter: 5
+      });
+    }
+
+    const { event, number, payload } = validation.data;
+    const message = buildRavionNotificationMessage(event, payload);
+    const result = await sendMessageWithRetry(number, message);
+
+    console.log(chalk.green(`[OK] Ravion notification sent: event=${event} order=${payload.orderId} jid=${result.jid}`));
+    return res.status(200).json({
+      status: 'ok',
+      event,
+      order_id: payload.orderId,
+      sent_to: result.jid,
+      statusCode: 200
+    });
+  } catch (error) {
+    console.error(chalk.red('[!] Ravion webhook error:'), error.message);
+
+    let statusCode = 500;
+    if (error.message.includes('Invalid')) {
+      statusCode = 400;
+    } else if (error.message.includes('not ready')) {
+      statusCode = 503;
+    } else if (error.message.includes('timeout')) {
+      statusCode = 504;
+    } else if (error.message.includes('Bad MAC') || error.message.includes('session')) {
+      statusCode = 502;
+    }
+
+    return res.status(statusCode).json({
+      error: error.message,
+      statusCode,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
  * Webhook: Send promotional message
  */
 app.post("/webhook/send-promo", async (req, res) => {
@@ -645,5 +726,6 @@ const PORT = process.env.PORT || 5000;
 global.httpServer = app.listen(PORT, async () => {
     console.log(chalk.bold.green(`\n🚀 WhatsApp Webhook & Bot running on port ${PORT}`));
     console.log(chalk.gray('   Webhook: POST http://localhost:' + PORT + '/webhook/send-promo'));
+    console.log(chalk.gray('   Ravion:  POST http://localhost:' + PORT + '/webhook/ravion-notify'));
     console.log(chalk.gray('   Health: GET http://localhost:' + PORT + '/health\n'));
 });

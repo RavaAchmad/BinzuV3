@@ -31,6 +31,26 @@ global.APIKeys = {
   'https://ravaja.my.id': global.btc,
 }
 
+/*============== PTERODACTYL PANEL ==============*/
+global.panel = {
+    domain: process.env.PTERO_DOMAIN || process.env.PANEL_DOMAIN || '',
+    apikey: process.env.PTERO_APPLICATION_KEY || process.env.PTERO_APP_KEY || process.env.PANEL_APIKEY || '',
+    c_apikey: process.env.PTERO_CLIENT_KEY || process.env.PANEL_CLIENT_KEY || '',
+    defaultNest: Number(process.env.PTERO_DEFAULT_NEST || 6),
+    defaultEgg: Number(process.env.PTERO_DEFAULT_EGG || 0),
+    defaultLocation: Number(process.env.PTERO_DEFAULT_LOCATION || 1),
+    dockerImage: process.env.PTERO_DOCKER_IMAGE || 'ghcr.io/xm4ze/xmpanels:20',
+    startup: process.env.PTERO_STARTUP || 'node run.js'
+}
+global.pterodactyl = global.panel
+
+global.pteroRental = {
+    enabled: process.env.PTERO_RENTAL_ENABLED !== 'false',
+    checkIntervalMinutes: Number(process.env.PTERO_RENTAL_CHECK_MINUTES || 10),
+    reminderBeforeHours: Number(process.env.PTERO_RENTAL_REMINDER_BEFORE_HOURS || 24),
+    reminderIntervalHours: Number(process.env.PTERO_RENTAL_REMINDER_INTERVAL_HOURS || 5)
+}
+
 /*============== WATERMARK ==============*/
 global.wm = 'ʙɪɴᴢᴜ-MD'
 global.author = '\n\n\n\n\n\n\n62895325866441'
