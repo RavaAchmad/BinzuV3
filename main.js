@@ -847,7 +847,7 @@ app.get('/health', (req, res) => {
 
 // ========== END WEBHOOK ==========
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5090;
 global.httpServer = app.listen(PORT, async () => {
     console.log(chalk.bold.green(`\n🚀 WhatsApp Webhook & Bot running on port ${PORT}`));
     console.log(chalk.gray('   Webhook: POST http://localhost:' + PORT + '/webhook/send-promo'));
