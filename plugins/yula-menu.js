@@ -4,7 +4,6 @@ import { join } from 'path'
 import fetch from 'node-fetch'
 import { xpRange } from '../lib/levelling.js'
 import moment from 'moment-timezone'
-import { getDevice } from 'baileys'
 import os from 'os'
 import axios from 'axios' 
 import fs from 'fs'
@@ -13,6 +12,7 @@ import { toAudio } from '../lib/converter.js'
 import path from 'path'
 import { interactiveMsg } from '../lib/buttons.js'
 let cachedThumbnail = null
+const MENU_TEXT_CHUNK_LIMIT = 30000
 let tags = {
   // 🧭 CORE / WAJIB (Tier 1)
   'main': 'Main Menu',
@@ -272,24 +272,24 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
       xp4levelup: max - exp,
       github: _package.homepage ? _package.homepage.url || _package.homepage : '[unknown github url]',
       level, limit, name, weton, week, date, year, dateIslamic, time, totalreg, rtotalreg, role, prems, tag, status, wib, platform, mode, 
-      readmore: readMore
+      readmore: ''
     }
     textToSend = textToSend.replace(new RegExp(`%(${Object.keys(replace).sort((a, b) => b.length - a.length).join`|`})`, 'g'), (_, name) => '' + replace[name])
     
-    if (!cachedThumbnail) {
+    const isAllMenu = menuType === 'all'
+
+    if (!isAllMenu && !cachedThumbnail) {
       cachedThumbnail = await loadMenuThumbnail()
     }
 
     let fkon = { key: { fromMe: false, participant: `0@s.whatsapp.net`, ...(m.chat ? { remoteJid: '0@s.whatsapp.net' } : {}) }, message: { contactMessage: { displayName: `${botName}`, vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;a,;;;\nFN:${botName}\nitem1.TEL;waid=${m.sender.split('@')[0]}:${m.sender.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`}}}
 
-    const contextInfo = buildMenuContext(m.sender, year, cachedThumbnail)
-    const isAllMenu = menuType === 'all'
+    const contextInfo = !isAllMenu
+      ? buildMenuContext(m.sender, year, cachedThumbnail)
+      : { mentionedJid: [m.sender] }
 
     if (!isAllMenu) {
-      await conn.sendMessage(m.chat, {
-        text: textToSend,
-        contextInfo
-      }, { quoted: m })
+      await sendMenuText(conn, m, textToSend)
 
       try {
         await interactiveMsg(conn, m.chat, {
@@ -301,51 +301,8 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
       } catch (e) {
         console.warn('[menu] interactive menu skipped:', e?.message || e)
       }
-    } else if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
-      if (!db.data.settings[conn.user.jid].thumbnail) {
-        await conn.sendMessage(m.chat, {
-            text: textToSend,
-            contextInfo: {
-                mentionedJid: [m.sender],
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: global.info.channel,
-                    serverMessageId: null,
-                    newsletterName: global.info.namechannel,
-                },
-                externalAdReply: {
-                    showAdAttribution: false,
-                    title: global.info.namebot + ` © ` + year,
-                    body: '',
-                    mediaType: 1,
-                    sourceUrl: gcbot,
-                    renderLargerThumbnail: true,
-                    thumbnail: cachedThumbnail, // ← pindah ke sini, harus Buffer jpeg
-                }
-            },
-        }, { quoted: m });
-      } else {
-        await conn.sendMessage(m.chat, { text: textToSend, contextInfo: { mentionedJid: [m.sender] }}, { quoted: m });
-      }
     } else {
-      try {
-        await conn.sendMessage(m.chat, {
-          video: {
-            url: global.thumvid || "https://files.catbox.moe/morbwn.mp4"
-          },
-          gifPlayback: true,
-          fileName: wm,
-          caption: textToSend,
-          contextInfo: {
-            mentionedJid: [m.sender]
-          }
-        }, { quoted: m });
-      } catch (sendErr) {
-        console.warn('[menu] video menu failed, falling back to text:', sendErr?.message || sendErr)
-        await conn.sendMessage(m.chat, {
-          text: textToSend,
-          contextInfo
-        }, { quoted: m });
-      }
+      await sendMenuText(conn, m, textToSend)
     }
   } catch (e) {
     throw e
@@ -354,6 +311,40 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
   // Display ads after menu with delay
   setTimeout(() => displayAds(m, conn), 1200)
 };
+
+async function sendMenuText(conn, m, text) {
+  const chunks = splitMenuText(text)
+
+  for (let i = 0; i < chunks.length; i++) {
+    if (i > 0) await new Promise(resolve => setTimeout(resolve, 500))
+    const options = i === 0 ? { quoted: m } : {}
+    await conn.sendMessage(m.chat, {
+      text: chunks[i],
+      contextInfo: {
+        mentionedJid: [m.sender]
+      }
+    }, options)
+  }
+}
+
+function splitMenuText(text) {
+  text = String(text || '')
+  if (text.length <= MENU_TEXT_CHUNK_LIMIT) return [text]
+
+  const chunks = []
+  let current = ''
+  for (const line of text.split('\n')) {
+    const next = current ? `${current}\n${line}` : line
+    if (next.length > MENU_TEXT_CHUNK_LIMIT && current) {
+      chunks.push(current)
+      current = line
+    } else {
+      current = next
+    }
+  }
+  if (current) chunks.push(current)
+  return chunks
+}
 
 /**
  * Load and display ads from config
