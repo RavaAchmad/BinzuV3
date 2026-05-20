@@ -38,6 +38,8 @@ import {
 import { setupBadMacHandler, resetErrorTracking } from './lib/bad-mac-handler.js';
 import { startCryptoTicker } from './plugins/crypto-ticker.js';
 import {
+  buildRavionDeveloperMessage,
+  buildRavionGroupInviteMessage,
   buildRavionNotificationMessage,
   validateRavionNotificationBody
 } from './lib/ravion-notification.js';
@@ -562,6 +564,119 @@ async function sendMessageWithRetry(jid, message, maxRetries = 3) {
   throw lastError || new Error('Failed to send message after retries');
 }
 
+function toWhatsAppUserJid(number) {
+  return number.includes('@') ? number : `${number}@s.whatsapp.net`;
+}
+
+function participantMatchesNumber(participant, number) {
+  const expectedNumber = String(number).replace(/\D/g, '');
+  const values = [
+    participant?.id,
+    participant?.jid,
+    participant?.phoneNumber,
+    participant?.participant,
+    participant?.user
+  ].filter(Boolean);
+
+  return values.some(value => {
+    const normalized = String(value).replace(/@(s\.whatsapp\.net|c\.us|lid)$/i, '').replace(/\D/g, '');
+    return normalized === expectedNumber;
+  });
+}
+
+async function isRavionBuyerAlreadyInGroup(groupId, number) {
+  try {
+    const metadata = await conn.groupMetadata(groupId);
+    return Boolean(metadata?.participants?.some(participant => participantMatchesNumber(participant, number)));
+  } catch (error) {
+    console.log(chalk.yellow(`[!] Ravion group metadata check failed: ${error.message}`));
+    return false;
+  }
+}
+
+function getParticipantUpdateStatus(result) {
+  const first = Array.isArray(result) ? result[0] : result;
+  return String(first?.status || first?.content?.attrs?.error || 'unknown');
+}
+
+async function addRavionBuyerToGroup(number, payload) {
+  const groupId = process.env.RAVION_BUYER_GROUP_ID || '120363409710035902@g.us';
+  const inviteUrl = process.env.RAVION_BUYER_GROUP_INVITE_URL || 'https://chat.whatsapp.com/JLCtpfiyxR5CgJ6JAB9bqz';
+  const buyerJid = toWhatsAppUserJid(number);
+
+  try {
+    const alreadyMember = await isRavionBuyerAlreadyInGroup(groupId, number);
+    if (alreadyMember) {
+      return {
+        status: 'already_member',
+        group_id: groupId,
+        invite_sent: false
+      };
+    }
+
+    const updateResult = await conn.groupParticipantsUpdate(groupId, [buyerJid], 'add');
+    const participantStatus = getParticipantUpdateStatus(updateResult);
+
+    if (participantStatus !== '200') {
+      throw new Error(`Group add rejected with status ${participantStatus}`);
+    }
+
+    console.log(chalk.green(`[OK] Ravion buyer added to group: order=${payload.orderId} jid=${buyerJid}`));
+    return {
+      status: 'added',
+      group_id: groupId,
+      invite_sent: false,
+      participant_status: participantStatus
+    };
+  } catch (error) {
+    console.log(chalk.yellow(`[!] Ravion group add failed for ${buyerJid}: ${error.message}`));
+
+    try {
+      const inviteMessage = buildRavionGroupInviteMessage(payload, inviteUrl);
+      await sendMessageWithRetry(number, inviteMessage);
+
+      return {
+        status: 'invite_sent',
+        group_id: groupId,
+        invite_sent: true,
+        error: error.message
+      };
+    } catch (inviteError) {
+      console.log(chalk.yellow(`[!] Ravion group invite fallback failed: ${inviteError.message}`));
+
+      return {
+        status: 'invite_failed',
+        group_id: groupId,
+        invite_sent: false,
+        error: error.message,
+        invite_error: inviteError.message
+      };
+    }
+  }
+}
+
+async function notifyRavionDeveloper(event, number, payload, groupResult) {
+  const developerNumber = process.env.RAVION_DEVELOPER_NUMBER || '6281212035575';
+
+  try {
+    const developerMessage = buildRavionDeveloperMessage(event, number, payload, groupResult);
+    const result = await sendMessageWithRetry(developerNumber, developerMessage);
+    console.log(chalk.green(`[OK] Ravion developer notified: order=${payload.orderId} jid=${result.jid}`));
+
+    return {
+      status: 'sent',
+      sent_to: result.jid
+    };
+  } catch (error) {
+    console.log(chalk.yellow(`[!] Ravion developer notify failed: ${error.message}`));
+
+    return {
+      status: 'failed',
+      error: error.message
+    };
+  }
+}
+
 /**
  * Webhook: Ravion internal order notifications
  */
@@ -608,6 +723,15 @@ app.post("/webhook/ravion-notify", async (req, res) => {
     const { event, number, payload } = validation.data;
     const message = buildRavionNotificationMessage(event, payload);
     const result = await sendMessageWithRetry(number, message);
+    const automation = {
+      buyer_group: { status: 'skipped' },
+      developer_notice: { status: 'skipped' }
+    };
+
+    if (event === 'ORDER_PROVISIONED') {
+      automation.buyer_group = await addRavionBuyerToGroup(number, payload);
+      automation.developer_notice = await notifyRavionDeveloper(event, number, payload, automation.buyer_group);
+    }
 
     console.log(chalk.green(`[OK] Ravion notification sent: event=${event} order=${payload.orderId} jid=${result.jid}`));
     return res.status(200).json({
@@ -615,6 +739,7 @@ app.post("/webhook/ravion-notify", async (req, res) => {
       event,
       order_id: payload.orderId,
       sent_to: result.jid,
+      automation,
       statusCode: 200
     });
   } catch (error) {
