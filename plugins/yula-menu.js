@@ -303,7 +303,7 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
       }
     } else if (!/all/.test(command) && await getDevice(m.key.id) == 'android') {
       if (!db.data.settings[conn.user.jid].thumbnail) {
-        conn.sendMessage(m.chat, {
+        await conn.sendMessage(m.chat, {
             text: textToSend,
             contextInfo: {
                 mentionedJid: [m.sender],
@@ -324,18 +324,29 @@ let handler = async (m, { conn, usedPrefix, command, __dirname, text }) => {
             },
         }, { quoted: m });
       } else {
-      conn.sendMessage(m.chat, { text: textToSend, contextInfo: { mentionedJid: [m.sender] }}, { quoted: m });
+        await conn.sendMessage(m.chat, { text: textToSend, contextInfo: { mentionedJid: [m.sender] }}, { quoted: m });
       }
-    } else await conn.sendMessage(m.chat, { 
-          image: { 
-             url: "https://files.catbox.moe/morbwn.mp4" 
-             }, 
-             fileName: wm, 
-             caption: textToSend, 
-                 contextInfo: { 
-                     mentionedJid: [m.sender] 
-                 }
-          }, { quoted: m });
+    } else {
+      try {
+        await conn.sendMessage(m.chat, {
+          video: {
+            url: global.thumvid || "https://files.catbox.moe/morbwn.mp4"
+          },
+          gifPlayback: true,
+          fileName: wm,
+          caption: textToSend,
+          contextInfo: {
+            mentionedJid: [m.sender]
+          }
+        }, { quoted: m });
+      } catch (sendErr) {
+        console.warn('[menu] video menu failed, falling back to text:', sendErr?.message || sendErr)
+        await conn.sendMessage(m.chat, {
+          text: textToSend,
+          contextInfo
+        }, { quoted: m });
+      }
+    }
   } catch (e) {
     throw e
   }
