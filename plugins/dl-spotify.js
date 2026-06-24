@@ -1,7 +1,4 @@
 import axios from 'axios'
-import {
-    getUrlBuffer
-} from 'baileys_helpers'
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
     if (!args[0]) {
