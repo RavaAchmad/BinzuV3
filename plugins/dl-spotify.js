@@ -1,4 +1,8 @@
 import axios from 'axios'
+import {
+    getUrlBuffer,
+    generateWAMessageContent
+} from 'baileys_helpers'
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
     if (!args[0]) {
@@ -17,23 +21,30 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
         const r = data.result
 
+        const thumb = await getUrlBuffer(r.thumbnail)
         await conn.sendMessage(m.chat, {
-            audio: {
-                url: r.audio
-            },
-            mimetype: 'audio/mpeg',
-            fileName: `${r.title}.mp3`,
+            text:
+        `🎵 *Spotify Downloader*
+
+        📀 ${r.title}
+        👤 ${r.artist}
+        ⏱ ${(r.duration / 1000).toFixed(0)} detik
+
+        ⬇️ Sedang mengunggah audio...`,
             contextInfo: {
                 externalAdReply: {
                     title: r.title,
                     body: r.artist,
-                    thumbnailUrl: r.thumbnail,
+                    thumbnailUrl: thumb,
                     sourceUrl: r.spotify,
-                    mediaType: 2,
-                    renderLargerThumbnail: true
+                    mediaType: 1,
+                    renderLargerThumbnail: true,
+                    showAdAttribution: false
                 }
             }
-        }, { quoted: m })
+        }, { quoted: m });
+
+        await sendSpotify(conn, m.chat, m, r);
 
     } catch (e) {
         await m.reply(`❌ Gagal: ${e.message}`)
@@ -97,5 +108,37 @@ async function spotifydl(spotifyUrl) {
             status: false,
             message: err.message
         }
+    }
+}
+
+async function sendSpotify(conn, chat, m, r) {
+    try {
+        await conn.sendMessage(chat, {
+            audio: {
+                url: r.audio
+            },
+            mimetype: 'audio/mpeg',
+            fileName: `${r.title}.mp3`,
+            ptt: false
+        }, { quoted: m })
+
+        return true
+
+    } catch (e) {
+        console.error('Audio failed, fallback document')
+
+        await conn.sendMessage(chat, {
+            document: {
+                url: r.audio
+            },
+            mimetype: 'audio/mpeg',
+            fileName: `${r.title}.mp3`,
+            caption:
+`🎵 ${r.title}
+
+👤 ${r.artist}`
+        }, { quoted: m })
+
+        return false
     }
 }
