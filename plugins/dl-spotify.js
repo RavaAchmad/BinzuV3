@@ -17,7 +17,6 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
         const r = data.result
 
-        const thumb = await getUrlBuffer(r.thumbnail)
         await conn.sendMessage(m.chat, {
             text:
         `🎵 *Spotify Downloader*
@@ -31,7 +30,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
                 externalAdReply: {
                     title: r.title,
                     body: r.artist,
-                    thumbnailUrl: thumb,
+                    thumbnailUrl: r.thumbnail,
                     sourceUrl: r.spotify,
                     mediaType: 1,
                     renderLargerThumbnail: true,
