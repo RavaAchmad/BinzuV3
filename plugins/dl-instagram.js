@@ -111,8 +111,6 @@ async function downloadInstagram(instagramUrl) {
         }
     };
 }
-const axios = require('axios');
-
 async function igdlrava(instagramUrl) {
     const api_base = 'https://ravaja.my.id/api/download/instagram/v1';
 
