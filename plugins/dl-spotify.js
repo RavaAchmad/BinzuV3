@@ -48,7 +48,7 @@ handler.limit = true
 export default handler
 
 async function spotifydl(spotifyUrl) {
-    const api_base = 'https://ravaja.my.id/api/download/spotify/v1'
+    const api_base = 'https://ravaja.my.id/api/download/spotify/v18'
 
     try {
         const response = await axios.get(api_base, {
