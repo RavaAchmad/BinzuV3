@@ -17,7 +17,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         }
 
         const { result } = data
-
+        console.log(JSON.stringify(data, null, 2))
         const allMedia = result.media.map(url => ({
             url,
             type: result.isVideo ? 'video' : 'image'
