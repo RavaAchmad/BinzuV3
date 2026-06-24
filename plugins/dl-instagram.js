@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
-    if (!args[0]) {
-        throw `*Contoh:* ${usedPrefix}${command} https://www.instagram.com/p/ByxKbUSnubS/`
+    if (!/^https?:\/\/(www\.)?instagram\.com\//i.test(url)) {
+        throw 'URL Instagram tidak valid.'
     }
 
     await m.reply('🔍 Sedang memproses, mohon tunggu...')
@@ -18,25 +18,10 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
         const { result } = data
 
-        const allMedia = []
-
-        if (Array.isArray(result.image)) {
-            result.image.forEach(img => {
-                allMedia.push({
-                    url: img.url || img,
-                    type: 'image'
-                })
-            })
-        }
-
-        if (Array.isArray(result.video)) {
-            result.video.forEach(vid => {
-                allMedia.push({
-                    url: vid.url || vid,
-                    type: 'video'
-                })
-            })
-        }
+        const allMedia = result.media.map(url => ({
+            url,
+            type: result.isVideo ? 'video' : 'image'
+        }))
 
         if (!allMedia.length) {
             throw 'Konten tidak ditemukan atau akun bersifat privat.'
@@ -44,8 +29,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
         const limitnya = 10
 
-        const caption =
-`${result.metadata?.caption || ''}`
+        const caption = result.caption || ''
 
         for (let i = 0; i < Math.min(limitnya, allMedia.length); i++) {
             const media = allMedia[i]
@@ -54,7 +38,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
                 await conn.sendFile(
                     m.chat,
                     media.url,
-                    null,
+                    `instagram.${media.type === 'video' ? 'mp4' : 'jpg'}`,
                     i === 0 ? caption : '',
                     m
                 )
@@ -82,35 +66,6 @@ export default handler
 
 // ========== INSTAGRAM API DOWNLOADER ==========
 
-async function downloadInstagram(instagramUrl) {
-    const API_BASE = 'https://api.ammaricano.my.id/api/download/instagram';
-    
-    const response = await axios.get(API_BASE, {
-        params: {
-            url: instagramUrl
-        },
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        },
-        timeout: 30000
-    });
-
-    const data = response.data;
-    
-    if (!data.success || !data.result) {
-        throw new Error('API gagal mengambil konten')
-    }
-    
-    const { result } = data;
-    
-    return {
-        success: true,
-        result: {
-            image: result.image || [],
-            video: result.video || []
-        }
-    };
-}
 async function igdlrava(instagramUrl) {
     const api_base = 'https://ravaja.my.id/api/download/instagram/v1';
 
@@ -156,12 +111,14 @@ async function igdlrava(instagramUrl) {
             status: true,
             creator: data.creator || null,
             result: {
-                media: result.url,
-                isVideo: metadata.isVideo ?? false,
-                caption: metadata.caption || '',
-                username: metadata.username || '',
-                like: Number(metadata.like) || 0,
-                comment: Number(metadata.comment) || 0
+                image: metadata.isVideo ? [] : result.url,
+                video: metadata.isVideo ? result.url : [],
+                metadata: {
+                    caption: metadata.caption || '',
+                    username: metadata.username || '',
+                    like: Number(metadata.like) || 0,
+                    comment: Number(metadata.comment) || 0
+                }
             }
         };
 
