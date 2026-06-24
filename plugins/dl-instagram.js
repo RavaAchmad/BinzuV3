@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
-    if (!/^https?:\/\/(www\.)?instagram\.com\//i.test(url)) {
+    if (!/^https?:\/\/(www\.)?instagram\.com\//i.test(args[0])) {
         throw 'URL Instagram tidak valid.'
     }
 
