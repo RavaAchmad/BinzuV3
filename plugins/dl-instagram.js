@@ -1,68 +1,70 @@
 import axios from 'axios';
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
-    if (!args[0]) throw `*Contoh:* ${usedPrefix}${command} https://www.instagram.com/p/ByxKbUSnubS/`
-    
+    if (!args[0]) {
+        throw `*Contoh:* ${usedPrefix}${command} https://www.instagram.com/p/ByxKbUSnubS/`
+    }
+
     await m.reply('🔍 Sedang memproses, mohon tunggu...')
 
     try {
-        let url = args[0]
-        let data;
+        const url = args[0]
 
-        try {
-            data = await downloadInstagram(url)
-        } catch (e) {
-            throw 'Gagal mengambil data dari API. Coba lagi nanti.'
+        const data = await igdlrava(url)
+
+        if (!data?.status) {
+            throw (data?.message || 'Tidak ada data yang ditemukan.')
         }
 
-        if (!data || !data.success) {
-            throw data?.error || 'Tidak ada data yang ditemukan.'
-        }
-        
-        const { result } = data;
-        const allMedia = [];
-        
-        // Kumpulkan semua media (image dan video)
-        if (result.image && Array.isArray(result.image) && result.image.length > 0) {
+        const { result } = data
+
+        const allMedia = []
+
+        if (Array.isArray(result.image)) {
             result.image.forEach(img => {
                 allMedia.push({
                     url: img.url || img,
                     type: 'image'
-                });
-            });
+                })
+            })
         }
-        
-        if (result.video && Array.isArray(result.video) && result.video.length > 0) {
+
+        if (Array.isArray(result.video)) {
             result.video.forEach(vid => {
                 allMedia.push({
                     url: vid.url || vid,
                     type: 'video'
-                });
-            });
+                })
+            })
         }
 
-        if (allMedia.length === 0) {
-            throw 'Konten tidak ditemukan atau url bersifat privat.'
+        if (!allMedia.length) {
+            throw 'Konten tidak ditemukan atau akun bersifat privat.'
         }
 
-        const limitnya = 10;
-        
+        const limitnya = 10
+
+        const caption =
+`${result.metadata?.caption || ''}`
+
         for (let i = 0; i < Math.min(limitnya, allMedia.length); i++) {
-            let fileUrl = allMedia[i].url
-            let fileType = allMedia[i].type === 'video' ? '🎥 Video' : '🖼️ Foto'
-            
-            if (i > 0) await sleep(150);
+            const media = allMedia[i]
 
             try {
                 await conn.sendFile(
-                    m.chat, 
-                    fileUrl, 
-                    null, 
-                    `*Instagram Downloader*\n${fileType} (${i + 1}/${Math.min(limitnya, allMedia.length)})`, 
+                    m.chat,
+                    media.url,
+                    null,
+                    i === 0 ? caption : '',
                     m
                 )
-            } catch (sendErr) {
-                //
+
+                if (i < allMedia.length - 1) {
+                    await new Promise(r => setTimeout(r, 500))
+                }
+
+            } catch (err) {
+                console.error('Send media failed:', err)
             }
         }
 
@@ -108,6 +110,69 @@ async function downloadInstagram(instagramUrl) {
             video: result.video || []
         }
     };
+}
+const axios = require('axios');
+
+async function igdlrava(instagramUrl) {
+    const api_base = 'https://ravaja.my.id/api/download/instagram/v1';
+
+    try {
+        const response = await axios.get(api_base, {
+            params: {
+                url: instagramUrl,
+                apikey: 'ravaja'
+            },
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            },
+            timeout: 30000
+        });
+
+        const data = response.data;
+
+        // Validasi level 1
+        if (!data || typeof data !== 'object') {
+            throw new Error('Response API tidak valid');
+        }
+
+        // Validasi level 2
+        if (data.status !== 200) {
+            throw new Error(`API Error (${data.status})`);
+        }
+
+        // Validasi level 3
+        if (!data.result?.result) {
+            throw new Error('Data result tidak ditemukan');
+        }
+
+        const result = data.result.result;
+
+        // Validasi URL media
+        if (!Array.isArray(result.url) || result.url.length === 0) {
+            throw new Error('Media tidak ditemukan');
+        }
+
+        const metadata = result.metadata || {};
+
+        return {
+            status: true,
+            creator: data.creator || null,
+            result: {
+                media: result.url,
+                isVideo: metadata.isVideo ?? false,
+                caption: metadata.caption || '',
+                username: metadata.username || '',
+                like: Number(metadata.like) || 0,
+                comment: Number(metadata.comment) || 0
+            }
+        };
+
+    } catch (err) {
+        return {
+            status: false,
+            message: err.message
+        };
+    }
 }
 
 function sleep(ms) {
