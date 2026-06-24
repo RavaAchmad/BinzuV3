@@ -18,10 +18,21 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
         const { result } = data
         console.log(JSON.stringify(data, null, 2))
-        const allMedia = result.media.map(url => ({
-            url,
-            type: result.isVideo ? 'video' : 'image'
-        }))
+        const allMedia = []
+
+        for (const img of (result.image || [])) {
+            allMedia.push({
+                url: img,
+                type: 'image'
+            })
+        }
+
+        for (const vid of (result.video || [])) {
+            allMedia.push({
+                url: vid,
+                type: 'video'
+            })
+        }
 
         if (!allMedia.length) {
             throw 'Konten tidak ditemukan atau akun bersifat privat.'
@@ -29,7 +40,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
         const limitnya = 10
 
-        const caption = result.caption || ''
+        const caption = result.metadata?.caption || ''
 
         for (let i = 0; i < Math.min(limitnya, allMedia.length); i++) {
             const media = allMedia[i]
