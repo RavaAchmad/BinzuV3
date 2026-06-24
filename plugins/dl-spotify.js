@@ -1,7 +1,6 @@
 import axios from 'axios'
 import {
-    getUrlBuffer,
-    generateWAMessageContent
+    getUrlBuffer
 } from 'baileys_helpers'
 
 let handler = async (m, { conn, args, usedPrefix, command }) => {
