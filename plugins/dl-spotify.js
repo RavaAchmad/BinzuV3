@@ -10,6 +10,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
     try {
         const data = await spotifydl(args[0])
 
+        console.log(JSON.stringify(data, null, 2))
         if (!data?.status) {
             throw new Error(data?.message || 'Download gagal')
         }

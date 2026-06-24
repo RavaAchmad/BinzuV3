@@ -17,7 +17,6 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
         }
 
         const { result } = data
-        console.log(JSON.stringify(data, null, 2))
         const allMedia = []
 
         for (const img of (result.image || [])) {
